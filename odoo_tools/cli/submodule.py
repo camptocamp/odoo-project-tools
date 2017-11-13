@@ -13,6 +13,7 @@ from invoke import exceptions, task
 
 from .common import (
     GIT_C2C_REMOTE_NAME,
+    MIGRATION_FILE,
     PENDING_MERGES_DIR,
     ask_confirmation,
     ask_or_abort,
@@ -23,6 +24,7 @@ from .common import (
     get_migration_file_modules,
     root_path,
 )
+from .module import Module
 
 try:
     import git_aggregator.config
@@ -920,11 +922,27 @@ def remove_pending(ctx, entity_url):
         repo.update_merges_config(config)
 
 
+def get_dependency_module_list(modules):
+    """ Get dependency modules from a list of modules
+    construct the dependency list from existing modules in addons_path
+
+    """
+    todo = modules[:]
+    deps = []
+    while todo:
+        current = todo.pop()
+        for d in Module(current).get_dependencies():
+            if d not in modules and d not in deps and d not in todo:
+                todo.append(d)
+                deps.append(d)
+    return deps
+
+
 @task
 def list_external_dependencies_installed(ctx, submodule_path):
-    """List installed modules a specific directory.
+    """List installed modules of a specific directory.
 
-        Compare the modules one the submodule path with the installed
+        Compare the modules in the submodule path against the installed
         module in odoo/migration.yml.
 
         eg:
@@ -939,19 +957,38 @@ def list_external_dependencies_installed(ctx, submodule_path):
 
           so contain account_cutoff_base + account_cutoff_prepaid are returned
 
-        # TODO: to cherry-pick things from odoo-template/pull/134
-        # TODO: create inverse methode -> for all installed modules retrive
-            the external path
     """
-    migration_modules = get_migration_file_modules('odoo/migration.yml')
-    print(
-        "\nInstalled modules for {} :\n".format(submodule_path.split('/')[-1])
-    )
+    migration_modules = get_migration_file_modules(MIGRATION_FILE)
+    print("\nInstalled modules from {}:\n".format(submodule_path))
+    modules = []
     with cd(submodule_path):
         for mod in os.listdir():
             if mod in migration_modules:
+                modules.append(mod)
                 print("\t- " + mod)
-    print('\nCAREFULL /!\\ \nDependencies are not included in this list')
+
+    # Construct a dependency name list by submodule
+    submodules = {}
+    deps = get_dependency_module_list(modules)
+    for dep in deps:
+        sub = Module(dep).dir
+        if sub in modules:
+            continue
+        if sub not in submodules:
+            submodules[sub] = []
+        submodules[sub].append(dep)
+
+    if not submodules:
+        return
+    print("\n\nDependencies:")
+    submodule_names = submodules.keys()
+    submodule_names = sorted(submodule_names)
+    # Display dependencies
+    for sub in submodule_names:
+        deps = submodules[sub]
+        print("\n{} :".format(sub))
+        for mod in deps:
+            print("\t- " + mod)
 
 
 def _get_current_commit_from_submodule(ctx, path):
