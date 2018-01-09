@@ -2,14 +2,22 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 from __future__ import print_function
 
+import logging
+import re
+
 from itertools import chain
 
 from invoke import task, exceptions
+import git_aggregator.config
+import git_aggregator.main
+import git_aggregator.repo
+
 from .common import (
     cookiecutter_context,
     cd,
     build_path,
     root_path,
+    ask_or_abort,
 )
 
 
@@ -76,3 +84,76 @@ def list(ctx, dockerfile=True):
         print(template % (', \\\n'.join(lines)))
     else:
         print(content)
+
+
+@task
+def merges(ctx, submodule_path, push=True):
+    """ Regenerate a pending branch for a submodule
+
+    It reads pending-merges.yaml, runs gitaggregator on the submodule and
+    pushes the new branch on
+    camptocamp/merge-branch-<project_id>-<branch>
+
+    By default, the branch is pushed on the camptocamp remote, but you
+    can disable the push with ``--no-push``.
+
+    Example:
+    1. Run: git checkout -b my-new-feature-branch
+    2. Add pending-merge in odoo/pending-merges.yaml
+    3. Run: invoke submodule.merges odoo/external-src/sale-workflow
+    4. Run: git add odoo/pending-merges.yaml odoo/external-src/sale-workflow
+    5. Run: git commit -m"add PR #XX in sale-workflow"
+    6. Create pull request for inclusion in master branch
+
+    Beware, if you changed the remote of the submodule, you still need
+    to edit it manually in the ``.gitmodules`` file.
+
+    """
+    git_aggregator.main.setup_logger()
+    repositories = git_aggregator.config.load_config(
+        build_path('odoo/pending-merges.yaml')
+    )
+    relative_path = submodule_path.lstrip('odoo/')
+    for repo_dict in repositories:
+        repo = git_aggregator.repo.Repo(**repo_dict)
+        if git_aggregator.main.match_dir(repo.cwd, relative_path):
+            break
+    branch = ctx.run('git symbolic-ref --short HEAD', hide=True).stdout.strip()
+    project_id = cookiecutter_context()['project_id']
+    commit = ctx.run('git rev-parse HEAD', hide=True).stdout.strip()[:8]
+    target = 'merge-branch-{}-{}-{}'.format(project_id, branch, commit)
+
+    if branch == 'master' or re.match(r'\d{1,2}.\d', branch):
+        ask_or_abort('You are on branch {}.'
+                     ' Please confirm override of target branch {}'.format(
+                         branch, target
+                     ))
+
+    print('Building and pushing to camptocamp/{}'.format(target))
+    print()
+    repo.cwd = build_path(submodule_path)
+    repo.target['branch'] = target
+    repo.aggregate()
+    if push:
+        repo.push()
+
+
+@task
+def show_closed_prs(ctx, submodule_path=None):
+    """ Show all closed pull requests in pending merges """
+    git_aggregator.main.setup_logger()
+    logging.getLogger('requests').setLevel(logging.ERROR)
+    repositories = git_aggregator.config.load_config(
+        build_path('odoo/pending-merges.yaml')
+    )
+    if submodule_path:
+        submodule_path = submodule_path.lstrip('odoo/')
+    for repo_dict in repositories:
+        repo = git_aggregator.repo.Repo(**repo_dict)
+        if not git_aggregator.main.match_dir(repo.cwd, submodule_path):
+            continue
+        try:
+            repo.show_closed_prs()
+        except AttributeError:
+            print('You need to upgrade git-aggregator.'
+                  ' This function is available since 1.2.0.')
