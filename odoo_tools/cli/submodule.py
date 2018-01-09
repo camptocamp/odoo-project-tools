@@ -8,9 +8,12 @@ import re
 from itertools import chain
 
 from invoke import task, exceptions
-import git_aggregator.config
-import git_aggregator.main
-import git_aggregator.repo
+try:
+    import git_aggregator.config
+    import git_aggregator.main
+    import git_aggregator.repo
+except ImportError:
+    print('Please install git-aggregator')
 
 from .common import (
     cookiecutter_context,
