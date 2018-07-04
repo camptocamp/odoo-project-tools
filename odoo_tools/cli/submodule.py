@@ -23,6 +23,11 @@ from .common import (
     ask_or_abort,
 )
 
+BRANCH_EXCLUDE = """
+branches:
+  except:
+    - /^merge-branch-.*$/
+"""
 
 @task
 def init(ctx):
@@ -137,8 +142,28 @@ def merges(ctx, submodule_path, push=True):
     repo.cwd = build_path(submodule_path)
     repo.target['branch'] = target
     repo.aggregate()
+    edit_travis_yml(repo)
+    commit_travis_yml(repo)
     if push:
         repo.push()
+
+
+def edit_travis_yml(ctx, repo):
+    """
+    add config options in .travis.yml file in order to
+    prevent travis to run on some branches
+    """
+    travis_file = "{}/.travis.yml".format(repo.cwd)
+    print("Writing exclude branch option in {}".format(travis_file)
+    with open(TRAVIS_FILE, 'a') as travis:
+        travis.write(BRANCH_EXCLUDE)
+
+
+def commit_travis_yml(ctx, repo):
+    commit = ctx.run(
+        'git commit {} -m "Travis: exclude new branch from build"'.format(
+            travis_file, hide=True).stdout.strip()[:8]
+    print("Committed in {}".format(commit)
 
 
 @task
