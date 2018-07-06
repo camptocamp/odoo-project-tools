@@ -142,28 +142,32 @@ def merges(ctx, submodule_path, push=True):
     repo.cwd = build_path(submodule_path)
     repo.target['branch'] = target
     repo.aggregate()
-    edit_travis_yml(repo)
-    commit_travis_yml(repo)
+    edit_travis_yml(ctx, repo)
+    commit_travis_yml(ctx, repo)
     if push:
         repo.push()
 
+
+def travis_filepath(repo):
+    return "{}/.travis.yml".format(repo.cwd.rstrip('/'))
 
 def edit_travis_yml(ctx, repo):
     """
     add config options in .travis.yml file in order to
     prevent travis to run on some branches
     """
-    travis_file = "{}/.travis.yml".format(repo.cwd)
-    print("Writing exclude branch option in {}".format(travis_file)
-    with open(TRAVIS_FILE, 'a') as travis:
+    tf = travis_filepath(repo)
+    print("Writing exclude branch option in {}".format(tf))
+    with open(tf, 'a') as travis:
         travis.write(BRANCH_EXCLUDE)
 
 
 def commit_travis_yml(ctx, repo):
-    commit = ctx.run(
-        'git commit {} -m "Travis: exclude new branch from build"'.format(
-            travis_file, hide=True).stdout.strip()[:8]
-    print("Committed in {}".format(commit)
+    with cd(repo.cwd):
+        tf = '.travis.yml'
+        cmd = 'git commit {} -m "Travis: exclude new branch from build"'
+        commit = ctx.run(cmd.format(tf), hide=True)
+        print("Committed as:\n{}".format(commit.stdout.strip()))
 
 
 @task
