@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import logging
 import re
-
+import os
 from itertools import chain
 
 from invoke import task, exceptions
@@ -163,8 +163,11 @@ def edit_travis_yml(ctx, repo):
 
 
 def commit_travis_yml(ctx, repo):
+    tf = '.travis.yml'
+    if not os.path.exists(repo.cwd + tf):
+        print(repo.cwd + tf, 'does not exists. Skipping travis exclude commit')
+        return
     with cd(repo.cwd):
-        tf = '.travis.yml'
         cmd = 'git commit {} -m "Travis: exclude new branch from build"'
         commit = ctx.run(cmd.format(tf), hide=True)
         print("Committed as:\n{}".format(commit.stdout.strip()))
