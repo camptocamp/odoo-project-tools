@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import logging
 import re
+import os
 
 from itertools import chain
 
@@ -16,11 +17,13 @@ except ImportError:
     print('Please install git-aggregator')
 
 from .common import (
+    PENDING_MERGES,
     cookiecutter_context,
     cd,
     build_path,
     root_path,
     ask_or_abort,
+    exit_msg,
 )
 
 BRANCH_EXCLUDE = """
@@ -107,9 +110,9 @@ def merges(ctx, submodule_path, push=True):
 
     Example:
     1. Run: git checkout -b my-new-feature-branch
-    2. Add pending-merge in odoo/pending-merges.yaml
+    2. Add pending-merge in pending-merges.yml
     3. Run: invoke submodule.merges odoo/external-src/sale-workflow
-    4. Run: git add odoo/pending-merges.yaml odoo/external-src/sale-workflow
+    4. Run: git add pending-merges.yml odoo/external-src/sale-workflow
     5. Run: git commit -m"add PR #XX in sale-workflow"
     6. Create pull request for inclusion in master branch
 
@@ -118,8 +121,16 @@ def merges(ctx, submodule_path, push=True):
 
     """
     git_aggregator.main.setup_logger()
+
+    # check if there's a migration file at the old path
+    if os.path.exists('odoo/pending-merges.yaml'):
+        # notify ppl that this file was moved
+        exit_msg(
+            'Found a file in \'odoo/pending-merges.yaml\'.'
+            'Please run `invoke deprecate.move-pending-merges\' task first.')
+
     repositories = git_aggregator.config.load_config(
-        build_path('odoo/pending-merges.yaml')
+        build_path(PENDING_MERGES)
     )
     relative_path = submodule_path.lstrip('odoo/')
     for repo_dict in repositories:
@@ -176,7 +187,7 @@ def show_closed_prs(ctx, submodule_path=None):
     git_aggregator.main.setup_logger()
     logging.getLogger('requests').setLevel(logging.ERROR)
     repositories = git_aggregator.config.load_config(
-        build_path('odoo/pending-merges.yaml')
+        build_path(PENDING_MERGES)
     )
     if submodule_path:
         submodule_path = submodule_path.lstrip('odoo/')
