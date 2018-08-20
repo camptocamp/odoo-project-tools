@@ -127,7 +127,7 @@ def merges(ctx, submodule_path, push=True):
         # notify ppl that this file was moved
         exit_msg(
             'Found a file in \'odoo/pending-merges.yaml\'.'
-            ' Please run `invoke deprecate.move-pending-merges\' task first.')
+            'Please run `invoke deprecate.move-pending-merges\' task first.')
 
     repositories = git_aggregator.config.load_config(
         build_path(PENDING_MERGES)
