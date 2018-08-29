@@ -203,11 +203,16 @@ def show_closed_prs(ctx, submodule_path=None):
 
 
 @task
-def update(ctx, submodule_path):
-    """Synchronize and update every registered submodule
+def update(ctx, submodule_path=None):
+    """Synchronize and update given submodule path
 
-    :param submodule_path: submodule marked for a precise sync & update
+    :param submodule_path: submodule path for a precise sync & update
     """
+    sync_cmd = 'git submodule sync'
+    update_cmd = 'git submodule update --init'
+    if submodule_path is not None:
+        sync_cmd += ' -- {}'.format(submodule_path)
+        update_cmd += ' -- {}'.format(submodule_path)
     with cd(root_path()):
-        ctx.run('git submodule sync -- {}'.format(submodule_path))
-        ctx.run('git submodule update --init -- {}'.format(submodule_path))
+        ctx.run(sync_cmd)
+        ctx.run(update_cmd)
