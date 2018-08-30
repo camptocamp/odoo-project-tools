@@ -189,3 +189,19 @@ def show_closed_prs(ctx, submodule_path=None):
         except AttributeError:
             print('You need to upgrade git-aggregator.'
                   ' This function is available since 1.2.0.')
+
+
+@task
+def update(ctx, submodule_path=None):
+    """Synchronize and update given submodule path
+
+    :param submodule_path: submodule path for a precise sync & update
+    """
+    sync_cmd = 'git submodule sync'
+    update_cmd = 'git submodule update --init'
+    if submodule_path is not None:
+        sync_cmd += ' -- {}'.format(submodule_path)
+        update_cmd += ' -- {}'.format(submodule_path)
+    with cd(root_path()):
+        ctx.run(sync_cmd)
+        ctx.run(update_cmd)
