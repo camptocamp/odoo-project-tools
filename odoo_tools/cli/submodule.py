@@ -193,7 +193,7 @@ def edit_travis_yml(ctx, repo):
 
 def commit_travis_yml(ctx, repo):
     tf = '.travis.yml'
-    if not os.path.exists(repo.cwd + tf):
+    if not os.path.exists(repo.cwd.rstrip('/') + '/' + tf):
         print(repo.cwd + tf, 'does not exists. Skipping travis exclude commit')
         return
     with cd(repo.cwd):
