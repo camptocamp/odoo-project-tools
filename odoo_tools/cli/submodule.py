@@ -16,12 +16,14 @@ except ImportError:
     print('Please install git-aggregator')
 
 from .common import (
+    ask_or_abort,
+    build_path,
     cookiecutter_context,
     cd,
-    build_path,
-    root_path,
-    ask_or_abort,
+    exit_msg,
     get_aggregator_repo,
+    get_aggregator_repositories,
+    root_path,
 )
 
 BRANCH_EXCLUDE = """
@@ -207,20 +209,20 @@ def show_closed_prs(ctx, submodule_path=None):
     """ Show all closed pull requests in pending merges """
     git_aggregator.main.setup_logger()
     logging.getLogger('requests').setLevel(logging.ERROR)
-    repositories = git_aggregator.config.load_config(
-        build_path('odoo/pending-merges.yaml')
-    )
-    if submodule_path:
+    if submodule_path is None:
+        repositories = get_aggregator_repositories()
+    else:
         submodule_path = submodule_path.lstrip('odoo/')
-    for repo_dict in repositories:
-        repo = git_aggregator.repo.Repo(**repo_dict)
-        if not git_aggregator.main.match_dir(repo.cwd, submodule_path):
-            continue
-        try:
+        repositories = [get_aggregator_repo(submodule_path)]
+    if not repositories:
+        exit_msg('No repo to check.')
+    try:
+        for repo in repositories:
+            print('Checking', repo.cwd)
             repo.show_closed_prs()
-        except AttributeError:
-            print('You need to upgrade git-aggregator.'
-                  ' This function is available since 1.2.0.')
+    except AttributeError:
+        print('You need to upgrade git-aggregator.'
+                ' This function is available since 1.2.0.')
 
 
 @task
