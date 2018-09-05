@@ -205,14 +205,17 @@ def commit_travis_yml(ctx, repo):
 
 
 @task
-def show_closed_prs(ctx, submodule_path=None):
-    """ Show all closed pull requests in pending merges """
+def show_closed_prs(ctx, submodule_path='all'):
+    """Show all closed pull requests in pending merges.
+
+    Pass nothing to check all submodules.
+    Pass `-s path/to/submodule` to check specific ones.
+    """
     git_aggregator.main.setup_logger()
     logging.getLogger('requests').setLevel(logging.ERROR)
-    if submodule_path is None:
+    if submodule_path == 'all':
         repositories = get_aggregator_repositories()
     else:
-        submodule_path = submodule_path.lstrip('odoo/')
         repositories = [get_aggregator_repo(submodule_path)]
     if not repositories:
         exit_msg('No repo to check.')
