@@ -151,8 +151,7 @@ def merges(ctx, submodule_path, push=True, target_branch=None):
     repo.target['branch'] = target_branch
     repo.aggregate()
 
-    edit_travis_yml(ctx, repo)
-    commit_travis_yml(ctx, repo)
+    process_travis_file(ctx, repo)
     if push:
         repo.push()
 
@@ -173,32 +172,22 @@ def push(ctx, submodule_path, target_branch=None):
     repo.target['branch'] = target_branch
     with cd(submodule_path):
         repo._switch_to_branch(target_branch)
-        edit_travis_yml(ctx, repo)
-        commit_travis_yml(ctx, repo)
+        process_travis_file(ctx, repo)
         repo.push()
 
 
-def travis_filepath(repo):
-    return "{}/.travis.yml".format(repo.cwd.rstrip('/'))
-
-
-def edit_travis_yml(ctx, repo):
-    """
-    add config options in .travis.yml file in order to
-    prevent travis to run on some branches
-    """
-    tf = travis_filepath(repo)
-    print("Writing exclude branch option in {}".format(tf))
-    with open(tf, 'a') as travis:
-        travis.write(BRANCH_EXCLUDE)
-
-
-def commit_travis_yml(ctx, repo):
+def process_travis_file(ctx, repo):
     tf = '.travis.yml'
-    if not os.path.exists(repo.cwd.rstrip('/') + '/' + tf):
-        print(repo.cwd + tf, 'does not exists. Skipping travis exclude commit')
-        return
     with cd(repo.cwd):
+        if not os.path.exists(tf):
+            print(repo.cwd + tf,
+                  'does not exists. Skipping travis exclude commit')
+            return
+
+        print("Writing exclude branch option in {}".format(tf))
+        with open(tf, 'a') as travis:
+            travis.write(BRANCH_EXCLUDE)
+
         cmd = 'git commit {} -m "Travis: exclude new branch from build"'
         commit = ctx.run(cmd.format(tf), hide=True)
         print("Committed as:\n{}".format(commit.stdout.strip()))
