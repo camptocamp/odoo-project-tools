@@ -28,19 +28,14 @@ import requests
 from invoke import exceptions, task
 
 from .common import (
-    GIT_REMOTE_NAME,
+    GIT_C2C_REMOTE_NAME,
     PENDING_MERGES_DIR,
     ask_confirmation,
     ask_or_abort,
     build_path,
-    build_github_remote_url,
     cd,
     cookiecutter_context,
     exit_msg,
-    get_aggregator_repo,
-    get_aggregator_repositories,
-    build_submodule_path,
-    build_submodule_merges_path,
     root_path,
 )
 
@@ -54,6 +49,7 @@ except ImportError:
 try:
     from ruamel.yaml import YAML
     from ruamel.yaml.comments import CommentedSeq
+    from ruamel.yaml.comments import CommentedMap
 except ImportError:
     print('Please install ruamel.yaml')
 
@@ -68,6 +64,128 @@ branches:
     - /^merge-branch-.*$/
 """
 yaml = YAML()
+
+git_aggregator.main.setup_logger()
+
+
+class Repo(object):
+    """Handle repository/submodule homogenously."""
+
+    def __init__(self, name_or_path, path_check=True):
+        self.path = self.build_submodule_path(name_or_path)
+        self.abs_path = build_path(self.path)
+        # ensure that given submodule is a mature submodule
+        self.merges_path = self.build_submodule_merges_path(self.path)
+        if path_check:
+            self._check_paths()
+        self.name = self._safe_module_name(name_or_path)
+
+    def _check_paths(self):
+        if not os.path.exists(os.path.join(self.path, '.git')):
+            exit_msg(
+                'GIT CONFIG NOT FOUND. '
+                '{} does not look like a mature repository. '
+                'Aborting.'.format(self.path)
+            )
+        if not os.path.exists(self.merges_path):
+            exit_msg('NOT FOUND `{}\'.'.format(self.merges_path))
+
+    @classmethod
+    def _safe_module_name(cls, name_or_path):
+        return name_or_path.rstrip('/').rsplit('/', 1)[-1]
+
+    @classmethod
+    def build_submodule_path(cls, name_or_path):
+        """Return a submodule path by a submodule name."""
+        submodule_name = cls._safe_module_name(name_or_path)
+        is_src = submodule_name in ('odoo', 'ocb', 'src')
+        if is_src:
+            relative_path = 'odoo/src'
+        else:
+            relative_path = 'odoo/external-src/{}'.format(submodule_name)
+        return relative_path
+
+    @classmethod
+    def build_submodule_merges_path(cls, name_or_path):
+        """Return a pending-merges file for a given submodule.
+
+        :param submodule: either a full path or a bare submodule name,
+        as it is known at Github (i.e., `odoo` would stand for `odoo/src`)
+        """
+        submodule_name = cls._safe_module_name(name_or_path)
+        if submodule_name.lower() in ('odoo', 'ocb'):
+            submodule_name = 'src'
+        relative_path = '{}/{}.yml'.format(PENDING_MERGES_DIR, submodule_name)
+        return build_path(relative_path)
+
+    def aggregator_config(self):
+        return git_aggregator.config.load_config(self.merges_path)[0]
+
+    def get_aggregator(self, **extra_config):
+        repo_config = self.aggregator_config()
+        repo_config.update(extra_config)
+        repo = git_aggregator.repo.Repo(**repo_config)
+        repo.cwd = self.abs_path
+        return repo
+
+    @classmethod
+    def repositories_from_pending_folder(cls, path=None):
+        path = path or PENDING_MERGES_DIR
+        for root, dirs, files in os.walk(path):
+            repo_names = [
+                os.path.splitext(fname)[0]
+                for fname in files
+                if fname.endswith('.yml')
+            ]
+        return [cls(name) for name in repo_names]
+
+    def has_pending_merges(self):
+        found = os.path.exists(self.merges_path)
+        if not found:
+            return False
+        # either empty or commented out
+        return bool(self.merges_config())
+
+    def merges_config(self):
+        with open(self.merges_path) as f:
+            data = yaml.load(f.read()) or {}
+            submodule_relpath = os.path.join(os.path.pardir, self.path)
+            return data.get(submodule_relpath, {})
+
+    def update_merges_config(self, config):
+        # get former config if any
+        if os.path.exists(self.merges_path):
+            with open(self.merges_path, 'r') as f:
+                data = yaml.load(f.read())
+        else:
+            data = {}
+        submodule_relpath = os.path.join(os.path.pardir, self.path)
+        data[submodule_relpath] = config
+        with open(self.merges_path, 'w') as f:
+            yaml.dump(data, f)
+
+    def api_url(self):
+        return 'https://api.github.com/repos/{}/{}'.format(
+            GIT_C2C_REMOTE_NAME, self.name)
+
+    def ssh_url(self, namespace):
+        return self.build_ssh_url(namespace, self.name)
+
+    @classmethod
+    def build_ssh_url(cls, namespace, repo_name):
+        return 'git@github.com:{}/{}.git'.format(namespace, repo_name)
+
+
+def check_pending_merge_version():
+    # First of all, check if there's a migration file at the old path
+    if os.path.exists('odoo/pending-merges.yaml'):
+        # notify ppl that this file was moved, then terminate execution
+        exit_msg(
+            '##############################################################\n'
+            'Found file `odoo/pending-merges.yaml`.\n'
+            'Please run `invoke deprecate.split-pending-merges` task first.\n'
+            '##############################################################\n'
+        )
 
 
 def get_target_branch(ctx, target_branch=None):
@@ -93,7 +211,7 @@ def get_target_branch(ctx, target_branch=None):
 
 @task
 def init(ctx):
-    """ Add git submodules read in the .gitmodules files
+    """Add git submodules read in the .gitmodules files.
 
     Allow to edit the .gitmodules file, add all the repositories and
     run the command once to add all the submodules.
@@ -132,7 +250,7 @@ def init(ctx):
                   'of the Dockerfile format'
 })
 def list(ctx, dockerfile=True):
-    """ list git submodules paths
+    """List git submodules paths.
 
     It can be used to directly copy-paste the addons paths in the Dockerfile.
     The order depends of the order in the .gitmodules file.
@@ -172,62 +290,31 @@ def merges(ctx, submodule_path, push=True, target_branch=None):
 
     Example:
     1. Run: git checkout -b my-new-feature-branch
-    2. Add pending-merge in pending-merges.d/sale-workflow.yml
-    3. Run: invoke submodule.merges odoo/external-src/sale-workflow
-    4. Run: git add pending-merges.d/sale-workflow.yml odoo/external-src/sale-workflow
-    5. Run: git commit -m"add PR #XX in sale-workflow"
+    2. Add pending-merge in pending-merges.d/web.yml
+    3. Run: invoke submodule.merges odoo/external-src/web
+    4. Run: git add pending-merges.d/web.yml odoo/external-src/web
+    5. Run: git commit -m "add PR #XX in web"
     6. Create pull request for inclusion in master branch
 
     Beware, if you changed the remote of the submodule, you still need
     to edit it manually in the ``.gitmodules`` file.
     """
-    # First of all, check if there's a migration file at the old path
-    if os.path.exists('odoo/pending-merges.yaml'):
-        # notify ppl that this file was moved, then terminate execution
-        exit_msg(
-            'Found a file in \'odoo/pending-merges.yaml\'.'
-            ' Please run `invoke deprecate.move-pending-merges\' task first.')
 
-    # ensure that given submodule is a mature submodule
-    if not os.path.exists(os.path.join(submodule_path, '.git')):
-        exit_msg('{} does not look like a mature repository. Aborting.'.format(
-            submodule_path))
+    check_pending_merge_version()
+    repo = Repo(submodule_path)
 
-    # Second: check if there's a config for the requested repo around
-    # we only need a repo name, actually, not the full path
-    repo_merges_file = build_submodule_merges_path(submodule_path)
-    if not os.path.exists(repo_merges_file):
-        exit_msg('Nothing to push for `{}\'.'.format(submodule_path))
-    # Aight, we good to go here.
-    git_aggregator.main.setup_logger()
-
-    # as there's only one repo config per file
-    # resolve the target for a push
-    project_id = cookiecutter_context()['project_id']
-    # branch of the master repository, this has nothing to do w/ the submodule
-    branch = ctx.run('git symbolic-ref --short HEAD', hide=True).stdout.strip()
-    commit_hash = ctx.run('git rev-parse HEAD', hide=True).stdout.strip()[:8]
-    target = 'merge-branch-{}-{}-{}'.format(project_id, branch, commit_hash)
-
-    if branch == 'master' or re.match(r'^\d{1,2}\.\d$', branch):
-        ask_or_abort(
-            'You are on branch {}. Please confirm override of target branch {}'
-            .format(branch, target))
-
+    target_branch = get_target_branch(ctx, target_branch=target_branch)
     print('Building and pushing to camptocamp/{}'.format(target_branch))
     print()
-    repo_config = git_aggregator.config.load_config(repo_merges_file)[0]
-    repo_config['target'] = {
-        'branch': target,
-        'remote': GIT_REMOTE_NAME,
-    }
-    repo = git_aggregator.repo.Repo(**repo_config)
-    repo.cwd = build_path(submodule_path)
-    repo.aggregate()
+    aggregator = repo.get_aggregator(target={
+        'branch': target_branch,
+        'remote': GIT_C2C_REMOTE_NAME,
+    })
+    aggregator.aggregate()
 
     process_travis_file(ctx, repo)
     if push:
-        repo.push()
+        aggregator.push()
 
 
 @task
@@ -237,24 +324,26 @@ def push(ctx, submodule_path, target_branch=None):
     Pushes the current state of your submodule to the target remote and branch
     either given by you or specified in pending-merges.yml
     """
-    git_aggregator.main.setup_logger()
-    repo = get_aggregator_repo(submodule_path)
-    target_branch = get_target_branch(ctx, target_branch)
-    print('Pushing to {}/{}'.format(repo.target['remote'], target_branch))
+    check_pending_merge_version()
+    repo = Repo(submodule_path)
+    target_branch = get_target_branch(ctx, target_branch=target_branch)
+    print('Pushing to camptocamp/{}'.format(target_branch))
     print()
-    repo.cwd = build_path(submodule_path)
-    repo.target['branch'] = target_branch
-    with cd(submodule_path):
-        repo._switch_to_branch(target_branch)
+    aggregator = repo.get_aggregator(target={
+        'branch': target_branch,
+        'remote': GIT_C2C_REMOTE_NAME,
+    })
+    with cd(repo.path):
+        aggregator._switch_to_branch(target_branch)
         process_travis_file(ctx, repo)
-        repo.push()
+        aggregator.push()
 
 
 def process_travis_file(ctx, repo):
     tf = '.travis.yml'
-    with cd(repo.cwd):
+    with cd(repo.abs_path):
         if not os.path.exists(tf):
-            print(repo.cwd + tf,
+            print(repo.abs_path + tf,
                   'does not exists. Skipping travis exclude commit')
             return
 
@@ -268,24 +357,25 @@ def process_travis_file(ctx, repo):
 
 
 @task
-def show_closed_prs(ctx, submodule_path='all'):
+def show_closed_prs(ctx, submodule_path=None):
     """Show all closed pull requests in pending merges.
 
     Pass nothing to check all submodules.
     Pass `-s path/to/submodule` to check specific ones.
     """
-    git_aggregator.main.setup_logger()
+    check_pending_merge_version()
     logging.getLogger('requests').setLevel(logging.ERROR)
-    if submodule_path == 'all':
-        repositories = get_aggregator_repositories()
+    if submodule_path is None:
+        repositories = Repo.repositories_from_pending_folder()
     else:
-        repositories = [get_aggregator_repo(submodule_path)]
+        repositories = [Repo(submodule_path)]
     if not repositories:
         exit_msg('No repo to check.')
     try:
         for repo in repositories:
-            print('Checking', repo.cwd)
-            repo.show_closed_prs()
+            aggregator = repo.get_aggregator()
+            print('Checking', aggregator.cwd)
+            aggregator.show_closed_prs()
     except AttributeError:
         print('You need to upgrade git-aggregator.'
               ' This function is available since 1.2.0.')
@@ -308,28 +398,31 @@ def update(ctx, submodule_path=None):
 
 
 @task
-def sync_remote(ctx, submodule_path, force_remote=False):
+def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
     """Use to alter remotes between camptocamp and upstream in .gitmodules.
 
     :param force_remote: explicit remote to add, if omitted, acts this way:
+
     * sets upstream to `camptocamp` if `merges` section of it's pending-merges
       file is populated
+
     * tries to guess upstream otherwise - for `odoo/src` path it is usually
       `OCA/OCB` repository, for anything else it would search for a fork in a
       `camptocamp` namespace and then set the upstream to fork's parent
+
     Mainly used as a post-execution step for add/remove-pending-merge but it's
     possible to call it directly from the command line.
     """
-    submodule_pending_merges_path = build_submodule_merges_path(submodule_path)
-    has_pending_merges = os.path.exists(submodule_pending_merges_path)
-
-    if has_pending_merges:
-        with open(submodule_pending_merges_path) as pending_merges:
+    check_pending_merge_version()
+    assert submodule_path or repo
+    repo = repo or Repo(submodule_path)
+    if repo.has_pending_merges():
+        with open(repo.merges_path) as pending_merges:
             # read everything we can reach
             # for reading purposes only
             data = yaml.load(pending_merges.read())
             submodule_pending_config = data[
-                os.path.join(os.path.pardir, submodule_path)
+                os.path.join(os.path.pardir, repo.path)
             ]
             merges_in_action = submodule_pending_config['merges']
             registered_remotes = submodule_pending_config['remotes']
@@ -337,39 +430,42 @@ def sync_remote(ctx, submodule_path, force_remote=False):
             if force_remote:
                 new_remote_url = registered_remotes[force_remote]
             elif merges_in_action:
-                new_remote_url = registered_remotes[GIT_REMOTE_NAME]
+                new_remote_url = registered_remotes[GIT_C2C_REMOTE_NAME]
             else:
                 new_remote_url = next(
                     remote for remote in registered_remotes.values()
-                    if remote != GIT_REMOTE_NAME)
+                    if remote != GIT_C2C_REMOTE_NAME)
     elif submodule_path == 'odoo/src':
         # special way to treat that particular submodule
         # TODO: ask user if it's preferred to use `odoo/odoo` instead?
         if ask_confirmation('Use odoo:odoo instead of OCA/OCB?'):
-            new_remote_url = build_github_remote_url('odoo', 'odoo')
+            new_remote_url = Repo.build_ssh_url('odoo', 'odoo')
         else:
-            new_remote_url = build_github_remote_url('OCA', 'OCB')
+            new_remote_url = Repo.build_ssh_url('OCA', 'OCB')
     else:
         # resolve what's the parent repository from which C2C consolidation
         # one was forked
-        submodule_name = submodule_path.split('/')[-1].strip()
-        response = requests.get(
-            'https://api.github.com/repos/{}/{}'
-            .format(GIT_REMOTE_NAME, submodule_name))
+        response = requests.get(repo.api_url())
         if response.ok:
-            new_remote_url \
-                = response.json().get('parent', {}).get('ssh_url')
+            info = response.json()
+            parent = info.get('parent', {})
+            if parent:
+                # resolve w/ parent repository
+                # C2C consolidation was forked from
+                new_remote_url = parent.get('ssh_url')
+            else:
+                # not a forked repo (eg: camptocamp/connector-jira)
+                new_remote_url = info.get('ssh_url')
         else:
             print("Couldn't reach Github API to resolve submodule upstream."
                   " Please provide it manually.")
-            default_repo = submodule_name.replace('_', '-')
+            default_repo = repo.name.replace('_', '-')
             new_namespace = input('Namespace [OCA]: ') or 'OCA'
             new_repo = input('Repo name [{}]: '.format(default_repo)) \
                 or default_repo
-            new_remote_url = build_github_remote_url(
-                new_namespace, new_repo)
+            new_remote_url = Repo.build_ssh_url(new_namespace, new_repo)
 
-    submodule_path = submodule_path.lstrip('./')
+    submodule_path = repo.path
     ctx.run('git config --file=.gitmodules submodule.{}.url {}'.format(
         submodule_path, new_remote_url))
     relative_name = submodule_path.replace('../', '')
@@ -379,22 +475,23 @@ def sync_remote(ctx, submodule_path, force_remote=False):
     print('Submodule {} is now being sourced from {}'.format(
         submodule_path, new_remote_url))
 
-    if has_pending_merges:
+    if repo.has_pending_merges():
         # we're being polite here, excode 1 doesn't apply to this answer
-        if not ask_confirmation(
-                'Rebuild consolidation branch for {}?'.format(relative_name)):
-            return
-
-        push = ask_confirmation('Push it to `{}\'?'.format(GIT_REMOTE_NAME))
+        ask_or_abort(
+            'Rebuild consolidation branch for {}?'.format(relative_name)
+        )
+        push = ask_confirmation(
+            'Push it to `{}\'?'.format(GIT_C2C_REMOTE_NAME))
         merges(ctx, relative_name, push=push)
     else:
+        odoo_version = cookiecutter_context()['odoo_version']
         if ask_confirmation(
-                'Submodule {} has no pending merges. Update it to {}?'
-                .format(relative_name, cookiecutter_context()['odoo_version'])
+            'Submodule {} has no pending merges. Update it to {}?'
+            .format(relative_name, odoo_version)
         ):
-            with cd(build_path(relative_name)):
-                os.system('git fetch origin {{cookiecutter.odoo_version}}')
-                os.system('git checkout origin/{{cookiecutter.odoo_version}}')
+            with cd(repo.abs_path):
+                os.system('git fetch origin {}'.format(odoo_version))
+                os.system('git checkout origin/{}'.format(odoo_version))
 
 
 def parse_github_url(entity_spec):
@@ -430,50 +527,50 @@ def parse_github_url(entity_spec):
     }
 
 
-def generate_pending_merges_file_template(
-        pending_mrg_filepath, upstream, repo_name):
-    # create a submodule merges file from template
-    # that should be either `odoo/src` or `odoo/external-src/<module>`
+def generate_pending_merges_file_template(repo, upstream):
+    """Create a submodule merges file from template.
 
+    That should be either `odoo/src` or `odoo/external-src/<module>`
+    """
     # could be that this is the first PM ever added to this project
     if not os.path.exists(PENDING_MERGES_DIR):
         os.makedirs(PENDING_MERGES_DIR)
 
-    remote_upstream_url = build_github_remote_url(upstream, repo_name)
-    remote_c2c_url = build_github_remote_url(GIT_REMOTE_NAME, repo_name)
-    submodule_path = os.path.join(
-        os.path.pardir, build_submodule_path(repo_name))
+    remote_upstream_url = repo.ssh_url(upstream)
+    remote_c2c_url = repo.ssh_url(GIT_C2C_REMOTE_NAME)
+    cc_context = cookiecutter_context()
+    odoo_version = cc_context['odoo_version']
+    default_target = 'merge-branch-{}-master'.format(cc_context['project_id'])
+    remotes = CommentedMap()
+    remotes.insert(0, upstream, remote_upstream_url)
+    if upstream != GIT_C2C_REMOTE_NAME:
+        # if origin is not the same: add c2c one
+        remotes.insert(0, GIT_C2C_REMOTE_NAME, remote_c2c_url)
+    config = CommentedMap()
+    config.insert(0, 'remotes', remotes)
+    config.insert(
+        1, 'target',
+        '{} {}'.format(GIT_C2C_REMOTE_NAME, default_target)
+    )
+    config.insert(2, 'merges', CommentedSeq([
+        '{} {}'.format(upstream, odoo_version)
+    ]))
+    repo.update_merges_config(config)
+
+
+def add_pending_pull_request(repo, conf, upstream, pull_id):
     odoo_version = cookiecutter_context().get('odoo_version')
-
-    template_content = '\n'.join([
-        '{}:'.format(submodule_path),
-        '  remotes:',
-        '    {}: {}'.format(upstream, remote_upstream_url),
-        '    {}: {}'.format(GIT_REMOTE_NAME, remote_c2c_url),
-        '  merges:',
-        '    - {} {}'.format(upstream, odoo_version),
-        '  target: {} {}'.format(GIT_REMOTE_NAME, 'dummy-target'),
-        '',
-    ])
-    with open(pending_mrg_filepath, 'w') as f:
-        # let `yaml` handle document structure
-        yaml.dump(yaml.load(template_content), f)
-
-
-def add_pending_pull_request(conf, upstream, repo_name, pull_id):
     pending_mrg_line = '{} refs/pull/{}/head'.format(upstream, pull_id)
-    pending_mrg_filepath = build_submodule_merges_path(repo_name)
+    if pending_mrg_line in conf.get('merges', {}):
+        exit_msg('Requested pending merge is mentioned in {} already'
+                 .format(repo.merges_path))
 
-    response = requests.get(
-        'https://api.github.com/repos/'
-        '{upstream}/{repo_name}/pulls/{pull_id}'
-        .format(**locals()))
+    response = requests.get('{}/pulls/{}'.format(repo.api_url(), pull_id))
 
     # TODO: auth
     base_branch = response.json().get('base', {}).get('ref')
     if response.ok:
         if base_branch:
-            odoo_version = cookiecutter_context().get('odoo_version')
             if base_branch != odoo_version:
                 ask_or_abort('Requested PR targets branch different from'
                              ' current project\'s major version. Proceed?')
@@ -482,32 +579,19 @@ def add_pending_pull_request(conf, upstream, repo_name, pull_id):
               ' skipping target branch validation.'
               .format(response.status_code))
 
-    if response.ok:
-        # probably, wrapping `if` could be an overkill
-        pending_mrg_comment = response.json().get('title')
-    else:
-        pending_mrg_comment = False
-        print('Unable to get a pull request title.'
-              ' You can provide it manually by editing {}.'.format(
-                  pending_mrg_filepath))
-
-    # prepend path w/ `parent directory` expression to make it
-    # relative to files in `pending-merges.d`
-    submodule_path = os.path.join(
-        os.path.pardir, build_submodule_path(repo_name))
+    # TODO: handle comment
+    # if response.ok:
+    #     # probably, wrapping `if` could be an overkill
+    #     pending_mrg_comment = response.json().get('title')
+    # else:
+    #     pending_mrg_comment = False
+    #     print('Unable to get a pull request title.'
+    #           ' You can provide it manually by editing {}.'.format(
+    #               repo.merges_path))
 
     known_remotes = conf['remotes']
-
-    if pending_mrg_line in conf['merges']:
-        exit_msg('Requested pending merge is mentioned in {} already'
-                 .format(pending_mrg_filepath))
-
     if upstream not in known_remotes:
-        # ruamel struggles to insert a comment here, fut fails drastically.
-        known_remotes.insert(
-            0, upstream, build_github_remote_url(upstream, repo_name),
-            comment=pending_mrg_comment)
-
+        known_remotes.insert(0, upstream, repo.ssh_url(upstream))
     # we're just at the place to append a new pending merge
     # ruamel.yaml's API won't allow ppl to insert items at the end of
     # array, so the closest solution would be to insert it at position 1,
@@ -515,7 +599,7 @@ def add_pending_pull_request(conf, upstream, repo_name, pull_id):
     conf['merges'].insert(1, pending_mrg_line)
 
 
-def add_pending_commit(conf, upstream, repo_name, commit_sha):
+def add_pending_commit(repo, conf, upstream, commit_sha):
     if len(commit_sha) < 40:
         ask_or_abort(
             "You are about to add a patch referenced by a short commit SHA.\n"
@@ -523,11 +607,10 @@ def add_pending_commit(conf, upstream, repo_name, commit_sha):
             "Continue?")
     pending_mrg_line \
         = 'git am "$(git format-patch -1 {} -o ../patches)"'.format(commit_sha)
-    pending_mrg_filepath = build_submodule_merges_path(repo_name)
 
     if pending_mrg_line in conf.get('shell_command_after', {}):
         exit_msg('Requested pending merge is mentioned in {} already'
-                 .format(pending_mrg_filepath))
+                 .format(repo.merges_path))
     if 'shell_command_after' not in conf:
         conf['shell_command_after'] = CommentedSeq()
 
@@ -545,6 +628,7 @@ def add_pending_commit(conf, upstream, repo_name, commit_sha):
 @task
 def add_pending(ctx, entity_url):
     """Add a pending merge using given entity link"""
+    check_pending_merge_version()
     # pattern, given an https://github.com/<upstream>/<repo>/pull/<pr-index>
     # # PR headline
     # # PR link as is
@@ -555,50 +639,43 @@ def add_pending(ctx, entity_url):
     repo_name = parts.get('repo_name')
     entity_type = parts.get('entity_type')
     entity_id = parts.get('entity_id')
-    pending_mrg_filepath = build_submodule_merges_path(repo_name)
 
-    if not os.path.exists(pending_mrg_filepath):
-        generate_pending_merges_file_template(
-            pending_mrg_filepath, upstream, repo_name)
+    repo = Repo(repo_name, path_check=False)
+    if not os.path.exists(repo.merges_path):
+        generate_pending_merges_file_template(repo, upstream)
 
+    conf = repo.merges_config()
     # TODO: adding comments doesn't really work :/
-    with open(pending_mrg_filepath) as f:
-        data = yaml.load(f.read())
-        submodule_relpath \
-            = os.path.join(os.path.pardir, build_submodule_path(repo_name))
-        conf = data[submodule_relpath]
-
     if entity_type == 'pull':
-        add_pending_pull_request(conf, upstream, repo_name, entity_id)
+        add_pending_pull_request(repo, conf, upstream, entity_id)
     elif entity_type in ('commit', 'tree'):
-        add_pending_commit(conf, upstream, repo_name, entity_id)
+        add_pending_commit(repo, conf, upstream, entity_id)
 
     # write back a file
-    with open(pending_mrg_filepath, 'w') as f:
-        yaml.dump(data, f)
-        sync_remote(ctx, build_submodule_path(repo_name))
+    repo.update_merges_config(conf)
+    sync_remote(ctx, repo=repo)
 
 
-def remove_pending_commit(conf, upstream, commit_sha, pending_mrg_filepath):
+def remove_pending_commit(repo, conf, upstream, commit_sha):
     line_to_drop \
         = 'git am "$(git format-patch -1 {} -o ../patches)"'.format(commit_sha)
     if line_to_drop not in conf.get('shell_command_after', {}):
         exit_msg('No such reference found in {},'
                  ' having troubles removing that:\n'
                  'Looking for: {}'
-                 .format(pending_mrg_filepath, line_to_drop))
+                 .format(repo.merges_path, line_to_drop))
     conf['shell_command_after'].remove(line_to_drop)
     if not conf['shell_command_after']:
         del conf['shell_command_after']
 
 
-def remove_pending_pull(conf, upstream, pull_id, pending_mrg_filepath):
+def remove_pending_pull(repo, conf, upstream, pull_id):
     line_to_drop = '{} refs/pull/{}/head'.format(upstream, pull_id)
     if line_to_drop not in conf['merges']:
         exit_msg('No such reference found in {},'
                  ' having troubles removing that:\n'
                  'Looking for: {}'
-                 .format(pending_mrg_filepath, line_to_drop))
+                 .format(repo.merges_path, line_to_drop))
     conf['merges'].remove(line_to_drop)
 
 
@@ -606,40 +683,30 @@ def remove_pending_pull(conf, upstream, pull_id, pending_mrg_filepath):
 def remove_pending(ctx, entity_url):
     """Remove a pending merge using given entity link"""
 
+    check_pending_merge_version()
     parts = parse_github_url(entity_url)
 
     upstream = parts.get('upstream')
     repo_name = parts.get('repo_name')
-    submodule_path = os.path.join(
-        os.path.pardir, build_submodule_path(repo_name))
+    repo = Repo(repo_name)
     entity_type = parts.get('entity_type')
     entity_id = parts.get('entity_id')
 
-    pending_mrg_filepath = build_submodule_merges_path(repo_name)
-
-    if not os.path.exists(pending_mrg_filepath):
-        exit_msg('No file found at {}'.format(pending_mrg_filepath))
-
-    with open(pending_mrg_filepath) as f:
-        data = yaml.load(f.read())
-        submodule_config = data[submodule_path]
-        if entity_type == 'pull':
-            remove_pending_pull(
-                submodule_config, upstream, entity_id, pending_mrg_filepath)
-        elif entity_type in ('tree', 'commit'):
-            remove_pending_commit(
-                submodule_config, upstream, entity_id, pending_mrg_filepath)
+    config = repo.merges_config()
+    if entity_type == 'pull':
+        remove_pending_pull(repo, config, upstream, entity_id)
+    elif entity_type in ('tree', 'commit'):
+        remove_pending_commit(repo, config, upstream, entity_id)
 
     # check if that file is useless since it has an empty `merges` section
     # if it does - drop it instead of writing a new file version
     # only the upstream branch is present in `merges`
     # first item is `- oca {{cookiecutter.odoo_version}}` or similar
-    pending_merges_present = len(submodule_config['merges']) > 1
-    patches = len(submodule_config.get('shell_command_after', {}))
+    pending_merges_present = len(config['merges']) > 1
+    patches = len(config.get('shell_command_after', {}))
 
     if not pending_merges_present and not patches:
-        os.remove(pending_mrg_filepath)
-        sync_remote(ctx, submodule_path)
+        os.remove(repo.merges_path)
+        sync_remote(ctx, repo=repo)
     else:
-        with open(pending_mrg_filepath, 'w') as f:
-            yaml.dump(data, f)
+        repo.update_merges_config(config)
