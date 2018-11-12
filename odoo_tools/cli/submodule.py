@@ -110,7 +110,7 @@ def list(ctx, dockerfile=True):
         lines = (line for line in content.splitlines()
                  if line not in blacklist)
         lines = chain(lines, ['odoo/src/addons', 'odoo/local-src'])
-        lines = ("/%s" % line for line in lines)
+        lines = ("/opt/%s" % line for line in lines)
         template = (
             "ENV ADDONS_PATH=\"%s\" \\\n"
         )
