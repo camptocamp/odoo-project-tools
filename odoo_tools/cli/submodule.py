@@ -117,10 +117,10 @@ class Repo(object):
         submodule_name = cls._safe_module_name(name_or_path)
         if submodule_name.lower() in ('odoo', 'ocb'):
             submodule_name = 'src'
-        relative_path = '{}/{}.yml'.format(PENDING_MERGES_DIR, submodule_name)
+        base_path = PENDING_MERGES_DIR
         if relative:
-            return relative_path
-        return build_path(relative_path)
+            base_path = os.path.basename(PENDING_MERGES_DIR)
+        return  '{}/{}.yml'.format(base_path, submodule_name)
 
     def aggregator_config(self):
         return git_aggregator.config.load_config(self.abs_merges_path)[0]
@@ -377,33 +377,39 @@ def show_prs(ctx, submodule_path=None, state=None):
         exit_msg('No repo to check.')
 
     pr_info_msg = '{shortcut} in state {state} ({merged})'
-    try:
-        for repo in repositories:
-            aggregator = repo.get_aggregator()
-            print('--')
-            print('Checking', repo.name)
-            print('Path', repo.path)
-            print('Merge file', repo.merges_path)
-            all_prs = aggregator.collect_prs_info()
-            if state is not None:
-                # filter only our state
-                all_prs = {k: v for k, v in all_prs.items() if k == state}
-            for pr_state, prs in all_prs.items():
-                print('State', pr_state)
-                for i, pr_info in enumerate(prs, 1):
-                    print('  {})'.format(i), pr_info_msg.format(**pr_info))
-    except AttributeError:
-        print('You need to upgrade git-aggregator.'
-              ' This function is available since 1.2.0.')
+    all_repos_prs = {}
+    for repo in repositories:
+        aggregator = repo.get_aggregator()
+        print('--')
+        print('Checking:', repo.name)
+        print('Path:', repo.path)
+        print('Merge file:', repo.merges_path)
+        # requires https://github.com/acsone/git-aggregator/pull/25
+        all_prs = aggregator.collect_prs_info()
+        if state is not None:
+            # filter only our state
+            all_prs = {k: v for k, v in all_prs.items() if k == state}
+        for pr_state, prs in all_prs.items():
+            print('State:', pr_state)
+            for i, pr_info in enumerate(prs, 1):
+                all_repos_prs.setdefault(pr_state, []).append(pr_info)
+                print('  {})'.format(i), pr_info_msg.format(**pr_info))
+    return all_repos_prs
 
 @task
-def show_closed_prs(ctx, submodule_path=None):
+def show_closed_prs(ctx, submodule_path=None, purge_closed=False):
     """Show all closed pull requests in pending merges.
 
     Pass nothing to check all submodules.
     Pass `-s path/to/submodule` to check specific ones.
     """
-    show_prs(ctx, submodule_path=submodule_path, state='closed')
+    all_repos_prs = show_prs(
+        ctx, submodule_path=submodule_path, state='closed')
+
+    if purge_closed:
+        print('Purging closed ones...')
+        for closed_pr_info in all_repos_prs.get('closed', []):
+            remove_pending(ctx, closed_pr_info['shortcut'])
 
 
 @task
