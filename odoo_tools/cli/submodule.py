@@ -75,7 +75,9 @@ class Repo(object):
         self.path = self.build_submodule_path(name_or_path)
         self.abs_path = build_path(self.path)
         # ensure that given submodule is a mature submodule
-        self.merges_path = self.build_submodule_merges_path(self.path)
+        self.abs_merges_path = self.build_submodule_merges_path(self.path)
+        self.merges_path = self.build_submodule_merges_path(
+            self.path, relative=True)
         if path_check:
             self._check_paths()
         self.name = self._safe_module_name(name_or_path)
@@ -87,8 +89,8 @@ class Repo(object):
                 '{} does not look like a mature repository. '
                 'Aborting.'.format(self.path)
             )
-        if not os.path.exists(self.merges_path):
-            exit_msg('NOT FOUND `{}\'.'.format(self.merges_path))
+        if not os.path.exists(self.abs_merges_path):
+            exit_msg('NOT FOUND `{}\'.'.format(self.abs_merges_path))
 
     @classmethod
     def _safe_module_name(cls, name_or_path):
@@ -106,7 +108,7 @@ class Repo(object):
         return relative_path
 
     @classmethod
-    def build_submodule_merges_path(cls, name_or_path):
+    def build_submodule_merges_path(cls, name_or_path, relative=False):
         """Return a pending-merges file for a given submodule.
 
         :param submodule: either a full path or a bare submodule name,
@@ -116,10 +118,12 @@ class Repo(object):
         if submodule_name.lower() in ('odoo', 'ocb'):
             submodule_name = 'src'
         relative_path = '{}/{}.yml'.format(PENDING_MERGES_DIR, submodule_name)
+        if relative:
+            return relative_path
         return build_path(relative_path)
 
     def aggregator_config(self):
-        return git_aggregator.config.load_config(self.merges_path)[0]
+        return git_aggregator.config.load_config(self.abs_merges_path)[0]
 
     def get_aggregator(self, **extra_config):
         repo_config = self.aggregator_config()
@@ -140,28 +144,28 @@ class Repo(object):
         return [cls(name) for name in repo_names]
 
     def has_pending_merges(self):
-        found = os.path.exists(self.merges_path)
+        found = os.path.exists(self.abs_merges_path)
         if not found:
             return False
         # either empty or commented out
         return bool(self.merges_config())
 
     def merges_config(self):
-        with open(self.merges_path) as f:
+        with open(self.abs_merges_path) as f:
             data = yaml.load(f.read()) or {}
             submodule_relpath = os.path.join(os.path.pardir, self.path)
             return data.get(submodule_relpath, {})
 
     def update_merges_config(self, config):
         # get former config if any
-        if os.path.exists(self.merges_path):
-            with open(self.merges_path, 'r') as f:
+        if os.path.exists(self.abs_merges_path):
+            with open(self.abs_merges_path, 'r') as f:
                 data = yaml.load(f.read())
         else:
             data = {}
         submodule_relpath = os.path.join(os.path.pardir, self.path)
         data[submodule_relpath] = config
-        with open(self.merges_path, 'w') as f:
+        with open(self.abs_merges_path, 'w') as f:
             yaml.dump(data, f)
 
     def api_url(self):
@@ -357,8 +361,8 @@ def process_travis_file(ctx, repo):
 
 
 @task
-def show_closed_prs(ctx, submodule_path=None):
-    """Show all closed pull requests in pending merges.
+def show_prs(ctx, submodule_path=None, state=None):
+    """Show all pull requests in pending merges.
 
     Pass nothing to check all submodules.
     Pass `-s path/to/submodule` to check specific ones.
@@ -371,14 +375,35 @@ def show_closed_prs(ctx, submodule_path=None):
         repositories = [Repo(submodule_path)]
     if not repositories:
         exit_msg('No repo to check.')
+
+    pr_info_msg = '{shortcut} in state {state} ({merged})'
     try:
         for repo in repositories:
             aggregator = repo.get_aggregator()
-            print('Checking', aggregator.cwd)
-            aggregator.show_closed_prs()
+            print('--')
+            print('Checking', repo.name)
+            print('Path', repo.path)
+            print('Merge file', repo.merges_path)
+            all_prs = aggregator.collect_prs_info()
+            if state is not None:
+                # filter only our state
+                all_prs = {k: v for k, v in all_prs.items() if k == state}
+            for pr_state, prs in all_prs.items():
+                print('State', pr_state)
+                for i, pr_info in enumerate(prs, 1):
+                    print('  {})'.format(i), pr_info_msg.format(**pr_info))
     except AttributeError:
         print('You need to upgrade git-aggregator.'
               ' This function is available since 1.2.0.')
+
+@task
+def show_closed_prs(ctx, submodule_path=None):
+    """Show all closed pull requests in pending merges.
+
+    Pass nothing to check all submodules.
+    Pass `-s path/to/submodule` to check specific ones.
+    """
+    show_prs(ctx, submodule_path=submodule_path, state='closed')
 
 
 @task
@@ -417,7 +442,7 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
     assert submodule_path or repo
     repo = repo or Repo(submodule_path)
     if repo.has_pending_merges():
-        with open(repo.merges_path) as pending_merges:
+        with open(repo.abs_merges_path) as pending_merges:
             # read everything we can reach
             # for reading purposes only
             data = yaml.load(pending_merges.read())
@@ -563,7 +588,7 @@ def add_pending_pull_request(repo, conf, upstream, pull_id):
     pending_mrg_line = '{} refs/pull/{}/head'.format(upstream, pull_id)
     if pending_mrg_line in conf.get('merges', {}):
         exit_msg('Requested pending merge is mentioned in {} already'
-                 .format(repo.merges_path))
+                 .format(repo.abs_merges_path))
 
     response = requests.get('{}/pulls/{}'.format(repo.api_url(), pull_id))
 
@@ -587,7 +612,7 @@ def add_pending_pull_request(repo, conf, upstream, pull_id):
     #     pending_mrg_comment = False
     #     print('Unable to get a pull request title.'
     #           ' You can provide it manually by editing {}.'.format(
-    #               repo.merges_path))
+    #               repo.abs_merges_path))
 
     known_remotes = conf['remotes']
     if upstream not in known_remotes:
@@ -610,7 +635,7 @@ def add_pending_commit(repo, conf, upstream, commit_sha):
 
     if pending_mrg_line in conf.get('shell_command_after', {}):
         exit_msg('Requested pending merge is mentioned in {} already'
-                 .format(repo.merges_path))
+                 .format(repo.abs_merges_path))
     if 'shell_command_after' not in conf:
         conf['shell_command_after'] = CommentedSeq()
 
@@ -641,7 +666,7 @@ def add_pending(ctx, entity_url):
     entity_id = parts.get('entity_id')
 
     repo = Repo(repo_name, path_check=False)
-    if not os.path.exists(repo.merges_path):
+    if not os.path.exists(repo.abs_merges_path):
         generate_pending_merges_file_template(repo, upstream)
 
     conf = repo.merges_config()
@@ -663,7 +688,7 @@ def remove_pending_commit(repo, conf, upstream, commit_sha):
         exit_msg('No such reference found in {},'
                  ' having troubles removing that:\n'
                  'Looking for: {}'
-                 .format(repo.merges_path, line_to_drop))
+                 .format(repo.abs_merges_path, line_to_drop))
     conf['shell_command_after'].remove(line_to_drop)
     if not conf['shell_command_after']:
         del conf['shell_command_after']
@@ -675,7 +700,7 @@ def remove_pending_pull(repo, conf, upstream, pull_id):
         exit_msg('No such reference found in {},'
                  ' having troubles removing that:\n'
                  'Looking for: {}'
-                 .format(repo.merges_path, line_to_drop))
+                 .format(repo.abs_merges_path, line_to_drop))
     conf['merges'].remove(line_to_drop)
 
 
@@ -701,12 +726,12 @@ def remove_pending(ctx, entity_url):
     # check if that file is useless since it has an empty `merges` section
     # if it does - drop it instead of writing a new file version
     # only the upstream branch is present in `merges`
-    # first item is `- oca {{cookiecutter.odoo_version}}` or similar
+    # first item is `- oca 11.0` or similar
     pending_merges_present = len(config['merges']) > 1
     patches = len(config.get('shell_command_after', {}))
 
     if not pending_merges_present and not patches:
-        os.remove(repo.merges_path)
+        os.remove(repo.abs_merges_path)
         sync_remote(ctx, repo=repo)
     else:
         repo.update_merges_config(config)
