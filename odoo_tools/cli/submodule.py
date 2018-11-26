@@ -15,6 +15,13 @@ try:
 except ImportError:
     print('Please install git-aggregator')
 
+try:
+    import git_autoshare
+    AUTOSHARE_ENABLED = True
+except ImportError:
+    print('Please install git-autoshare from requirements')
+    AUTOSHARE_ENABLED = False
+
 from .common import (
     ask_or_abort,
     build_path,
@@ -64,6 +71,9 @@ def init(ctx):
     It means less 'git submodule add -b ... {url} {path}' commands to run
 
     """
+    add_command = 'git submodule add'
+    if AUTOSHARE_ENABLED:
+        add_command = 'git autoshare-submodule-add'
     gitmodules = build_path('.gitmodules')
     res = ctx.run(r"git config -f %s --get-regexp '^submodule\..*\.path$'" %
                   gitmodules, hide=True)
@@ -75,8 +85,8 @@ def init(ctx):
             url = ctx.run('git config -f %s --get "%s"' %
                           (gitmodules, url_key), hide=True).stdout
             try:
-                ctx.run('git submodule add -b %s %s %s' %
-                        (odoo_version, url.strip(), path.strip()))
+                ctx.run('%s -b %s %s %s' %
+                        (add_command, odoo_version, url.strip(), path.strip()))
             except exceptions.Failure:
                 pass
 
