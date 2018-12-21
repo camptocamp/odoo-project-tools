@@ -17,7 +17,7 @@ except ImportError:
     print('Please run `pip install -r tasks/requirements.txt`')
 
 try:
-    import git_autoshare
+    import git_autoshare  # noqa: F401
     AUTOSHARE_ENABLED = True
 except ImportError:
     print('Missing git-autoshare from requirements')
