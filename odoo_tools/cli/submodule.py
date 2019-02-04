@@ -13,13 +13,15 @@ try:
     import git_aggregator.main
     import git_aggregator.repo
 except ImportError:
-    print('Please install git-aggregator')
+    print('Missing git-aggregator from requirements')
+    print('Please run `pip install -r tasks/requirements.txt`')
 
 try:
     import git_autoshare
     AUTOSHARE_ENABLED = True
 except ImportError:
-    print('Please install git-autoshare from requirements')
+    print('Missing git-autoshare from requirements')
+    print('Please run `pip install -r tasks/requirements.txt`')
     AUTOSHARE_ENABLED = False
 
 from .common import (
