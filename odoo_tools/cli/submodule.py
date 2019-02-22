@@ -285,6 +285,8 @@ def list(ctx, dockerfile=True):
 def merges(ctx, submodule_path, push=True, target_branch=None):
     """Regenerate a pending branch for a submodule.
 
+    Use case: a PR has been updated and you want to refresh it.
+
     It reads pending-merges.d/sub-name.yml, runs gitaggregator on the submodule
     and pushes the new branch on dynamic target constructed as follows:
     camptocamp/merge-branch-<project_id>-<branch>-<commit>
@@ -292,16 +294,8 @@ def merges(ctx, submodule_path, push=True, target_branch=None):
     By default, the branch is pushed on the camptocamp remote, but you
     can disable the push with ``--no-push``.
 
-    Example:
-    1. Run: git checkout -b my-new-feature-branch
-    2. Add pending-merge in pending-merges.d/web.yml
-    3. Run: invoke submodule.merges odoo/external-src/web
-    4. Run: git add pending-merges.d/web.yml odoo/external-src/web
-    5. Run: git commit -m "add PR #XX in web"
-    6. Create pull request for inclusion in master branch
-
-    Beware, if you changed the remote of the submodule, you still need
-    to edit it manually in the ``.gitmodules`` file.
+    Beware, if you changed the remote of the submodule manually, you still need
+    to run `sync_remote` manually.
     """
 
     check_pending_merge_version()
@@ -319,6 +313,7 @@ def merges(ctx, submodule_path, push=True, target_branch=None):
     process_travis_file(ctx, repo)
     if push:
         aggregator.push()
+
 
 
 @task
@@ -384,7 +379,6 @@ def show_prs(ctx, submodule_path=None, state=None):
         print('Checking:', repo.name)
         print('Path:', repo.path)
         print('Merge file:', repo.merges_path)
-        # requires https://github.com/acsone/git-aggregator/pull/25
         all_prs = aggregator.collect_prs_info()
         if state is not None:
             # filter only our state
