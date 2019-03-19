@@ -117,7 +117,7 @@ class Repo(object):
         base_path = PENDING_MERGES_DIR
         if relative:
             base_path = os.path.basename(PENDING_MERGES_DIR)
-        return  '{}/{}.yml'.format(base_path, submodule_name)
+        return '{}/{}.yml'.format(base_path, submodule_name)
 
     def aggregator_config(self):
         return git_aggregator.config.load_config(self.abs_merges_path)[0]
@@ -398,6 +398,7 @@ def show_prs(ctx, submodule_path=None, state=None):
                 print('  {})'.format(i), pr_info_msg.format(**pr_info))
     return all_repos_prs
 
+
 @task
 def show_closed_prs(ctx, submodule_path=None, purge_closed=False):
     """Show all closed pull requests in pending merges.
@@ -449,6 +450,7 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
     check_pending_merge_version()
     assert submodule_path or repo
     repo = repo or Repo(submodule_path)
+
     if repo.has_pending_merges():
         with open(repo.abs_merges_path) as pending_merges:
             # read everything we can reach
@@ -468,7 +470,7 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
                 new_remote_url = next(
                     remote for remote in registered_remotes.values()
                     if remote != GIT_C2C_REMOTE_NAME)
-    elif submodule_path == 'odoo/src':
+    elif repo.path == 'odoo/src':
         # special way to treat that particular submodule
         # TODO: ask user if it's preferred to use `odoo/odoo` instead?
         if ask_confirmation('Use odoo:odoo instead of OCA/OCB?'):
@@ -498,15 +500,14 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
                 or default_repo
             new_remote_url = Repo.build_ssh_url(new_namespace, new_repo)
 
-    submodule_path = repo.path
     ctx.run('git config --file=.gitmodules submodule.{}.url {}'.format(
-        submodule_path, new_remote_url))
-    relative_name = submodule_path.replace('../', '')
+        repo.path, new_remote_url))
+    relative_name = repo.path.replace('../', '')
     with cd(build_path(relative_name)):
         ctx.run('git remote set-url origin {}'.format(new_remote_url))
 
     print('Submodule {} is now being sourced from {}'.format(
-        submodule_path, new_remote_url))
+        repo.path, new_remote_url))
 
     if repo.has_pending_merges():
         # we're being polite here, excode 1 doesn't apply to this answer
@@ -544,8 +545,16 @@ def parse_github_url(entity_spec):
         #                    ========= ==== ==== ====
         # as we're not interested in parts 7 and beyond, we're just trimming it
         # this is done to allow passing link w/ trailing garbage to this task
-        upstream, repo_name, entity_type, entity_id \
-            = entity_spec.split('/')[3:7]
+        try:
+            upstream, repo_name, entity_type, entity_id \
+                = entity_spec.split('/')[3:7]
+        except ValueError:
+            exit_msg(
+                "Could not parse: {}.\n"
+                "Accept formats are either:\n"
+                "* Full url: https://github.com/namespace/repo/pull/1234/files#diff-deadbeef\n"
+                "* Short ref: remote/repo#pull-request-id".format(entity_spec)
+            )
 
     # force uppercase in OCA upstream name:
     # otherwise `oca` and `OCA` are treated as different namespaces
@@ -595,7 +604,7 @@ def add_pending_pull_request(repo, conf, upstream, pull_id):
     odoo_version = cookiecutter_context().get('odoo_version')
     pending_mrg_line = '{} refs/pull/{}/head'.format(upstream, pull_id)
     if pending_mrg_line in conf.get('merges', {}):
-        exit_msg('Requested pending merge is mentioned in {} already'
+        exit_msg('Requested pending merge is already mentioned in {} '
                  .format(repo.abs_merges_path))
 
     response = requests.get('{}/pulls/{}'.format(repo.api_url(), pull_id))
