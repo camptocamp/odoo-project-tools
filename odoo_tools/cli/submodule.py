@@ -472,7 +472,6 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
                     if remote != GIT_C2C_REMOTE_NAME)
     elif repo.path == 'odoo/src':
         # special way to treat that particular submodule
-        # TODO: ask user if it's preferred to use `odoo/odoo` instead?
         if ask_confirmation('Use odoo:odoo instead of OCA/OCB?'):
             new_remote_url = Repo.build_ssh_url('odoo', 'odoo')
         else:
@@ -578,6 +577,10 @@ def generate_pending_merges_file_template(repo, upstream):
     if not os.path.exists(PENDING_MERGES_DIR):
         os.makedirs(PENDING_MERGES_DIR)
 
+    oca_ocb_remote = False
+    if repo.path == 'odoo/src' and upstream == 'odoo':
+        oca_ocb_remote = not ask_confirmation('Use odoo:odoo instead of OCA/OCB?')
+
     remote_upstream_url = repo.ssh_url(upstream)
     remote_c2c_url = repo.ssh_url(GIT_C2C_REMOTE_NAME)
     cc_context = cookiecutter_context()
@@ -585,6 +588,12 @@ def generate_pending_merges_file_template(repo, upstream):
     default_target = 'merge-branch-{}-master'.format(cc_context['project_id'])
     remotes = CommentedMap()
     remotes.insert(0, upstream, remote_upstream_url)
+
+    if oca_ocb_remote:
+        # use the oca remote as base even if we are adding an
+        # odoo/odoo#123 pull request
+        remotes.insert(0, 'oca', Repo.build_ssh_url('OCA', 'OCB'))
+
     if upstream != GIT_C2C_REMOTE_NAME:
         # if origin is not the same: add c2c one
         remotes.insert(0, GIT_C2C_REMOTE_NAME, remote_c2c_url)
@@ -594,9 +603,11 @@ def generate_pending_merges_file_template(repo, upstream):
         1, 'target',
         '{} {}'.format(GIT_C2C_REMOTE_NAME, default_target)
     )
-    config.insert(2, 'merges', CommentedSeq([
-        '{} {}'.format(upstream, odoo_version)
-    ]))
+    if oca_ocb_remote:
+        base_merge = '{} {}'.format('oca', odoo_version)
+    else:
+        base_merge = '{} {}'.format(upstream, odoo_version)
+    config.insert(2, 'merges', CommentedSeq([base_merge]))
     repo.update_merges_config(config)
 
 
