@@ -7,22 +7,6 @@ import os
 import re
 from itertools import chain
 
-from invoke import task, exceptions
-try:
-    import git_aggregator.config
-    import git_aggregator.main
-    import git_aggregator.repo
-except ImportError:
-    print('Missing git-aggregator from requirements')
-    print('Please run `pip install -r tasks/requirements.txt`')
-
-try:
-    import git_autoshare
-    AUTOSHARE_ENABLED = True
-except ImportError:
-    print('Missing git-autoshare from requirements')
-    print('Please run `pip install -r tasks/requirements.txt`')
-    AUTOSHARE_ENABLED = False
 import requests
 
 from invoke import exceptions, task
@@ -44,14 +28,27 @@ try:
     import git_aggregator.main
     import git_aggregator.repo
 except ImportError:
-    print('Please install git-aggregator')
+    print('Missing git-aggregator from requirements')
+    print('Please run `pip install -r tasks/requirements.txt`')
+
+try:
+    import git_autoshare  # noqa: F401
+
+    AUTOSHARE_ENABLED = True
+except ImportError:
+    print('Missing git-autoshare from requirements')
+    print('Please run `pip install -r tasks/requirements.txt`')
+    AUTOSHARE_ENABLED = False
+
 
 try:
     from ruamel.yaml import YAML
     from ruamel.yaml.comments import CommentedSeq
     from ruamel.yaml.comments import CommentedMap
 except ImportError:
-    print('Please install ruamel.yaml')
+    print('Missing ruamel.yaml from requirements')
+    print('Please run `pip install -r tasks/requirements.txt`')
+
 
 try:
     input = raw_input
@@ -199,17 +196,21 @@ def get_target_branch(ctx, target_branch=None):
     Otherwise create the branch name and check for the override.
     """
     current_branch = ctx.run(
-        'git symbolic-ref --short HEAD', hide=True).stdout.strip()
+        'git symbolic-ref --short HEAD', hide=True
+    ).stdout.strip()
     project_id = cookiecutter_context()['project_id']
     if not target_branch:
         commit = ctx.run('git rev-parse HEAD', hide=True).stdout.strip()[:8]
         target_branch = 'merge-branch-{}-{}-{}'.format(
-            project_id, current_branch, commit)
+            project_id, current_branch, commit
+        )
     if current_branch == 'master' or re.match(r'\d{1,2}.\d', target_branch):
-        ask_or_abort('You are on branch {}.'
-                     ' Please confirm override of target branch {}'.format(
-                         current_branch, target_branch
-                     ))
+        ask_or_abort(
+            'You are on branch {}.'
+            ' Please confirm override of target branch {}'.format(
+                current_branch, target_branch
+            )
+        )
     return target_branch
 
 
@@ -227,18 +228,24 @@ def init(ctx):
     if AUTOSHARE_ENABLED:
         add_command = 'git autoshare-submodule-add'
     gitmodules = build_path('.gitmodules')
-    res = ctx.run(r"git config -f %s --get-regexp '^submodule\..*\.path$'" %
-                  gitmodules, hide=True)
+    res = ctx.run(
+        r"git config -f %s --get-regexp '^submodule\..*\.path$'" % gitmodules,
+        hide=True,
+    )
     odoo_version = cookiecutter_context()['odoo_version']
     with cd(root_path()):
         for line in res.stdout.splitlines():
             path_key, path = line.split()
             url_key = path_key.replace('.path', '.url')
-            url = ctx.run('git config -f %s --get "%s"' %
-                          (gitmodules, url_key), hide=True).stdout
+            url = ctx.run(
+                'git config -f %s --get "%s"' % (gitmodules, url_key),
+                hide=True,
+            ).stdout
             try:
-                ctx.run('%s -b %s %s %s' %
-                        (add_command, odoo_version, url.strip(), path.strip()))
+                ctx.run(
+                    '%s -b %s %s %s'
+                    % (add_command, odoo_version, url.strip(), path.strip())
+                )
             except exceptions.Failure:
                 pass
 
@@ -249,10 +256,12 @@ def init(ctx):
     list(ctx)
 
 
-@task(help={
-    'dockerfile': 'With --no-dockerfile, the raw paths are listed instead '
-                  'of the Dockerfile format'
-})
+@task(
+    help={
+        'dockerfile': 'With --no-dockerfile, the raw paths are listed instead '
+        'of the Dockerfile format'
+    }
+)
 def list(ctx, dockerfile=True):
     """List git submodules paths.
 
@@ -269,13 +278,12 @@ def list(ctx, dockerfile=True):
     content = res.stdout
     if dockerfile:
         blacklist = {'odoo/src'}
-        lines = (line for line in content.splitlines()
-                 if line not in blacklist)
+        lines = (
+            line for line in content.splitlines() if line not in blacklist
+        )
         lines = chain(lines, ['odoo/src/addons', 'odoo/local-src'])
         lines = ("/%s" % line for line in lines)
-        template = (
-            "ENV ADDONS_PATH=\"%s\" \\\n"
-        )
+        template = "ENV ADDONS_PATH=\"%s\" \\\n"
         print(template % (', \\\n'.join(lines)))
     else:
         print(content)
