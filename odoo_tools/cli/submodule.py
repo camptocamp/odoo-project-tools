@@ -74,7 +74,8 @@ class Repo(object):
         # ensure that given submodule is a mature submodule
         self.abs_merges_path = self.build_submodule_merges_path(self.path)
         self.merges_path = self.build_submodule_merges_path(
-            self.path, relative=True)
+            self.path, relative=True
+        )
         if path_check:
             self._check_paths()
         self.name = self._safe_module_name(name_or_path)
@@ -167,7 +168,8 @@ class Repo(object):
 
     def api_url(self):
         return 'https://api.github.com/repos/{}/{}'.format(
-            GIT_C2C_REMOTE_NAME, self.name)
+            GIT_C2C_REMOTE_NAME, self.name
+        )
 
     def ssh_url(self, namespace):
         return self.build_ssh_url(namespace, self.name)
@@ -312,16 +314,14 @@ def merges(ctx, submodule_path, push=True, target_branch=None):
     target_branch = get_target_branch(ctx, target_branch=target_branch)
     print('Building and pushing to camptocamp/{}'.format(target_branch))
     print()
-    aggregator = repo.get_aggregator(target={
-        'branch': target_branch,
-        'remote': GIT_C2C_REMOTE_NAME,
-    })
+    aggregator = repo.get_aggregator(
+        target={'branch': target_branch, 'remote': GIT_C2C_REMOTE_NAME}
+    )
     aggregator.aggregate()
 
     process_travis_file(ctx, repo)
     if push:
         aggregator.push()
-
 
 
 @task
@@ -336,10 +336,9 @@ def push(ctx, submodule_path, target_branch=None):
     target_branch = get_target_branch(ctx, target_branch=target_branch)
     print('Pushing to camptocamp/{}'.format(target_branch))
     print()
-    aggregator = repo.get_aggregator(target={
-        'branch': target_branch,
-        'remote': GIT_C2C_REMOTE_NAME,
-    })
+    aggregator = repo.get_aggregator(
+        target={'branch': target_branch, 'remote': GIT_C2C_REMOTE_NAME}
+    )
     with cd(repo.path):
         aggregator._switch_to_branch(target_branch)
         process_travis_file(ctx, repo)
@@ -350,8 +349,10 @@ def process_travis_file(ctx, repo):
     tf = '.travis.yml'
     with cd(repo.abs_path):
         if not os.path.exists(tf):
-            print(repo.abs_path + tf,
-                  'does not exists. Skipping travis exclude commit')
+            print(
+                repo.abs_path + tf,
+                'does not exists. Skipping travis exclude commit',
+            )
             return
 
         print("Writing exclude branch option in {}".format(tf))
@@ -407,7 +408,8 @@ def show_closed_prs(ctx, submodule_path=None, purge_closed=False):
     Pass `-s path/to/submodule` to check specific ones.
     """
     all_repos_prs = show_prs(
-        ctx, submodule_path=submodule_path, state='closed')
+        ctx, submodule_path=submodule_path, state='closed'
+    )
 
     if purge_closed:
         print('Purging closed ones...')
@@ -468,8 +470,10 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
                 new_remote_url = registered_remotes[GIT_C2C_REMOTE_NAME]
             else:
                 new_remote_url = next(
-                    remote for remote in registered_remotes.values()
-                    if remote != GIT_C2C_REMOTE_NAME)
+                    remote
+                    for remote in registered_remotes.values()
+                    if remote != GIT_C2C_REMOTE_NAME
+                )
     elif repo.path == 'odoo/src':
         # special way to treat that particular submodule
         if ask_confirmation('Use odoo:odoo instead of OCA/OCB?'):
@@ -491,22 +495,31 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
                 # not a forked repo (eg: camptocamp/connector-jira)
                 new_remote_url = info.get('ssh_url')
         else:
-            print("Couldn't reach Github API to resolve submodule upstream."
-                  " Please provide it manually.")
+            print(
+                "Couldn't reach Github API to resolve submodule upstream."
+                " Please provide it manually."
+            )
             default_repo = repo.name.replace('_', '-')
             new_namespace = input('Namespace [OCA]: ') or 'OCA'
-            new_repo = input('Repo name [{}]: '.format(default_repo)) \
-                or default_repo
+            new_repo = (
+                input('Repo name [{}]: '.format(default_repo)) or default_repo
+            )
             new_remote_url = Repo.build_ssh_url(new_namespace, new_repo)
 
-    ctx.run('git config --file=.gitmodules submodule.{}.url {}'.format(
-        repo.path, new_remote_url))
+    ctx.run(
+        'git config --file=.gitmodules submodule.{}.url {}'.format(
+            repo.path, new_remote_url
+        )
+    )
     relative_name = repo.path.replace('../', '')
     with cd(build_path(relative_name)):
         ctx.run('git remote set-url origin {}'.format(new_remote_url))
 
-    print('Submodule {} is now being sourced from {}'.format(
-        repo.path, new_remote_url))
+    print(
+        'Submodule {} is now being sourced from {}'.format(
+            repo.path, new_remote_url
+        )
+    )
 
     if repo.has_pending_merges():
         # we're being polite here, excode 1 doesn't apply to this answer
@@ -514,13 +527,15 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
             'Rebuild consolidation branch for {}?'.format(relative_name)
         )
         push = ask_confirmation(
-            'Push it to `{}\'?'.format(GIT_C2C_REMOTE_NAME))
+            'Push it to `{}\'?'.format(GIT_C2C_REMOTE_NAME)
+        )
         merges(ctx, relative_name, push=push)
     else:
         odoo_version = cookiecutter_context()['odoo_version']
         if ask_confirmation(
-            'Submodule {} has no pending merges. Update it to {}?'
-            .format(relative_name, odoo_version)
+            'Submodule {} has no pending merges. Update it to {}?'.format(
+                relative_name, odoo_version
+            )
         ):
             with cd(repo.abs_path):
                 os.system('git fetch origin {}'.format(odoo_version))
@@ -545,8 +560,9 @@ def parse_github_url(entity_spec):
         # as we're not interested in parts 7 and beyond, we're just trimming it
         # this is done to allow passing link w/ trailing garbage to this task
         try:
-            upstream, repo_name, entity_type, entity_id \
-                = entity_spec.split('/')[3:7]
+            upstream, repo_name, entity_type, entity_id = entity_spec.split(
+                '/'
+            )[3:7]
         except ValueError:
             exit_msg(
                 "Could not parse: {}.\n"
@@ -579,7 +595,9 @@ def generate_pending_merges_file_template(repo, upstream):
 
     oca_ocb_remote = False
     if repo.path == 'odoo/src' and upstream == 'odoo':
-        oca_ocb_remote = not ask_confirmation('Use odoo:odoo instead of OCA/OCB?')
+        oca_ocb_remote = not ask_confirmation(
+            'Use odoo:odoo instead of OCA/OCB?'
+        )
 
     remote_upstream_url = repo.ssh_url(upstream)
     remote_c2c_url = repo.ssh_url(GIT_C2C_REMOTE_NAME)
@@ -600,8 +618,7 @@ def generate_pending_merges_file_template(repo, upstream):
     config = CommentedMap()
     config.insert(0, 'remotes', remotes)
     config.insert(
-        1, 'target',
-        '{} {}'.format(GIT_C2C_REMOTE_NAME, default_target)
+        1, 'target', '{} {}'.format(GIT_C2C_REMOTE_NAME, default_target)
     )
     if oca_ocb_remote:
         base_merge = '{} {}'.format('oca', odoo_version)
@@ -615,8 +632,11 @@ def add_pending_pull_request(repo, conf, upstream, pull_id):
     odoo_version = cookiecutter_context().get('odoo_version')
     pending_mrg_line = '{} refs/pull/{}/head'.format(upstream, pull_id)
     if pending_mrg_line in conf.get('merges', {}):
-        exit_msg('Requested pending merge is already mentioned in {} '
-                 .format(repo.abs_merges_path))
+        exit_msg(
+            'Requested pending merge is already mentioned in {} '.format(
+                repo.abs_merges_path
+            )
+        )
 
     response = requests.get('{}/pulls/{}'.format(repo.api_url(), pull_id))
 
@@ -625,12 +645,15 @@ def add_pending_pull_request(repo, conf, upstream, pull_id):
     if response.ok:
         if base_branch:
             if base_branch != odoo_version:
-                ask_or_abort('Requested PR targets branch different from'
-                             ' current project\'s major version. Proceed?')
+                ask_or_abort(
+                    'Requested PR targets branch different from'
+                    ' current project\'s major version. Proceed?'
+                )
     else:
-        print('Github API call failed ({}):'
-              ' skipping target branch validation.'
-              .format(response.status_code))
+        print(
+            'Github API call failed ({}):'
+            ' skipping target branch validation.'.format(response.status_code)
+        )
 
     # TODO: handle comment
     # if response.ok:
@@ -657,13 +680,18 @@ def add_pending_commit(repo, conf, upstream, commit_sha):
         ask_or_abort(
             "You are about to add a patch referenced by a short commit SHA.\n"
             "It's recommended to use fully qualified 40-digit hashes though.\n"
-            "Continue?")
-    pending_mrg_line \
-        = 'git am "$(git format-patch -1 {} -o ../patches)"'.format(commit_sha)
+            "Continue?"
+        )
+    pending_mrg_line = 'git am "$(git format-patch -1 {} -o ../patches)"'.format(
+        commit_sha
+    )
 
     if pending_mrg_line in conf.get('shell_command_after', {}):
-        exit_msg('Requested pending merge is mentioned in {} already'
-                 .format(repo.abs_merges_path))
+        exit_msg(
+            'Requested pending merge is mentioned in {} already'.format(
+                repo.abs_merges_path
+            )
+        )
     if 'shell_command_after' not in conf:
         conf['shell_command_after'] = CommentedSeq()
 
@@ -710,13 +738,15 @@ def add_pending(ctx, entity_url):
 
 
 def remove_pending_commit(repo, conf, upstream, commit_sha):
-    line_to_drop \
-        = 'git am "$(git format-patch -1 {} -o ../patches)"'.format(commit_sha)
+    line_to_drop = 'git am "$(git format-patch -1 {} -o ../patches)"'.format(
+        commit_sha
+    )
     if line_to_drop not in conf.get('shell_command_after', {}):
-        exit_msg('No such reference found in {},'
-                 ' having troubles removing that:\n'
-                 'Looking for: {}'
-                 .format(repo.abs_merges_path, line_to_drop))
+        exit_msg(
+            'No such reference found in {},'
+            ' having troubles removing that:\n'
+            'Looking for: {}'.format(repo.abs_merges_path, line_to_drop)
+        )
     conf['shell_command_after'].remove(line_to_drop)
     if not conf['shell_command_after']:
         del conf['shell_command_after']
@@ -725,10 +755,11 @@ def remove_pending_commit(repo, conf, upstream, commit_sha):
 def remove_pending_pull(repo, conf, upstream, pull_id):
     line_to_drop = '{} refs/pull/{}/head'.format(upstream, pull_id)
     if line_to_drop not in conf['merges']:
-        exit_msg('No such reference found in {},'
-                 ' having troubles removing that:\n'
-                 'Looking for: {}'
-                 .format(repo.abs_merges_path, line_to_drop))
+        exit_msg(
+            'No such reference found in {},'
+            ' having troubles removing that:\n'
+            'Looking for: {}'.format(repo.abs_merges_path, line_to_drop)
+        )
     conf['merges'].remove(line_to_drop)
 
 
