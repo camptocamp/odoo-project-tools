@@ -94,7 +94,7 @@ def init(ctx):
             path_key, path = line.split()
             url_key = path_key.replace('.path', '.url')
             url = ctx.run(
-                'git config -f %s --get "%s"' % (gitmodules, url_key),
+                'git config -f {} --get "{}"'.format(gitmodules, url_key),
                 hide=True,
             ).stdout
             try:
