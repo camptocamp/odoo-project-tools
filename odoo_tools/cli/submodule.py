@@ -8,7 +8,6 @@ import re
 from itertools import chain
 
 import requests
-
 from invoke import exceptions, task
 
 from .common import (
