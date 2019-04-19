@@ -19,6 +19,7 @@ from .common import (
     cd,
     cookiecutter_context,
     exit_msg,
+    get_migration_file_modules,
     root_path,
 )
 
@@ -793,3 +794,37 @@ def remove_pending(ctx, entity_url):
         sync_remote(ctx, repo=repo)
     else:
         repo.update_merges_config(config)
+
+
+@task
+def list_external_dependencies_installed(ctx, submodule_path):
+    """List installed modules a specific directory.
+
+        Compare the modules one the submodule path with the installed
+        module in odoo/migration.yml.
+
+        eg:
+          odoo/external-src/account-closing
+            ├── account_cutoff_accrual_base
+            ├── account_cutoff_base
+            ├── account_cutoff_prepaid
+            ├── account_invoice_start_end_dates
+            └── account_multicurrency_revaluation
+
+          migration.yml contain account_cutoff_base + account_cutoff_prepaid
+
+          so contain account_cutoff_base + account_cutoff_prepaid are returned
+
+        # TODO: to cherry-pick things from odoo-template/pull/134
+        # TODO: create inverse methode -> for all installed modules retrive
+            the external path
+    """
+    migration_modules = get_migration_file_modules('odoo/migration.yml')
+    print(
+        "\nInstalled modules for {} :\n".format(submodule_path.split('/')[-1])
+    )
+    with cd(submodule_path):
+        for mod in os.listdir():
+            if mod in migration_modules:
+                print("\t- " + mod)
+    print('\nCAREFULL /!\\ \nDependencies are not included in this list')
