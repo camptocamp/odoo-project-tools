@@ -133,6 +133,7 @@ class Repo(object):
     @classmethod
     def repositories_from_pending_folder(cls, path=None):
         path = path or PENDING_MERGES_DIR
+        repo_names = []
         for root, dirs, files in os.walk(path):
             repo_names = [
                 os.path.splitext(fname)[0]
