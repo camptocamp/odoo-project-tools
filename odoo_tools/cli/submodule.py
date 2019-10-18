@@ -33,6 +33,7 @@ except ImportError:
 
 try:
     import git_autoshare  # noqa: F401
+    from git_autoshare.core import find_autoshare_repository
 
     AUTOSHARE_ENABLED = True
 except ImportError:
@@ -258,6 +259,7 @@ def init(ctx):
     print()
     ls(ctx)
 
+
 @task(
     help={
         'dockerfile': 'With --no-dockerfile, the raw paths are listed instead '
@@ -417,20 +419,65 @@ def show_closed_prs(ctx, submodule_path=None, purge_closed=False):
             remove_pending(ctx, closed_pr_info['shortcut'])
 
 
+def _cmd_git_submodule_update(ctx, path, url):
+    update_cmd = 'git submodule update --init'
+
+    if AUTOSHARE_ENABLED:
+        index, ar = find_autoshare_repository([url])
+        if ar:
+            if not os.path.exists(ar.repo_dir):
+                ar.prefetch(True)
+            update_cmd += ' --reference {}'.format(ar.repo_dir)
+    update_cmd = update_cmd + ' ' + path
+    print(update_cmd)
+    ctx.run(update_cmd)
+
+
 @task
 def update(ctx, submodule_path=None):
-    """Synchronize and update given submodule path
+    """Initialize or update submodules
+
+    Synchronize submodules and then launch `git submodule update --init`
+    for each submodule.
+
+    If `git-autoshare` is configured locally, it will add `--reference` to
+    fetch data from local cache.
 
     :param submodule_path: submodule path for a precise sync & update
+
     """
     sync_cmd = 'git submodule sync'
-    update_cmd = 'git submodule update --init'
+
+    gitmodules = build_path('.gitmodules')
+    paths = ctx.run(
+        "git config --file %s "
+        "--get-regexp 'path' | awk '{ print $2 }' " % (gitmodules,),
+        hide=True,
+    )
+    urls = ctx.run(
+        "git config --file %s "
+        "--get-regexp 'url' | awk '{ print $2 }' " % (gitmodules,),
+        hide=True,
+    )
+
+    module_list = list(
+        zip(paths.stdout.splitlines(), urls.stdout.splitlines())
+    )
+
     if submodule_path is not None:
+        submodule_path = os.path.normpath(submodule_path)
         sync_cmd += ' -- {}'.format(submodule_path)
-        update_cmd += ' -- {}'.format(submodule_path)
+        module_list = [
+            (path, url)
+            for path, url in module_list
+            if os.path.normpath(path) == submodule_path
+        ]
+
     with cd(root_path()):
         ctx.run(sync_cmd)
-        ctx.run(update_cmd)
+
+        for path, url in module_list:
+            _cmd_git_submodule_update(ctx, path, url)
 
 
 @task
