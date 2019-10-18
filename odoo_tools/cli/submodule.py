@@ -256,8 +256,7 @@ def init(ctx):
     print()
     print("You can now update odoo/Dockerfile with this addons-path:")
     print()
-    list(ctx)
-
+    ls(ctx)
 
 @task(
     help={
@@ -265,7 +264,7 @@ def init(ctx):
         'of the Dockerfile format'
     }
 )
-def list(ctx, dockerfile=True):
+def ls(ctx, dockerfile=True):
     """List git submodules paths.
 
     It can be used to directly copy-paste the addons paths in the Dockerfile.
