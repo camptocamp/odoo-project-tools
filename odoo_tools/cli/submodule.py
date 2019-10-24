@@ -260,6 +260,16 @@ def init(ctx):
     ls(ctx)
 
 
+@task(name="list")
+def deprecated_list(ctx, dockerfile=True):
+    print(
+        '##############################################################\n'
+        'submodule.list is deprecated, please use submodule.ls instead\n'
+        '##############################################################\n'
+    )
+    ls(ctx, dockerfile=dockerfile)
+
+
 @task(
     help={
         'dockerfile': 'With --no-dockerfile, the raw paths are listed instead '
