@@ -392,7 +392,15 @@ def show_prs(ctx, submodule_path=None, state=None):
     if not repositories:
         exit_msg('No repo to check.')
 
-    pr_info_msg = '{shortcut} in state {state} ({merged})'
+    # NOTE: to collect all this info you must provide your GITHUB_TOKEN.
+    # See git-aggregator README.
+    pr_info_msg = (
+        '#{number} {title}\n'
+        '      State: {state} ({merged})\n'
+        '      Updated at: {updated_at}\n'
+        '      View: {html_url}\n'
+        '      Shortcut: {shortcut}\n'
+    )
     all_repos_prs = {}
     for repo in repositories:
         aggregator = repo.get_aggregator()
@@ -407,8 +415,14 @@ def show_prs(ctx, submodule_path=None, state=None):
         for pr_state, prs in all_prs.items():
             print('State:', pr_state)
             for i, pr_info in enumerate(prs, 1):
+                if 'raw' not in pr_info:
+                    exit_msg("Upgrade git-aggregator to 1.7.2 or later")
                 all_repos_prs.setdefault(pr_state, []).append(pr_info)
-                print('  {})'.format(i), pr_info_msg.format(**pr_info))
+                pr_info['raw'].update(pr_info)
+                print(
+                    '  {})'.format(str(i).zfill(2)),
+                    pr_info_msg.format(**pr_info['raw']),
+                )
     return all_repos_prs
 
 
