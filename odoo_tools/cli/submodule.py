@@ -371,7 +371,7 @@ def process_travis_file(ctx, repo):
         with open(tf, 'a') as travis:
             travis.write(BRANCH_EXCLUDE)
 
-        cmd = 'git commit {} -m "Travis: exclude new branch from build"'
+        cmd = 'git commit {} --no-verify -m "Travis: exclude new branch from build"'
         commit = ctx.run(cmd.format(tf), hide=True)
         print("Committed as:\n{}".format(commit.stdout.strip()))
 
