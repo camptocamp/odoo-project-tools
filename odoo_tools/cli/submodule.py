@@ -152,7 +152,7 @@ class Repo(object):
 
     def merges_config(self):
         with open(self.abs_merges_path) as f:
-            data = yaml.safe_load(f.read()) or {}
+            data = yaml.load(f.read()) or {}
             submodule_relpath = os.path.join(os.path.pardir, self.path)
             return data.get(submodule_relpath, {})
 
@@ -160,7 +160,7 @@ class Repo(object):
         # get former config if any
         if os.path.exists(self.abs_merges_path):
             with open(self.abs_merges_path, 'r') as f:
-                data = yaml.safe_load(f.read())
+                data = yaml.load(f.read())
         else:
             data = {}
         submodule_relpath = os.path.join(os.path.pardir, self.path)
@@ -528,7 +528,7 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
         with open(repo.abs_merges_path) as pending_merges:
             # read everything we can reach
             # for reading purposes only
-            data = yaml.safe_load(pending_merges.read())
+            data = yaml.load(pending_merges.read())
             submodule_pending_config = data[
                 os.path.join(os.path.pardir, repo.path)
             ]
