@@ -635,12 +635,14 @@ def parse_github_url(entity_spec):
                 '/'
             )[3:7]
         except ValueError:
-            exit_msg(
+            msg = (
                 "Could not parse: {}.\n"
                 "Accept formats are either:\n"
-                "* Full url: https://github.com/namespace/repo/pull/1234/files#diff-deadbeef\n"
-                "* Short ref: remote/repo#pull-request-id".format(entity_spec)
-            )
+                "* Full PR URL: https://github.com/user/repo/pull/1234/files#diff-deadbeef\n"
+                "* Short PR ref: user/repo#pull-request-id"
+                "* Cherry-pick URL: https://github.com/user/repo/[tree]/<commit SHA>"
+            ).format(entity_spec)
+            exit_msg(msg)
 
     # force uppercase in OCA upstream name:
     # otherwise `oca` and `OCA` are treated as different namespaces
@@ -747,12 +749,16 @@ def add_pending_pull_request(repo, conf, upstream, pull_id):
 
 
 def add_pending_commit(repo, conf, upstream, commit_sha):
+    # TODO search in local git history for full hash
     if len(commit_sha) < 40:
         ask_or_abort(
             "You are about to add a patch referenced by a short commit SHA.\n"
             "It's recommended to use fully qualified 40-digit hashes though.\n"
             "Continue?"
         )
+    fetch_commit_line = "git fetch {} {}".format(
+        upstream, commit_sha
+    )
     pending_mrg_line = 'git am "$(git format-patch -1 {} -o ../patches)"'.format(
         commit_sha
     )
@@ -766,22 +772,29 @@ def add_pending_commit(repo, conf, upstream, commit_sha):
     if 'shell_command_after' not in conf:
         conf['shell_command_after'] = CommentedSeq()
 
-    # TODO: make comments great again
-    # This snippet was written according to ruamel.yaml docs, though not a
-    # single attempt to preserve/provide comments was successful
-    # https://yaml.readthedocs.io/en/latest/example.html
-    # comment = input(
-    #     'Comment? '
-    #     '(would appear just above new pending merge, optional):\n')
-    # conf['shell_command_after'].insert(1, pending_mrg_line, comment)
-    conf['shell_command_after'].insert(1, pending_mrg_line)
+    # TODO propose a default comment format
+    comment = input(
+        'Comment? '
+        '(would appear just above new pending merge, optional):\n')
+    conf['shell_command_after'].extend([
+        fetch_commit_line,
+        pending_mrg_line,
+    ])
+    # Add a comment in the list of shell commands
+    pos = conf['shell_command_after'].index(fetch_commit_line)
+    conf['shell_command_after'].yaml_set_comment_before_after_key(
+        pos,
+        before=comment,
+        indent=2,
+    )
+    print("📋 cherry pick {}/{} has been added".format(upstream, commit_sha))
 
 
 @task
 def add_pending(ctx, entity_url):
     """Add a pending merge using given entity link"""
     check_pending_merge_version()
-    # pattern, given an https://github.com/<upstream>/<repo>/pull/<pr-index>
+    # pattern, given an https://github.com/<user>/<repo>/pull/<pr-index>
     # # PR headline
     # # PR link as is
     # - refs/pull/<pr-index>/head
@@ -797,7 +810,6 @@ def add_pending(ctx, entity_url):
         generate_pending_merges_file_template(repo, upstream)
 
     conf = repo.merges_config()
-    # TODO: adding comments doesn't really work :/
     if entity_type == 'pull':
         add_pending_pull_request(repo, conf, upstream, entity_id)
     elif entity_type in ('commit', 'tree'):
@@ -809,18 +821,29 @@ def add_pending(ctx, entity_url):
 
 
 def remove_pending_commit(repo, conf, upstream, commit_sha):
-    line_to_drop = 'git am "$(git format-patch -1 {} -o ../patches)"'.format(
-        commit_sha
-    )
-    if line_to_drop not in conf.get('shell_command_after', {}):
+    lines_to_drop = [
+        'git fetch {} {}'.format(upstream, commit_sha),
+        'git am "$(git format-patch -1 {} -o ../patches)"'.format(
+            commit_sha
+        )
+    ]
+    if (lines_to_drop[0] not in conf.get('shell_command_after', {})
+            and lines_to_drop[1] not in conf.get('shell_command_after', {})):
         exit_msg(
             'No such reference found in {},'
             ' having troubles removing that:\n'
-            'Looking for: {}'.format(repo.abs_merges_path, line_to_drop)
+            'Looking for:\n- {}\n- {}'.format(
+                repo.abs_merges_path,
+                lines_to_drop[0],
+                lines_to_drop[1])
         )
-    conf['shell_command_after'].remove(line_to_drop)
+    for line in lines_to_drop:
+        if line in conf:
+            conf['shell_command_after'].remove(line)
     if not conf['shell_command_after']:
         del conf['shell_command_after']
+    print("✨ cherry pick {}/{} has been removed".format(upstream, commit_sha))
+
 
 
 def remove_pending_pull(repo, conf, upstream, pull_id):
