@@ -756,9 +756,7 @@ def add_pending_commit(repo, conf, upstream, commit_sha):
             "It's recommended to use fully qualified 40-digit hashes though.\n"
             "Continue?"
         )
-    fetch_commit_line = "git fetch {} {}".format(
-        upstream, commit_sha
-    )
+    fetch_commit_line = "git fetch {} {}".format(upstream, commit_sha)
     pending_mrg_line = 'git am "$(git format-patch -1 {} -o ../patches)"'.format(
         commit_sha
     )
@@ -774,8 +772,8 @@ def add_pending_commit(repo, conf, upstream, commit_sha):
 
     # TODO propose a default comment format
     comment = input(
-        'Comment? '
-        '(would appear just above new pending merge, optional):\n')
+        'Comment? ' '(would appear just above new pending merge, optional):\n'
+    )
     conf['shell_command_after'].extend([
         fetch_commit_line,
         pending_mrg_line,
@@ -783,9 +781,7 @@ def add_pending_commit(repo, conf, upstream, commit_sha):
     # Add a comment in the list of shell commands
     pos = conf['shell_command_after'].index(fetch_commit_line)
     conf['shell_command_after'].yaml_set_comment_before_after_key(
-        pos,
-        before=comment,
-        indent=2,
+        pos, before=comment, indent=2,
     )
     print("📋 cherry pick {}/{} has been added".format(upstream, commit_sha))
 
@@ -823,27 +819,23 @@ def add_pending(ctx, entity_url):
 def remove_pending_commit(repo, conf, upstream, commit_sha):
     lines_to_drop = [
         'git fetch {} {}'.format(upstream, commit_sha),
-        'git am "$(git format-patch -1 {} -o ../patches)"'.format(
-            commit_sha
-        )
+        'git am "$(git format-patch -1 {} -o ../patches)"'.format(commit_sha),
     ]
-    if (lines_to_drop[0] not in conf.get('shell_command_after', {})
-            and lines_to_drop[1] not in conf.get('shell_command_after', {})):
+    if (lines_to_drop[0] not in conf.get(
+        'shell_command_after', {}
+    ) and lines_to_drop[1] not in conf.get('shell_command_after', {})):
         exit_msg(
             'No such reference found in {},'
             ' having troubles removing that:\n'
             'Looking for:\n- {}\n- {}'.format(
-                repo.abs_merges_path,
-                lines_to_drop[0],
-                lines_to_drop[1])
-        )
+                repo.abs_merges_path, lines_to_drop[0], lines_to_drop[1])
+            )
     for line in lines_to_drop:
         if line in conf:
             conf['shell_command_after'].remove(line)
     if not conf['shell_command_after']:
         del conf['shell_command_after']
     print("✨ cherry pick {}/{} has been removed".format(upstream, commit_sha))
-
 
 
 def remove_pending_pull(repo, conf, upstream, pull_id):
