@@ -774,14 +774,11 @@ def add_pending_commit(repo, conf, upstream, commit_sha):
     comment = input(
         'Comment? ' '(would appear just above new pending merge, optional):\n'
     )
-    conf['shell_command_after'].extend([
-        fetch_commit_line,
-        pending_mrg_line,
-    ])
+    conf['shell_command_after'].extend([fetch_commit_line, pending_mrg_line])
     # Add a comment in the list of shell commands
     pos = conf['shell_command_after'].index(fetch_commit_line)
     conf['shell_command_after'].yaml_set_comment_before_after_key(
-        pos, before=comment, indent=2,
+        pos, before=comment, indent=2
     )
     print("📋 cherry pick {}/{} has been added".format(upstream, commit_sha))
 
@@ -821,15 +818,16 @@ def remove_pending_commit(repo, conf, upstream, commit_sha):
         'git fetch {} {}'.format(upstream, commit_sha),
         'git am "$(git format-patch -1 {} -o ../patches)"'.format(commit_sha),
     ]
-    if (lines_to_drop[0] not in conf.get(
+    if lines_to_drop[0] not in conf.get(
         'shell_command_after', {}
-    ) and lines_to_drop[1] not in conf.get('shell_command_after', {})):
+    ) and lines_to_drop[1] not in conf.get('shell_command_after', {}):
         exit_msg(
             'No such reference found in {},'
             ' having troubles removing that:\n'
             'Looking for:\n- {}\n- {}'.format(
-                repo.abs_merges_path, lines_to_drop[0], lines_to_drop[1])
+                repo.abs_merges_path, lines_to_drop[0], lines_to_drop[1]
             )
+        )
     for line in lines_to_drop:
         if line in conf:
             conf['shell_command_after'].remove(line)
