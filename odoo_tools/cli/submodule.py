@@ -199,9 +199,20 @@ def get_target_branch(ctx, target_branch=None):
     If target_branch is given only checks for the override.
     Otherwise create the branch name and check for the override.
     """
-    current_branch = ctx.run(
-        'git symbolic-ref --short HEAD', hide=True
-    ).stdout.strip()
+    for rebase_file in ("rebase-merge", "rebase-apply"):
+        # in case of rebase, the ref of the branch is in one of these
+        # directories, in a file named "head-name"
+        path = ctx.run(
+            "git rev-parse --git-path {}".format(rebase_file), hide=True
+        ).stdout.strip()
+        if os.path.exists(path):
+            with open(os.path.join(path, "head-name")) as rf:
+                current_branch = rf.read().strip().replace("refs/heads/", "")
+            break
+    else:
+        current_branch = ctx.run(
+            'git symbolic-ref --short HEAD', hide=True
+        ).stdout.strip()
     project_id = cookiecutter_context()['project_id']
     if not target_branch:
         commit = ctx.run('git rev-parse HEAD', hide=True).stdout.strip()[:8]
