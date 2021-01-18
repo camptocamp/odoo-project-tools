@@ -427,8 +427,11 @@ def show_prs(ctx, submodule_path=None, state=None):
 
 
 @task
-def show_closed_prs(ctx, submodule_path=None, purge_closed=False):
-    """Show all closed pull requests in pending merges.
+def show_closed_prs(
+    ctx, submodule_path=None, purge_closed=False, purge_merged=False
+):
+    """Show all closed and unmerged pull requests in pending merges.
+
 
     Pass nothing to check all submodules.
     Pass `-s path/to/submodule` to check specific ones.
@@ -437,10 +440,35 @@ def show_closed_prs(ctx, submodule_path=None, purge_closed=False):
         ctx, submodule_path=submodule_path, state='closed'
     )
 
-    if purge_closed:
+    closed_prs = all_repos_prs.get('closed', [])
+    closed_unmerged_prs = [
+        pr for pr in closed_prs if pr.get('merged') == 'not merged'
+    ]
+    closed_merged_prs = [
+        pr for pr in closed_prs if pr.get('merged') == 'merged'
+    ]
+
+    # This list will received all closed and unmerged pr's url to return
+    # If purge_closed is set to True, removed prs will not be returned
+    unmerged_prs_urls = [pr.get('url') for pr in closed_unmerged_prs]
+
+    if closed_unmerged_prs and purge_closed:
         print('Purging closed ones...')
-        for closed_pr_info in all_repos_prs.get('closed', []):
+        for closed_pr_info in closed_unmerged_prs:
+            try:
+                remove_pending(ctx, closed_pr_info['shortcut'])
+                unmerged_prs_urls.remove(closed_pr_info.get('url'))
+            except exceptions.Failure as e:
+                print(
+                    "An error occurs during '{}' removal : {}".format(
+                        closed_pr_info.get('url'), e
+                    )
+                )
+    if closed_merged_prs and purge_merged:
+        print('Purging merged ones...')
+        for closed_pr_info in closed_merged_prs:
             remove_pending(ctx, closed_pr_info['shortcut'])
+    return unmerged_prs_urls
 
 
 def _cmd_git_submodule_update(ctx, path, url):
