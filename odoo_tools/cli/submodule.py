@@ -8,6 +8,7 @@ import re
 from itertools import chain
 
 import requests
+from git import Repo as GitRepo
 from invoke import exceptions, task
 
 from .common import (
@@ -940,3 +941,141 @@ def list_external_dependencies_installed(ctx, submodule_path):
             if mod in migration_modules:
                 print("\t- " + mod)
     print('\nCAREFULL /!\\ \nDependencies are not included in this list')
+
+
+def _get_current_commit_from_submodule(ctx, path):
+    """Returns the current in stage commit for a submodule path
+    """
+    ref_cmd = "git submodule status | grep '%s' | awk '{ print $1 }'" % path
+    commit_hash = ctx.run(ref_cmd, hide=True).stdout
+    # Clean for last carriage return and + at the beginning if stage has changed
+    return commit_hash.strip('\n').strip('+')
+
+
+def _cmd_git_submodule_upgrade(ctx, path, url, branch=None):
+    """Force update of a submodule.
+
+    If a branch is given, the submodule will be reset and checkout
+    """
+    current_ref = _get_current_commit_from_submodule(ctx, path)
+    reference_url = url
+    if AUTOSHARE_ENABLED:
+        index, ar = find_autoshare_repository([url])
+        if ar:
+            if not os.path.exists(ar.repo_dir):
+                ar.prefetch(True)
+            reference_url = ar.repo_dir
+
+    if branch:
+        with cd(build_path(path)):
+            checkout_cmd = (
+                "git reset HEAD --hard &&\
+                            git fetch %s &&\
+                            git checkout %s"
+                % (url, branch)
+            )
+            print(checkout_cmd)
+            ctx.run(checkout_cmd)
+    else:
+        upgrade_cmd = (
+            "git submodule update -f --remote "
+            "--checkout --reference {} {}".format(reference_url, path)
+        )
+        print(upgrade_cmd)
+        ctx.run(upgrade_cmd)
+
+    upgraded_ref = _get_current_commit_from_submodule(ctx, path)
+    if current_ref != upgraded_ref:
+        print(
+            "-- UPGRADED from '{}' to '{}'".format(current_ref, upgraded_ref)
+        )
+    else:
+        print("-- NOT UPGRADED")
+
+
+@task
+def upgrade(ctx, submodule_path=None, force_branch=None):
+    """Update and upgrade a submodule to it's latest commit.
+    Or all submodules if a submodule path is not specified.
+
+    If a module has a pending merges in state `closed` and `not merged`, it will
+    not be processed by this method but a list these pull requests is returned.
+
+    Prerequisites:
+        A submodule MUST BE BASED on a valid remote branch (An issue will occurs
+        if not).
+    """
+    odoo_version = cookiecutter_context().get('odoo_version')
+    project_repo = GitRepo(root_path())
+    submodules = project_repo.submodules
+    unmerged_prs = []
+
+    if submodule_path:
+        submodules = [sm for sm in submodules if sm.path == submodule_path]
+
+    with cd(root_path()):
+        for submodule in submodules:
+            print('--')
+            print('-- Upgrading:', submodule.name)
+            print('-- Path:', submodule.path)
+            print('-- Branch:', submodule.branch_name)
+            branch = None
+            sub_repo = Repo(submodule.path, path_check=False)
+            try:
+
+                # First pass to close pr's
+                # But close `merged` PR's only, not `not merged` !
+                if sub_repo.has_pending_merges():
+                    print('-- Merge file:', sub_repo.merges_path)
+                    unmerged_prs.extend(
+                        show_closed_prs(ctx, sub_repo.path, purge_merged=True)
+                    )
+
+                # Still pending left > merges to update
+                if sub_repo.has_pending_merges():
+                    merges(ctx, sub_repo.path, push=True)
+                    continue
+
+                # No more pending > Upgrade !
+
+                # To avoid issue while upgrading in a branch that does not
+                # exists in the remote or is detached, we must confirm that
+                # branch named differently that the Odoo version is properly
+                # indicated in the gitmodule
+                if force_branch:
+                    branch = force_branch
+                elif (
+                    submodule.branch_name != odoo_version and not force_branch
+                ):
+                    if ask_confirmation(
+                        "Configured target branch differs from current project"
+                        " major version (this can lead to impossible upgrade,"
+                        " you should also properly indicate it in the"
+                        " gitmodules file). "
+                        "Replace by odoo version '%s'?" % odoo_version
+                    ):
+                        branch = odoo_version
+
+                # Update to avoid further issues if in bad state
+                update(ctx, sub_repo.path)
+                # Try to effectively upgrade the submodule
+                _cmd_git_submodule_upgrade(
+                    ctx, sub_repo.path, submodule.url, branch
+                )
+            except Exception as e:
+                # Rollback to previous version
+                update(ctx, sub_repo.path)
+                print(
+                    "ERROR: occurs during '{}' upgrade : {}".format(
+                        submodule.name, e
+                    )
+                )
+    if unmerged_prs:
+        print("\nCAREFULL /!\\")
+        print(
+            "The following closed PR's could NOT be processed automatically,"
+        )
+        print("you have to manually manage them :")
+        for unmerged_pr in unmerged_prs:
+            print("- {}".format(unmerged_pr))
+    return unmerged_prs
