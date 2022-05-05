@@ -800,8 +800,8 @@ def add_pending_commit(repo, conf, upstream, commit_sha):
             "Continue?"
         )
     fetch_commit_line = "git fetch {} {}".format(upstream, commit_sha)
-    pending_mrg_line = 'git am "$(git format-patch -1 {} -o ../patches)"'.format(
-        commit_sha
+    pending_mrg_line = (
+        'git am "$(git format-patch -1 {} -o ../patches)"'.format(commit_sha)
     )
 
     if pending_mrg_line in conf.get('shell_command_after', {}):
@@ -924,7 +924,7 @@ def remove_pending(ctx, entity_url):
 
 
 def get_dependency_module_list(modules):
-    """ Get dependency modules from a list of modules
+    """Get dependency modules from a list of modules
     construct the dependency list from existing modules in addons_path
 
     """
@@ -943,20 +943,20 @@ def get_dependency_module_list(modules):
 def list_external_dependencies_installed(ctx, submodule_path):
     """List installed modules of a specific directory.
 
-        Compare the modules in the submodule path against the installed
-        module in odoo/migration.yml.
+    Compare the modules in the submodule path against the installed
+    module in odoo/migration.yml.
 
-        eg:
-          odoo/external-src/account-closing
-            ├── account_cutoff_accrual_base
-            ├── account_cutoff_base
-            ├── account_cutoff_prepaid
-            ├── account_invoice_start_end_dates
-            └── account_multicurrency_revaluation
+    eg:
+      odoo/external-src/account-closing
+        ├── account_cutoff_accrual_base
+        ├── account_cutoff_base
+        ├── account_cutoff_prepaid
+        ├── account_invoice_start_end_dates
+        └── account_multicurrency_revaluation
 
-          migration.yml contain account_cutoff_base + account_cutoff_prepaid
+      migration.yml contain account_cutoff_base + account_cutoff_prepaid
 
-          so contain account_cutoff_base + account_cutoff_prepaid are returned
+      so contain account_cutoff_base + account_cutoff_prepaid are returned
 
     """
     migration_modules = get_migration_file_modules(MIGRATION_FILE)
@@ -993,8 +993,7 @@ def list_external_dependencies_installed(ctx, submodule_path):
 
 
 def _get_current_commit_from_submodule(ctx, path):
-    """Returns the current in stage commit for a submodule path
-    """
+    """Returns the current in stage commit for a submodule path"""
     ref_cmd = "git submodule status | grep '%s' | awk '{ print $1 }'" % path
     commit_hash = ctx.run(ref_cmd, hide=True).stdout
     # Clean for last carriage return and + at the beginning if stage has changed
