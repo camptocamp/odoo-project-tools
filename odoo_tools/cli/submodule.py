@@ -78,9 +78,7 @@ class Repo(object):
         self.abs_path = build_path(self.path)
         # ensure that given submodule is a mature submodule
         self.abs_merges_path = self.build_submodule_merges_path(self.path)
-        self.merges_path = self.build_submodule_merges_path(
-            self.path, relative=True
-        )
+        self.merges_path = self.build_submodule_merges_path(self.path, relative=True)
         if path_check:
             self._check_paths()
         self.name = self._safe_module_name(name_or_path)
@@ -141,9 +139,7 @@ class Repo(object):
         repo_names = []
         for root, dirs, files in os.walk(path):
             repo_names = [
-                os.path.splitext(fname)[0]
-                for fname in files
-                if fname.endswith('.yml')
+                os.path.splitext(fname)[0] for fname in files if fname.endswith('.yml')
             ]
         return [cls(name) for name in repo_names]
 
@@ -300,16 +296,13 @@ def ls(ctx, dockerfile=True):
     """
     gitmodules = build_path('.gitmodules')
     res = ctx.run(
-        "git config --file %s "
-        "--get-regexp path | awk '{ print $2 }' " % gitmodules,
+        "git config --file %s --get-regexp path | awk '{ print $2 }' " % gitmodules,
         hide=True,
     )
     content = res.stdout
     if dockerfile:
         blacklist = {'odoo/src'}
-        lines = (
-            line for line in content.splitlines() if line not in blacklist
-        )
+        lines = (line for line in content.splitlines() if line not in blacklist)
         lines = chain(lines, ['odoo/src/addons', 'odoo/local-src'])
         lines = ("/%s" % line for line in lines)
         template = "ENV ADDONS_PATH=\"%s\" \\\n"
@@ -442,26 +435,18 @@ def show_prs(ctx, submodule_path=None, state=None):
 
 
 @task
-def show_closed_prs(
-    ctx, submodule_path=None, purge_closed=False, purge_merged=False
-):
+def show_closed_prs(ctx, submodule_path=None, purge_closed=False, purge_merged=False):
     """Show all closed and unmerged pull requests in pending merges.
 
 
     Pass nothing to check all submodules.
     Pass `-s path/to/submodule` to check specific ones.
     """
-    all_repos_prs = show_prs(
-        ctx, submodule_path=submodule_path, state='closed'
-    )
+    all_repos_prs = show_prs(ctx, submodule_path=submodule_path, state='closed')
 
     closed_prs = all_repos_prs.get('closed', [])
-    closed_unmerged_prs = [
-        pr for pr in closed_prs if pr.get('merged') == 'not merged'
-    ]
-    closed_merged_prs = [
-        pr for pr in closed_prs if pr.get('merged') == 'merged'
-    ]
+    closed_unmerged_prs = [pr for pr in closed_prs if pr.get('merged') == 'not merged']
+    closed_merged_prs = [pr for pr in closed_prs if pr.get('merged') == 'merged']
 
     # This list will received all closed and unmerged pr's url to return
     # If purge_closed is set to True, removed prs will not be returned
@@ -527,9 +512,7 @@ def update(ctx, submodule_path=None):
         hide=True,
     )
 
-    module_list = list(
-        zip(paths.stdout.splitlines(), urls.stdout.splitlines())
-    )
+    module_list = list(zip(paths.stdout.splitlines(), urls.stdout.splitlines()))
 
     if submodule_path is not None:
         submodule_path = os.path.normpath(submodule_path)
@@ -572,9 +555,7 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
             # read everything we can reach
             # for reading purposes only
             data = yaml_load(pending_merges.read())
-            submodule_pending_config = data[
-                os.path.join(os.path.pardir, repo.path)
-            ]
+            submodule_pending_config = data[os.path.join(os.path.pardir, repo.path)]
             merges_in_action = submodule_pending_config['merges']
             registered_remotes = submodule_pending_config['remotes']
 
@@ -615,9 +596,7 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
             )
             default_repo = repo.name.replace('_', '-')
             new_namespace = input('Namespace [OCA]: ') or 'OCA'
-            new_repo = (
-                input('Repo name [{}]: '.format(default_repo)) or default_repo
-            )
+            new_repo = input('Repo name [{}]: '.format(default_repo)) or default_repo
             new_remote_url = Repo.build_ssh_url(new_namespace, new_repo)
 
     ctx.run(
@@ -629,20 +608,12 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
     with cd(build_path(relative_name)):
         ctx.run('git remote set-url origin {}'.format(new_remote_url))
 
-    print(
-        'Submodule {} is now being sourced from {}'.format(
-            repo.path, new_remote_url
-        )
-    )
+    print('Submodule {} is now being sourced from {}'.format(repo.path, new_remote_url))
 
     if repo.has_pending_merges():
         # we're being polite here, excode 1 doesn't apply to this answer
-        ask_or_abort(
-            'Rebuild consolidation branch for {}?'.format(relative_name)
-        )
-        push = ask_confirmation(
-            'Push it to `{}\'?'.format(GIT_C2C_REMOTE_NAME)
-        )
+        ask_or_abort('Rebuild consolidation branch for {}?'.format(relative_name))
+        push = ask_confirmation('Push it to `{}\'?'.format(GIT_C2C_REMOTE_NAME))
         merges(ctx, relative_name, push=push)
     else:
         odoo_version = cookiecutter_context()['odoo_version']
@@ -674,9 +645,7 @@ def parse_github_url(entity_spec):
         # as we're not interested in parts 7 and beyond, we're just trimming it
         # this is done to allow passing link w/ trailing garbage to this task
         try:
-            upstream, repo_name, entity_type, entity_id = entity_spec.split(
-                '/'
-            )[3:7]
+            upstream, repo_name, entity_type, entity_id = entity_spec.split('/')[3:7]
         except ValueError:
             msg = (
                 "Could not parse: {}.\n"
@@ -711,9 +680,7 @@ def generate_pending_merges_file_template(repo, upstream):
 
     oca_ocb_remote = False
     if repo.path == 'odoo/src' and upstream == 'odoo':
-        oca_ocb_remote = not ask_confirmation(
-            'Use odoo:odoo instead of OCA/OCB?'
-        )
+        oca_ocb_remote = not ask_confirmation('Use odoo:odoo instead of OCA/OCB?')
 
     remote_upstream_url = repo.ssh_url(upstream)
     remote_c2c_url = repo.ssh_url(GIT_C2C_REMOTE_NAME)
@@ -733,9 +700,7 @@ def generate_pending_merges_file_template(repo, upstream):
         remotes.insert(0, GIT_C2C_REMOTE_NAME, remote_c2c_url)
     config = CommentedMap()
     config.insert(0, 'remotes', remotes)
-    config.insert(
-        1, 'target', '{} {}'.format(GIT_C2C_REMOTE_NAME, default_target)
-    )
+    config.insert(1, 'target', '{} {}'.format(GIT_C2C_REMOTE_NAME, default_target))
     if oca_ocb_remote:
         base_merge = '{} {}'.format('oca', odoo_version)
     else:
@@ -800,8 +765,8 @@ def add_pending_commit(repo, conf, upstream, commit_sha):
             "Continue?"
         )
     fetch_commit_line = "git fetch {} {}".format(upstream, commit_sha)
-    pending_mrg_line = (
-        'git am "$(git format-patch -1 {} -o ../patches)"'.format(commit_sha)
+    pending_mrg_line = 'git am "$(git format-patch -1 {} -o ../patches)"'.format(
+        commit_sha
     )
 
     if pending_mrg_line in conf.get('shell_command_after', {}):
@@ -861,9 +826,9 @@ def remove_pending_commit(repo, conf, upstream, commit_sha):
         'git fetch {} {}'.format(upstream, commit_sha),
         'git am "$(git format-patch -1 {} -o ../patches)"'.format(commit_sha),
     ]
-    if lines_to_drop[0] not in conf.get(
-        'shell_command_after', {}
-    ) and lines_to_drop[1] not in conf.get('shell_command_after', {}):
+    if lines_to_drop[0] not in conf.get('shell_command_after', {}) and lines_to_drop[
+        1
+    ] not in conf.get('shell_command_after', {}):
         exit_msg(
             'No such reference found in {},'
             ' having troubles removing that:\n'
@@ -1034,9 +999,7 @@ def _cmd_git_submodule_upgrade(ctx, path, url, branch=None):
 
     upgraded_ref = _get_current_commit_from_submodule(ctx, path)
     if current_ref != upgraded_ref:
-        print(
-            "-- UPGRADED from '{}' to '{}'".format(current_ref, upgraded_ref)
-        )
+        print("-- UPGRADED from '{}' to '{}'".format(current_ref, upgraded_ref))
     else:
         print("-- NOT UPGRADED")
 
@@ -1092,9 +1055,7 @@ def upgrade(ctx, submodule_path=None, force_branch=None):
                 # indicated in the gitmodule
                 if force_branch:
                     branch = force_branch
-                elif (
-                    submodule.branch_name != odoo_version and not force_branch
-                ):
+                elif submodule.branch_name != odoo_version and not force_branch:
                     if ask_confirmation(
                         "Configured target branch differs from current project"
                         " major version (this can lead to impossible upgrade,"
@@ -1107,22 +1068,16 @@ def upgrade(ctx, submodule_path=None, force_branch=None):
                 # Update to avoid further issues if in bad state
                 update(ctx, sub_repo.path)
                 # Try to effectively upgrade the submodule
-                _cmd_git_submodule_upgrade(
-                    ctx, sub_repo.path, submodule.url, branch
-                )
+                _cmd_git_submodule_upgrade(ctx, sub_repo.path, submodule.url, branch)
             except Exception as e:
                 # Rollback to previous version
                 update(ctx, sub_repo.path)
                 print(
-                    "ERROR: occurs during '{}' upgrade : {}".format(
-                        submodule.name, e
-                    )
+                    "ERROR: occurs during '{}' upgrade : {}".format(submodule.name, e)
                 )
     if unmerged_prs:
         print("\nCAREFULL /!\\")
-        print(
-            "The following closed PR's could NOT be processed automatically,"
-        )
+        print("The following closed PR's could NOT be processed automatically,")
         print("you have to manually manage them :")
         for unmerged_pr in unmerged_prs:
             print("- {}".format(unmerged_pr))
