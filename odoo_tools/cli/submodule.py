@@ -1,6 +1,5 @@
 # Copyright 2017 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
-from __future__ import print_function
 
 import logging
 import os
@@ -48,8 +47,7 @@ except ImportError:
 
 try:
     from ruamel.yaml import YAML
-    from ruamel.yaml.comments import CommentedSeq
-    from ruamel.yaml.comments import CommentedMap
+    from ruamel.yaml.comments import CommentedMap, CommentedSeq
 except ImportError:
     print('Missing ruamel.yaml from requirements')
     print('Please run `pip install -r tasks/requirements.txt`')
@@ -70,7 +68,7 @@ yaml = YAML()
 git_aggregator.main.setup_logger()
 
 
-class Repo(object):
+class Repo:
     """Handle repository/submodule homogenously."""
 
     def __init__(self, name_or_path, path_check=True):
@@ -159,7 +157,7 @@ class Repo(object):
     def update_merges_config(self, config):
         # get former config if any
         if os.path.exists(self.abs_merges_path):
-            with open(self.abs_merges_path, 'r') as f:
+            with open(self.abs_merges_path) as f:
                 data = yaml_load(f.read())
         else:
             data = {}
@@ -1033,7 +1031,6 @@ def upgrade(ctx, submodule_path=None, force_branch=None):
             branch = None
             sub_repo = Repo(submodule.path, path_check=False)
             try:
-
                 # First pass to close pr's
                 # But close `merged` PR's only, not `not merged` !
                 if sub_repo.has_pending_merges():
