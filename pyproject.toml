@@ -1,0 +1,16 @@
+[build-system]
+requires = [
+    "setuptools>=45",
+    "setuptools_scm>=6.2",
+    "wheel"
+]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 88
+skip-string-normalization = "True"
+
+[tool.towncrier]
+package = "odoo-project-tasks"
+filename = "HISTORY.rst"
+template = "template.rst"
