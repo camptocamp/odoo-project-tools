@@ -6,7 +6,7 @@ with open("README.md") as f:
     readme = f.read()
 
 requirements = [
-    "future==0.16.0",
+    "future==0.18.3",
     "invoke==2.0.0",
     "requests==2.25.1",
     "git-aggregator>=1.7.2",
