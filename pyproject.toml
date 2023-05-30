@@ -1,16 +1,64 @@
-[build-system]
-requires = [
-    "setuptools>=45",
-    "setuptools_scm>=6.2",
-    "wheel"
+[project]
+name = "odoo-tools"
+authors = [
+    {name = "Camptocamp SA", email="info@camptocamp.com"},
 ]
+description = "Our Odoo project tools"
+readme = "README.md"
+keywords = ["odoo", "project"]
+license = {file = "LICENSE"}
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Framework :: Odoo",
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+]
+dependencies = [
+    "future==0.18.3",
+    "invoke==2.0.0",
+    "requests==2.25.1",
+    "git-aggregator>=1.7.2",
+    "git-autoshare>=1.0.0b2",
+    "passlib",
+    "clipboard==0.0.4",
+    "marabunta>=0.10.6",
+    "pre-commit",
+    "psycopg2-binary>=2.7.6",
+    "gitpython",
+    "ruamel.yaml>=0.15.66",
+    "kaptan==0.5.12",
+    "PyYAML==5.4.1",
+    "wheel",
+    "cookiecutter",
+]
+requires-python = ">=3.8"
+dynamic = ["version"]
+
+[project.urls]
+homepage = "https://github.com/camptocamp/odoo-project-tools"
+documentation = "https://github.com/camptocamp/odoo-project-tools"
+repository = "https://github.com/camptocamp/odoo-project-tools"
+
+[project.scripts]
+otools-tasks = "odoo_tools.tasks.main:program.run"
+
+[build-system]
+requires = ["setuptools>=64", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages]
+find = {}
+
+[tool.setuptools_scm]
+
 
 [tool.black]
 line-length = 88
 skip-string-normalization = "True"
 
 [tool.towncrier]
-package = "odoo-project-tasks"
+package = "odoo-project-tools"
 filename = "HISTORY.rst"
 template = "template.rst"
