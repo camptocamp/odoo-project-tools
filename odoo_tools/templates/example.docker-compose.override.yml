@@ -1,0 +1,8 @@
+version: '3.8'
+services: 
+  odoo: 
+    build: 
+      context: .
+      args: 
+        UID: 1043
+        DEV_MODE: 1
