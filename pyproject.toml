@@ -44,6 +44,13 @@ repository = "https://github.com/camptocamp/odoo-project-tools"
 [project.scripts]
 otools-tasks = "odoo_tools.tasks.main:program.run"
 
+
+[project.optional-dependencies]
+test = [
+  'coverage',
+  'pytest',
+]
+
 [build-system]
 requires = ["setuptools>=64", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
