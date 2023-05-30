@@ -25,6 +25,7 @@ try:
     from builtins import input
 except ImportError:
     print("Missing install future from requirements")
+    # FIXME
     print("Please run `pip install -r tasks/requirements.txt`")
 
 try:

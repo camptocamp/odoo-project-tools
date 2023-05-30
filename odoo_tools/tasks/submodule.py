@@ -32,6 +32,7 @@ try:
     import git_aggregator.repo
 except ImportError:
     print("Missing git-aggregator from requirements")
+    # FIXME
     print("Please run `pip install -r tasks/requirements.txt`")
 
 try:
