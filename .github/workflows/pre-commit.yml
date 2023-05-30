@@ -1,13 +1,12 @@
-name: Linting and tests
+name: pre-commit
+
 on:
   pull_request:
     branches:
-      - 'main'
+      - "main"
   push:
     branches:
-      - '*'
-    tags:
-      - '*.*.*'
+      - "main"
 
 jobs:
   pre-commit:
