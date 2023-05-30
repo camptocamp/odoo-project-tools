@@ -34,7 +34,7 @@ setup(
     author="Camptocamp SA",
     author_email="info@camptocamp.com",
     url="https://github.com/camptocamp/odoo-project-tasks",
-    packages=["tasks"],
+    packages=["src"],
     entry_points={"console_scripts": ["odoo-tools=tasks.main:program.run"]},
     include_package_data=True,
     install_requires=requirements,
