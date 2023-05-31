@@ -21,4 +21,12 @@ def test_pkg_class():
     assert pkg.pypi_name == f"odoo-addon-{addon_name}"
     assert pkg.latest_version == "1.9.0"
     assert pkg.pinned_version is None
+    old_req = f"{pkg.pypi_name} @ git+https://github.com/OCA/repo@refs/pull/3/head#subdirectory=setup/{pkg.name}"
+    with runner.isolated_filesystem():
+        make_fake_project_root()
+        with open("./requirements.txt", "w") as fd:
+            fd.write(old_req)
+        req_path = os.getcwd() + "/requirements.txt"
+        pkg = pkg_utils.Package(addon_name, req_filepath=req_path)
+    assert pkg.has_pending_merge()
 
