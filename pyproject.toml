@@ -32,6 +32,8 @@ dependencies = [
     "PyYAML==5.4.1",
     "wheel",
     "cookiecutter",
+    "click",
+    "importlib_resources; python_version < '3.9'",
 ]
 requires-python = ">=3.8"
 dynamic = ["version"]
@@ -43,7 +45,7 @@ repository = "https://github.com/camptocamp/odoo-project-tools"
 
 [project.scripts]
 otools-tasks = "odoo_tools.tasks.main:program.run"
-
+otools-project = "odoo_tools.project:cli"
 
 [project.optional-dependencies]
 test = [
