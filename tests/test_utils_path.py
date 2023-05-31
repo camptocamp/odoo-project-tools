@@ -7,6 +7,7 @@ from click.testing import CliRunner
 
 from odoo_tools.utils import path as path_utils
 from odoo_tools import exceptions
+from .common import make_fake_project_root
 
 def test_root_path():
     runner = CliRunner()
@@ -15,10 +16,7 @@ def test_root_path():
         nested_path = "nested/project/path"
         os.makedirs(nested_path, exist_ok=True)
         assert os.path.exists(f"./{nested_path}")
-        marker_file = ".cookiecutter.context.yml"
-        with open(f"./{marker_file}", "w") as fd:
-            fd.write("nothing special")
-        assert os.path.exists(f"./{marker_file}")
+        make_fake_project_root()
         assert path_utils.root_path() == curr_dir
         os.chdir(nested_path)
         assert path_utils.root_path() == curr_dir
