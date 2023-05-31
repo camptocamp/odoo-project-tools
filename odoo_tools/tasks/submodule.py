@@ -10,18 +10,17 @@ import requests
 from git import Repo as GitRepo
 from invoke import exceptions, task
 
+from ..utils.path import build_path, root_path
 from .common import (
     GIT_C2C_REMOTE_NAME,
     MIGRATION_FILE,
     PENDING_MERGES_DIR,
     ask_confirmation,
     ask_or_abort,
-    build_path,
     cd,
     cookiecutter_context,
     exit_msg,
     get_migration_file_modules,
-    root_path,
     yaml_load,
 )
 from .module import Module

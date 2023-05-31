@@ -13,6 +13,8 @@ from subprocess import Popen
 import yaml
 from invoke import exceptions
 
+from ..utils.path import build_path
+
 try:
     from ruamel.yaml import YAML
 except ImportError:
@@ -23,36 +25,6 @@ except ImportError:
 def exit_msg(message):
     print(message)
     raise exceptions.Exit(1)
-
-
-def root_path():
-    current_dir = (
-        os.getcwd()
-    )  # directory from where search for .cookiecutter.context.yml starts
-    max_depth = 5
-    while max_depth > 0:
-        file_list = os.listdir(current_dir)
-        parent_dir = os.path.dirname(current_dir)
-        if ".cookiecutter.context.yml" in file_list:
-            return current_dir
-        else:
-            if current_dir == parent_dir:
-                break
-            else:
-                current_dir = parent_dir
-        max_depth -= 1
-    exit_msg("Missing cookiecutter.context.yml. It's not a project directory. Exiting")
-
-
-def build_path(path, from_root=True, from_file=None):
-    if not from_file and from_root:
-        base_path = root_path()
-    else:
-        if from_file is None:
-            from_file = __file__
-        base_path = os.path.dirname(os.path.realpath(from_file))
-
-    return os.path.join(base_path, path)
 
 
 # TODO: change depending on new structure
