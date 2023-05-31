@@ -14,6 +14,12 @@ def get_fixture(fname):
         return fd.read()
 
 
+def mock_pypi_version_cache(pkg_name, version):
+    """Hijack temporary cache to avoid mocking requests every time."""
+    from odoo_tools.utils.pypi import TMP_CACHE
+    TMP_CACHE[pkg_name] = version
+
+
 def make_fake_project_root(marker_file=".cookiecutter.context.yml", req_file="requirements.txt"):
     with open(marker_file, "w") as fd:
         fd.write("ok")
