@@ -8,7 +8,6 @@ import shutil
 import tempfile
 from contextlib import contextmanager
 from functools import lru_cache
-from subprocess import Popen
 
 import yaml
 from invoke import exceptions
@@ -203,13 +202,3 @@ def get_migration_file_modules(migration_file):
         except KeyError:
             pass
     return modules
-
-
-def has_exec(name):
-    try:
-        devnull = open(os.devnull, "w")
-        Popen([name], stdout=devnull, stderr=devnull).communicate()
-    except OSError as err:
-        if err.errno == os.errno.ENOENT:
-            return False
-    return True
