@@ -12,6 +12,7 @@ from invoke import exceptions, task
 
 from ..utils.gh import parse_github_url
 from ..utils.path import build_path, root_path
+from ..utils.yaml import yaml_load
 from .common import (
     GIT_C2C_REMOTE_NAME,
     MIGRATION_FILE,
@@ -22,7 +23,6 @@ from .common import (
     cookiecutter_context,
     exit_msg,
     get_migration_file_modules,
-    yaml_load,
 )
 from .module import Module
 

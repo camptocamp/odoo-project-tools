@@ -9,16 +9,10 @@ import tempfile
 from contextlib import contextmanager
 from functools import lru_cache
 
-import yaml
 from invoke import exceptions
 
 from ..utils.path import build_path
-
-try:
-    from ruamel.yaml import YAML
-except ImportError:
-    print("Missing ruamel.yaml from requirements")
-    print("Please run `pip install -r tasks/requirements.txt`")
+from ..utils.yaml import yaml_load
 
 
 def exit_msg(message):
@@ -50,10 +44,6 @@ def gpg_decrypt_to_file(ctx, file_name, password=False):
             password
         )
     ctx.run("gpg --yes {} '{}'".format(passphrase, file_name))
-
-
-def yaml_load(stream, Loader=None):
-    return yaml.load(stream, Loader=Loader or yaml.FullLoader)
 
 
 @lru_cache(maxsize=None)
@@ -123,22 +113,6 @@ def search_replace(file_path, old, new):
         with open(file_path, "w") as f_w:
             for line in f_r:
                 f_w.write(line.replace(old, new))
-
-
-def update_yml_file(path, new_data, main_key=None):
-    yaml = YAML()
-    # preservation of indentation
-    yaml.indent(mapping=2, sequence=4, offset=2)
-
-    with open(path) as f:
-        data = yaml_load(f.read())
-        if main_key:
-            data[main_key].update(new_data)
-        else:
-            data.update(new_data)
-
-    with open(path, "w") as f:
-        yaml.dump(data, f)
 
 
 def git_ignores(file):
