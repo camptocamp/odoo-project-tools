@@ -6,7 +6,11 @@ import os
 from ..exceptions import ProjectRootFolderNotFound
 
 
-def root_path(marker_file=".cookiecutter.context.yml", raise_if_missing=True):
+def get_root_marker():
+    return ".cookiecutter.context.yml"
+
+
+def root_path(marker_file=get_root_marker(), raise_if_missing=True):
     current_dir = (
         os.getcwd()
     )  # directory from where search for .cookiecutter.context.yml starts
