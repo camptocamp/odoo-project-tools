@@ -221,8 +221,5 @@ services:
         f.write(data)
 
 
-print("Restoring database")
-
-
 def restart(ctx):
     ctx.run("docker-compose down")
