@@ -12,6 +12,7 @@ from invoke import exceptions, task
 
 from ..utils.gh import parse_github_url
 from ..utils.path import build_path, root_path
+from ..utils.proj import get_project_manifest_key
 from ..utils.yaml import yaml_load
 from .common import (
     GIT_C2C_REMOTE_NAME,
@@ -20,7 +21,6 @@ from .common import (
     ask_confirmation,
     ask_or_abort,
     cd,
-    cookiecutter_context,
     exit_msg,
     get_migration_file_modules,
 )
@@ -202,7 +202,7 @@ def get_target_branch(ctx, target_branch=None):
         current_branch = ctx.run(
             "git symbolic-ref --short HEAD", hide=True
         ).stdout.strip()
-    project_id = cookiecutter_context()["project_id"]
+    project_id = get_project_manifest_key("project_id")
     if not target_branch:
         commit = ctx.run("git rev-parse HEAD", hide=True).stdout.strip()[:8]
         target_branch = "merge-branch-{}-{}-{}".format(
@@ -236,7 +236,7 @@ def init(ctx):
         r"git config -f %s --get-regexp '^submodule\..*\.path$'" % gitmodules,
         hide=True,
     )
-    odoo_version = cookiecutter_context()["odoo_version"]
+    odoo_version = get_project_manifest_key("odoo_version")
     with cd(root_path()):
         for line in res.stdout.splitlines():
             path_key, path = line.split()
@@ -613,7 +613,7 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
         push = ask_confirmation("Push it to `{}'?".format(GIT_C2C_REMOTE_NAME))
         merges(ctx, relative_name, push=push)
     else:
-        odoo_version = cookiecutter_context()["odoo_version"]
+        odoo_version = get_project_manifest_key("odoo_version")
         if ask_confirmation(
             "Submodule {} has no pending merges. Update it to {}?".format(
                 relative_name, odoo_version
@@ -641,9 +641,10 @@ def generate_pending_merges_file_template(repo, upstream):
 
     remote_upstream_url = repo.ssh_url(upstream)
     remote_c2c_url = repo.ssh_url(GIT_C2C_REMOTE_NAME)
-    cc_context = cookiecutter_context()
-    odoo_version = cc_context["odoo_version"]
-    default_target = "merge-branch-{}-master".format(cc_context["project_id"])
+    odoo_version = get_project_manifest_key("odoo_version")
+    default_target = "merge-branch-{}-master".format(
+        get_project_manifest_key("project_id")
+    )
     remotes = CommentedMap()
     remotes.insert(0, upstream, remote_upstream_url)
 
@@ -667,7 +668,7 @@ def generate_pending_merges_file_template(repo, upstream):
 
 
 def add_pending_pull_request(repo, conf, upstream, pull_id):
-    odoo_version = cookiecutter_context().get("odoo_version")
+    odoo_version = get_project_manifest_key("odoo_version")
     pending_mrg_line = "{} refs/pull/{}/head".format(upstream, pull_id)
     if pending_mrg_line in conf.get("merges", {}):
         exit_msg(
@@ -974,7 +975,7 @@ def upgrade(ctx, submodule_path=None, force_branch=None):
         A submodule MUST BE BASED on a valid remote branch (An issue will occurs
         if not).
     """
-    odoo_version = cookiecutter_context().get("odoo_version")
+    odoo_version = get_project_manifest_key("odoo_version")
     project_repo = GitRepo(root_path())
     submodules = project_repo.submodules
     unmerged_prs = []

@@ -7,7 +7,6 @@ import os
 import shutil
 import tempfile
 from contextlib import contextmanager
-from functools import lru_cache
 
 from invoke import exceptions
 
@@ -27,7 +26,6 @@ HISTORY_FILE = build_path("HISTORY.rst")
 PENDING_MERGES_DIR = build_path("pending-merges.d")
 MIGRATION_FILE = build_path("odoo/migration.yml")
 GITIGNORE_FILE = build_path(".gitignore")
-COOKIECUTTER_CONTEXT = build_path(".cookiecutter.context.yml")
 GIT_C2C_REMOTE_NAME = "camptocamp"
 TEMPLATE_GIT_REPO_URL = "git@github.com:{}.git"
 TEMPLATE_GIT = TEMPLATE_GIT_REPO_URL.format("camptocamp/odoo-template")
@@ -44,12 +42,6 @@ def gpg_decrypt_to_file(ctx, file_name, password=False):
             password
         )
     ctx.run("gpg --yes {} '{}'".format(passphrase, file_name))
-
-
-@lru_cache(maxsize=None)
-def cookiecutter_context():
-    with open(COOKIECUTTER_CONTEXT) as f:
-        return yaml_load(f.read())
 
 
 @contextmanager
