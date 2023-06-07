@@ -1,8 +1,6 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-import os
-from click.testing import CliRunner
 import responses
 
 from odoo_tools.utils import pypi as pypi_utils
@@ -31,6 +29,11 @@ def test_get_last_pypi_version():
 
 def test_odoo_name_to_pkg_name():
     assert pypi_utils.odoo_name_to_pkg_name("edi_oca") == "odoo-addon-edi_oca"
-    assert pypi_utils.odoo_name_to_pkg_name("odoo-addon-edi_oca") == "odoo-addon-edi_oca"
+    assert (
+        pypi_utils.odoo_name_to_pkg_name("odoo-addon-edi_oca") == "odoo-addon-edi_oca"
+    )
     assert pypi_utils.odoo_name_to_pkg_name("foo") == "odoo-addon-foo"
-    assert pypi_utils.odoo_name_to_pkg_name("foo", odoo_version="14.9") == "odoo-addon14-foo"
+    assert (
+        pypi_utils.odoo_name_to_pkg_name("foo", odoo_version="14.9")
+        == "odoo-addon14-foo"
+    )

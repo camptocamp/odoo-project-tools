@@ -1,13 +1,16 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-import pytest
 import os
+
+import pytest
 from click.testing import CliRunner
 
-from odoo_tools.utils import path as path_utils
 from odoo_tools import exceptions
+from odoo_tools.utils import path as path_utils
+
 from .common import make_fake_project_root
+
 
 def test_root_path():
     runner = CliRunner()
@@ -23,4 +26,3 @@ def test_root_path():
         os.chdir("/tmp")
         with pytest.raises(exceptions.ProjectRootFolderNotFound):
             path_utils.root_path()
-

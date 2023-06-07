@@ -1,12 +1,13 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-import pytest
 import os
+
 from click.testing import CliRunner
 
 from odoo_tools.utils import pkg as pkg_utils
-from .common import mock_pypi_version_cache, make_fake_project_root
+
+from .common import make_fake_project_root, mock_pypi_version_cache
 
 
 def test_pkg_class():
@@ -29,4 +30,3 @@ def test_pkg_class():
         req_path = os.getcwd() + "/requirements.txt"
         pkg = pkg_utils.Package(addon_name, req_filepath=req_path)
     assert pkg.has_pending_merge()
-

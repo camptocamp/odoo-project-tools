@@ -4,7 +4,9 @@
 import os
 
 from click.testing import CliRunner
+
 from odoo_tools.project import init
+
 
 def test_init():
     runner = CliRunner()
