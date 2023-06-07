@@ -20,9 +20,9 @@ def test_root_path():
         os.makedirs(nested_path, exist_ok=True)
         assert os.path.exists(f"./{nested_path}")
         make_fake_project_root()
-        assert path_utils.root_path() == curr_dir
+        assert path_utils.root_path().as_posix() == curr_dir
         os.chdir(nested_path)
-        assert path_utils.root_path() == curr_dir
+        assert path_utils.root_path().as_posix() == curr_dir
         os.chdir("/tmp")
         with pytest.raises(exceptions.ProjectRootFolderNotFound):
             path_utils.root_path()

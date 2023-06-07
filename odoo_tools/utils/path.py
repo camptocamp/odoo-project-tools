@@ -2,6 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import os
+from pathlib import PosixPath
 
 from ..exceptions import ProjectRootFolderNotFound
 
@@ -19,7 +20,7 @@ def root_path(marker_file=get_root_marker(), raise_if_missing=True):
         file_list = os.listdir(current_dir)
         parent_dir = os.path.dirname(current_dir)
         if marker_file in file_list:
-            return current_dir
+            return PosixPath(current_dir)
         else:
             if current_dir == parent_dir:
                 break
