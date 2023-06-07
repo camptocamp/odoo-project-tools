@@ -314,14 +314,18 @@ def merges(ctx, submodule_path, push=True, target_branch=None):
     target_branch = get_target_branch(ctx, target_branch=target_branch)
     print("Building and pushing to camptocamp/{}".format(target_branch))
     print()
+    aggregator = _aggregate(repo, target_branch=target_branch)
+    process_travis_file(ctx, repo)
+    if push:
+        aggregator.push()
+
+
+def _aggregate(repo, target_branch=None):
     aggregator = repo.get_aggregator(
         target={"branch": target_branch, "remote": GIT_C2C_REMOTE_NAME}
     )
     aggregator.aggregate()
-
-    process_travis_file(ctx, repo)
-    if push:
-        aggregator.push()
+    return aggregator
 
 
 @task
@@ -364,12 +368,14 @@ def process_travis_file(ctx, repo):
 
 
 @task
-def show_prs(ctx, submodule_path=None, state=None):
+def show_prs(ctx, submodule_path=None, state=None, purge=None):
     """Show all pull requests in pending merges.
 
     Pass nothing to check all submodules.
     Pass `-s path/to/submodule` to check specific ones.
     """
+    if purge:
+        assert purge in ("closed", "merged")
     logging.getLogger("requests").setLevel(logging.ERROR)
     if submodule_path is None:
         repositories = Repo.repositories_from_pending_folder()
@@ -409,6 +415,10 @@ def show_prs(ctx, submodule_path=None, state=None):
                     "  {})".format(str(i).zfill(2)),
                     pr_info_msg.format(**pr_info["raw"]),
                 )
+    if purge and all_repos_prs.get("closed", []):
+        kw = {f"purge_{purge}": True}
+        _purge_closed_prs(ctx, all_repos_prs, **kw)
+        # TODO: ask for re-aggregate?
     return all_repos_prs
 
 
@@ -421,7 +431,16 @@ def show_closed_prs(ctx, submodule_path=None, purge_closed=False, purge_merged=F
     Pass `-s path/to/submodule` to check specific ones.
     """
     all_repos_prs = show_prs(ctx, submodule_path=submodule_path, state="closed")
+    return _purge_closed_prs(
+        ctx,
+        all_repos_prs,
+        purge_closed=purge_closed,
+        purge_merged=purge_merged,
+    )
 
+
+def _purge_closed_prs(ctx, all_repos_prs, purge_merged=False, purge_closed=False):
+    assert purge_closed or purge_merged
     closed_prs = all_repos_prs.get("closed", [])
     closed_unmerged_prs = [pr for pr in closed_prs if pr.get("merged") == "not merged"]
     closed_merged_prs = [pr for pr in closed_prs if pr.get("merged") == "merged"]
@@ -526,7 +545,6 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
     """
     assert submodule_path or repo
     repo = repo or Repo(submodule_path)
-
     if repo.has_pending_merges():
         with open(repo.abs_merges_path) as pending_merges:
             # read everything we can reach
