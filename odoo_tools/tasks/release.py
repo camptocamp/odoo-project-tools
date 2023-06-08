@@ -8,6 +8,7 @@ from distutils.version import StrictVersion
 from invoke import exceptions, task
 from marabunta.version import MarabuntaVersion
 
+from ..utils.proj import get_project_manifest_key
 from .common import (
     GIT_C2C_REMOTE_NAME,
     HISTORY_FILE,
@@ -15,7 +16,6 @@ from .common import (
     VERSION_FILE,
     cd,
     check_git_diff,
-    cookiecutter_context,
     current_version,
     exit_msg,
 )
@@ -46,7 +46,7 @@ def push_branches(ctx, force=False):
     to build a new patch branch from the same commits if required.
     """
     version = current_version()
-    project_id = cookiecutter_context()["project_id"]
+    project_id = get_project_manifest_key("project_id")
     branch_name = "merge-branch-{}-{}".format(project_id, version)
     response = input("Push local branches to {}? (Y/n) ".format(branch_name))
     if response in ("n", "N", "no"):

@@ -12,6 +12,8 @@ from invoke import exceptions, task
 
 from ..utils.gh import parse_github_url
 from ..utils.path import build_path, root_path
+from ..utils.proj import get_project_manifest_key
+from ..utils.yaml import yaml_load
 from .common import (
     GIT_C2C_REMOTE_NAME,
     MIGRATION_FILE,
@@ -19,10 +21,8 @@ from .common import (
     ask_confirmation,
     ask_or_abort,
     cd,
-    cookiecutter_context,
     exit_msg,
     get_migration_file_modules,
-    yaml_load,
 )
 from .module import Module
 
@@ -202,7 +202,7 @@ def get_target_branch(ctx, target_branch=None):
         current_branch = ctx.run(
             "git symbolic-ref --short HEAD", hide=True
         ).stdout.strip()
-    project_id = cookiecutter_context()["project_id"]
+    project_id = get_project_manifest_key("project_id")
     if not target_branch:
         commit = ctx.run("git rev-parse HEAD", hide=True).stdout.strip()[:8]
         target_branch = "merge-branch-{}-{}-{}".format(
@@ -236,7 +236,7 @@ def init(ctx):
         r"git config -f %s --get-regexp '^submodule\..*\.path$'" % gitmodules,
         hide=True,
     )
-    odoo_version = cookiecutter_context()["odoo_version"]
+    odoo_version = get_project_manifest_key("odoo_version")
     with cd(root_path()):
         for line in res.stdout.splitlines():
             path_key, path = line.split()
@@ -314,14 +314,18 @@ def merges(ctx, submodule_path, push=True, target_branch=None):
     target_branch = get_target_branch(ctx, target_branch=target_branch)
     print("Building and pushing to camptocamp/{}".format(target_branch))
     print()
+    aggregator = _aggregate(repo, target_branch=target_branch)
+    process_travis_file(ctx, repo)
+    if push:
+        aggregator.push()
+
+
+def _aggregate(repo, target_branch=None):
     aggregator = repo.get_aggregator(
         target={"branch": target_branch, "remote": GIT_C2C_REMOTE_NAME}
     )
     aggregator.aggregate()
-
-    process_travis_file(ctx, repo)
-    if push:
-        aggregator.push()
+    return aggregator
 
 
 @task
@@ -364,12 +368,14 @@ def process_travis_file(ctx, repo):
 
 
 @task
-def show_prs(ctx, submodule_path=None, state=None):
+def show_prs(ctx, submodule_path=None, state=None, purge=None):
     """Show all pull requests in pending merges.
 
     Pass nothing to check all submodules.
     Pass `-s path/to/submodule` to check specific ones.
     """
+    if purge:
+        assert purge in ("closed", "merged")
     logging.getLogger("requests").setLevel(logging.ERROR)
     if submodule_path is None:
         repositories = Repo.repositories_from_pending_folder()
@@ -409,6 +415,10 @@ def show_prs(ctx, submodule_path=None, state=None):
                     "  {})".format(str(i).zfill(2)),
                     pr_info_msg.format(**pr_info["raw"]),
                 )
+    if purge and all_repos_prs.get("closed", []):
+        kw = {f"purge_{purge}": True}
+        _purge_closed_prs(ctx, all_repos_prs, **kw)
+        # TODO: ask for re-aggregate?
     return all_repos_prs
 
 
@@ -421,7 +431,16 @@ def show_closed_prs(ctx, submodule_path=None, purge_closed=False, purge_merged=F
     Pass `-s path/to/submodule` to check specific ones.
     """
     all_repos_prs = show_prs(ctx, submodule_path=submodule_path, state="closed")
+    return _purge_closed_prs(
+        ctx,
+        all_repos_prs,
+        purge_closed=purge_closed,
+        purge_merged=purge_merged,
+    )
 
+
+def _purge_closed_prs(ctx, all_repos_prs, purge_merged=False, purge_closed=False):
+    assert purge_closed or purge_merged
     closed_prs = all_repos_prs.get("closed", [])
     closed_unmerged_prs = [pr for pr in closed_prs if pr.get("merged") == "not merged"]
     closed_merged_prs = [pr for pr in closed_prs if pr.get("merged") == "merged"]
@@ -526,7 +545,6 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
     """
     assert submodule_path or repo
     repo = repo or Repo(submodule_path)
-
     if repo.has_pending_merges():
         with open(repo.abs_merges_path) as pending_merges:
             # read everything we can reach
@@ -595,7 +613,7 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
         push = ask_confirmation("Push it to `{}'?".format(GIT_C2C_REMOTE_NAME))
         merges(ctx, relative_name, push=push)
     else:
-        odoo_version = cookiecutter_context()["odoo_version"]
+        odoo_version = get_project_manifest_key("odoo_version")
         if ask_confirmation(
             "Submodule {} has no pending merges. Update it to {}?".format(
                 relative_name, odoo_version
@@ -623,9 +641,10 @@ def generate_pending_merges_file_template(repo, upstream):
 
     remote_upstream_url = repo.ssh_url(upstream)
     remote_c2c_url = repo.ssh_url(GIT_C2C_REMOTE_NAME)
-    cc_context = cookiecutter_context()
-    odoo_version = cc_context["odoo_version"]
-    default_target = "merge-branch-{}-master".format(cc_context["project_id"])
+    odoo_version = get_project_manifest_key("odoo_version")
+    default_target = "merge-branch-{}-master".format(
+        get_project_manifest_key("project_id")
+    )
     remotes = CommentedMap()
     remotes.insert(0, upstream, remote_upstream_url)
 
@@ -649,7 +668,7 @@ def generate_pending_merges_file_template(repo, upstream):
 
 
 def add_pending_pull_request(repo, conf, upstream, pull_id):
-    odoo_version = cookiecutter_context().get("odoo_version")
+    odoo_version = get_project_manifest_key("odoo_version")
     pending_mrg_line = "{} refs/pull/{}/head".format(upstream, pull_id)
     if pending_mrg_line in conf.get("merges", {}):
         exit_msg(
@@ -956,7 +975,7 @@ def upgrade(ctx, submodule_path=None, force_branch=None):
         A submodule MUST BE BASED on a valid remote branch (An issue will occurs
         if not).
     """
-    odoo_version = cookiecutter_context().get("odoo_version")
+    odoo_version = get_project_manifest_key("odoo_version")
     project_repo = GitRepo(root_path())
     submodules = project_repo.submodules
     unmerged_prs = []

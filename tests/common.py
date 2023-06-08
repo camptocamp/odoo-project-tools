@@ -3,6 +3,8 @@
 
 from pathlib import PosixPath
 
+from odoo_tools.utils.path import get_root_marker
+
 FIXTURES_PATH = PosixPath(__file__).parent / "fixtures"
 
 
@@ -22,10 +24,23 @@ def mock_pypi_version_cache(pkg_name, version):
     TMP_CACHE[pkg_name] = version
 
 
-def make_fake_project_root(
-    marker_file=".cookiecutter.context.yml", req_file="requirements.txt"
-):
+FAKE_MANIFEST = """
+customer_name: ACME Inc.
+odoo_version: '16.0'
+customer_shortname: acme
+repo_name: acme_odoo
+project_id: '1234'
+project_name: acme_odoo
+odoo_company_name: ACME Inc.
+country: ch
+odoo_main_lang: de_DE
+odoo_aux_langs: fr_CH;it_IT
+platform_name: azure
+"""
+
+
+def make_fake_project_root(marker_file=get_root_marker(), req_file="requirements.txt"):
     with open(marker_file, "w") as fd:
-        fd.write("ok")
+        fd.write(FAKE_MANIFEST)
     with open(req_file, "w") as fd:
         fd.write("")

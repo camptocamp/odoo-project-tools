@@ -10,15 +10,15 @@ from datetime import datetime
 import psycopg2
 from invoke import task
 
-from .common import cd, cookiecutter_context, exit_msg, make_dir
+from ..utils.proj import get_project_manifest_key
+from .common import cd, exit_msg, make_dir
 
 
 def get_default_parameters():
-    context = cookiecutter_context()
     # we assume that country -> fr|ch can be used as a platform
-    # some projects doesn't have country in cookiecutter context
+    # some projects doesn't have country in manifest
     # to get country you can update project from odoo-template
-    ctx_platform = context.get("country")
+    ctx_platform = get_project_manifest_key("country")
     assert ctx_platform, "Please specify the platform"
 
     # most of the project names are <single word project name>_odoo form
@@ -30,7 +30,7 @@ def get_default_parameters():
     # e.g. fleury-michon-traiteur-dedicated
     # project_name will be fleury-michon-traiteur
     # but on argocd apps we have fleury-michon-traiteur-dedicated
-    project_name = context.get("project_name")
+    project_name = get_project_manifest_key("project_name")
     ctx_customer = "-".join(project_name.split("_")[:-1])
     return ctx_platform, ctx_customer
 
@@ -390,7 +390,7 @@ def local_dump(ctx, db_name="odoodb", path="."):
     with ensure_db_container_up(ctx):
         db_port = get_db_container_port(ctx)
         username = getpass.getuser()
-        project_name = cookiecutter_context()["project_name"]
+        project_name = get_project_manifest_key("project_name")
         dump_name = "{}_{}-{}.pg".format(
             username, project_name, datetime.now().strftime("%Y%m%d-%H%M%S")
         )

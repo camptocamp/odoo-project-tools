@@ -15,7 +15,7 @@ from .pypi import pkg_name_to_odoo_name
 
 
 def get_project_req():
-    return root_path() + "/requirements.txt"
+    return root_path() / "requirements.txt"
 
 
 def get_requirements(req_filepath=None):

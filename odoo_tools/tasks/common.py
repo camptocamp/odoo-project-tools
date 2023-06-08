@@ -7,19 +7,11 @@ import os
 import shutil
 import tempfile
 from contextlib import contextmanager
-from functools import lru_cache
-from subprocess import Popen
 
-import yaml
 from invoke import exceptions
 
 from ..utils.path import build_path
-
-try:
-    from ruamel.yaml import YAML
-except ImportError:
-    print("Missing ruamel.yaml from requirements")
-    print("Please run `pip install -r tasks/requirements.txt`")
+from ..utils.yaml import yaml_load
 
 
 def exit_msg(message):
@@ -34,7 +26,6 @@ HISTORY_FILE = build_path("HISTORY.rst")
 PENDING_MERGES_DIR = build_path("pending-merges.d")
 MIGRATION_FILE = build_path("odoo/migration.yml")
 GITIGNORE_FILE = build_path(".gitignore")
-COOKIECUTTER_CONTEXT = build_path(".cookiecutter.context.yml")
 GIT_C2C_REMOTE_NAME = "camptocamp"
 TEMPLATE_GIT_REPO_URL = "git@github.com:{}.git"
 TEMPLATE_GIT = TEMPLATE_GIT_REPO_URL.format("camptocamp/odoo-template")
@@ -51,16 +42,6 @@ def gpg_decrypt_to_file(ctx, file_name, password=False):
             password
         )
     ctx.run("gpg --yes {} '{}'".format(passphrase, file_name))
-
-
-def yaml_load(stream, Loader=None):
-    return yaml.load(stream, Loader=Loader or yaml.FullLoader)
-
-
-@lru_cache(maxsize=None)
-def cookiecutter_context():
-    with open(COOKIECUTTER_CONTEXT) as f:
-        return yaml_load(f.read())
 
 
 @contextmanager
@@ -126,22 +107,6 @@ def search_replace(file_path, old, new):
                 f_w.write(line.replace(old, new))
 
 
-def update_yml_file(path, new_data, main_key=None):
-    yaml = YAML()
-    # preservation of indentation
-    yaml.indent(mapping=2, sequence=4, offset=2)
-
-    with open(path) as f:
-        data = yaml_load(f.read())
-        if main_key:
-            data[main_key].update(new_data)
-        else:
-            data.update(new_data)
-
-    with open(path, "w") as f:
-        yaml.dump(data, f)
-
-
 def git_ignores(file):
     ignored = []
     with open(file) as f:
@@ -203,13 +168,3 @@ def get_migration_file_modules(migration_file):
         except KeyError:
             pass
     return modules
-
-
-def has_exec(name):
-    try:
-        devnull = open(os.devnull, "w")
-        Popen([name], stdout=devnull, stderr=devnull).communicate()
-    except OSError as err:
-        if err.errno == os.errno.ENOENT:
-            return False
-    return True

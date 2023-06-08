@@ -12,7 +12,8 @@ from subprocess import PIPE, Popen
 from invoke import task
 from passlib.context import CryptContext
 
-from .common import build_path, exit_msg, has_exec
+from ..utils.os_exec import has_exec
+from .common import build_path, exit_msg
 
 SHARED_C2C_FOLDER_PREFIX = "Shared-C2C-Odoo-External/"
 ODOO_PROJECT_URL = "https://{}.odoo.camptocamp.{{cookiecutter.country}}"
