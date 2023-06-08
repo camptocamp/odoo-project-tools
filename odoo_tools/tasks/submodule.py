@@ -5,17 +5,15 @@ import logging
 import os
 from itertools import chain
 
-import git_aggregator.config
-import git_aggregator.main
-import git_aggregator.repo
 import requests
 from git import Repo as GitRepo
 from invoke import exceptions, task
 
 from ..config import get_conf_key
-from ..utils.gh import get_target_branch, parse_github_url
+from ..utils import pending_merge as pm_utils
+from ..utils.gh import get_target_branch
+from ..utils.os_exec import run
 from ..utils.path import build_path, root_path
-from ..utils.pending_merge import Repo
 from ..utils.proj import get_project_manifest_key
 from ..utils.yaml import yaml_load
 from .common import (
@@ -49,7 +47,6 @@ branches:
     - /^merge-branch-.*$/
 """
 
-git_aggregator.main.setup_logger()
 
 GIT_C2C_REMOTE_NAME = get_conf_key("c2c_git_remote")
 
@@ -145,23 +142,14 @@ def merges(ctx, submodule_path, push=True, target_branch=None):
     to run `sync_remote` manually.
     """
 
-    repo = Repo(submodule_path)
-
-    target_branch = get_target_branch(ctx, target_branch=target_branch)
+    repo = pm_utils.Repo(submodule_path)
+    target_branch = get_target_branch(target_branch=target_branch)
     print("Building and pushing to camptocamp/{}".format(target_branch))
     print()
-    aggregator = _aggregate(repo, target_branch=target_branch)
-    process_travis_file(ctx, repo)
+    aggregator = repo.get_aggregator(target_branch=target_branch)
+    process_travis_file(repo)
     if push:
         aggregator.push()
-
-
-def _aggregate(repo, target_branch=None):
-    aggregator = repo.get_aggregator(
-        target={"branch": target_branch, "remote": GIT_C2C_REMOTE_NAME}
-    )
-    aggregator.aggregate()
-    return aggregator
 
 
 @task
@@ -171,20 +159,20 @@ def push(ctx, submodule_path, target_branch=None):
     Pushes the current state of your submodule to the target remote and branch
     either given by you or specified in pending-merges.yml
     """
-    repo = Repo(submodule_path)
-    target_branch = get_target_branch(ctx, target_branch=target_branch)
+    repo = pm_utils.Repo(submodule_path)
+    target_branch = get_target_branch(target_branch=target_branch)
     print("Pushing to camptocamp/{}".format(target_branch))
     print()
-    aggregator = repo.get_aggregator(
-        target={"branch": target_branch, "remote": GIT_C2C_REMOTE_NAME}
-    )
+    aggregator = repo.get_aggregator(target_branch=target_branch)
     with cd(repo.path):
         aggregator._switch_to_branch(target_branch)
-        process_travis_file(ctx, repo)
+        process_travis_file(repo)
         aggregator.push()
 
 
-def process_travis_file(ctx, repo):
+# FIXME: must check if the repo uses travis or GH actions
+# TODO: add GH actions exclude support
+def process_travis_file(repo):
     tf = ".travis.yml"
     with cd(repo.abs_path):
         if not os.path.exists(tf):
@@ -199,7 +187,7 @@ def process_travis_file(ctx, repo):
             travis.write(BRANCH_EXCLUDE)
 
         cmd = 'git commit {} --no-verify -m "Travis: exclude new branch from build"'
-        commit = ctx.run(cmd.format(tf), hide=True)
+        commit = run(cmd.format(tf), hide=True)
         print("Committed as:\n{}".format(commit.stdout.strip()))
 
 
@@ -214,9 +202,9 @@ def show_prs(ctx, submodule_path=None, state=None, purge=None):
         assert purge in ("closed", "merged")
     logging.getLogger("requests").setLevel(logging.ERROR)
     if submodule_path is None:
-        repositories = Repo.repositories_from_pending_folder()
+        repositories = pm_utils.Repo.repositories_from_pending_folder()
     else:
-        repositories = [Repo(submodule_path)]
+        repositories = [pm_utils.Repo(submodule_path)]
     if not repositories:
         exit_msg("No repo to check.")
 
@@ -380,7 +368,7 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
     possible to call it directly from the command line.
     """
     assert submodule_path or repo
-    repo = repo or Repo(submodule_path)
+    repo = repo or pm_utils.Repo(submodule_path)
     if repo.has_pending_merges():
         with open(repo.abs_merges_path) as pending_merges:
             # read everything we can reach
@@ -405,9 +393,9 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
     elif repo.path == "odoo/src":
         # special way to treat that particular submodule
         if ask_confirmation("Use odoo:odoo instead of OCA/OCB?"):
-            new_remote_url = Repo.build_ssh_url("odoo", "odoo")
+            new_remote_url = pm_utils.Repo.build_ssh_url("odoo", "odoo")
         else:
-            new_remote_url = Repo.build_ssh_url("OCA", "OCB")
+            new_remote_url = pm_utils.Repo.build_ssh_url("OCA", "OCB")
     else:
         # resolve what's the parent repository from which C2C consolidation
         # one was forked
@@ -430,7 +418,7 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
             default_repo = repo.name.replace("_", "-")
             new_namespace = input("Namespace [OCA]: ") or "OCA"
             new_repo = input("Repo name [{}]: ".format(default_repo)) or default_repo
-            new_remote_url = Repo.build_ssh_url(new_namespace, new_repo)
+            new_remote_url = pm_utils.Repo.build_ssh_url(new_namespace, new_repo)
 
     ctx.run(
         "git config --file=.gitmodules submodule.{}.url {}".format(
@@ -463,27 +451,7 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
 @task
 def add_pending(ctx, entity_url):
     """Add a pending merge using given entity link"""
-    # pattern, given an https://github.com/<user>/<repo>/pull/<pr-index>
-    # # PR headline
-    # # PR link as is
-    # - refs/pull/<pr-index>/head
-    parts = parse_github_url(entity_url)
-
-    upstream = parts.get("upstream")
-    repo_name = parts.get("repo_name")
-    entity_type = parts.get("entity_type")
-    entity_id = parts.get("entity_id")
-
-    repo = Repo(repo_name, path_check=False)
-    if not repo.has_pending_merges():
-        repo.generate_pending_merges_file_template(upstream)
-
-    if entity_type == "pull":
-        repo.add_pending_pull_request(upstream, entity_id)
-    elif entity_type in ("commit", "tree"):
-        repo.add_pending_commit(upstream, entity_id)
-
-    # write back a file
+    repo = pm_utils.add_pending(entity_url)
     sync_remote(ctx, repo=repo)
 
 
@@ -491,30 +459,8 @@ def add_pending(ctx, entity_url):
 def remove_pending(ctx, entity_url):
     """Remove a pending merge using given entity link"""
 
-    parts = parse_github_url(entity_url)
-
-    upstream = parts.get("upstream")
-    repo_name = parts.get("repo_name")
-    repo = Repo(repo_name)
-    entity_type = parts.get("entity_type")
-    entity_id = parts.get("entity_id")
-
-    if entity_type == "pull":
-        repo.remove_pending_pull(upstream, entity_id)
-    elif entity_type in ("tree", "commit"):
-        repo.remove_pending_commit(upstream, entity_id)
-
-    # check if that file is useless since it has an empty `merges` section
-    # if it does - drop it instead of writing a new file version
-    # only the upstream branch is present in `merges`
-    # first item is `- oca 11.0` or similar
-    config = repo.merges_config()
-    pending_merges_present = len(config["merges"]) > 1
-    patches = len(config.get("shell_command_after", {}))
-
-    if not pending_merges_present and not patches:
-        os.remove(repo.abs_merges_path)
-        sync_remote(ctx, repo=repo)
+    repo = pm_utils.remove_pending(entity_url)
+    sync_remote(ctx, repo=repo)
 
 
 def get_dependency_module_list(modules):
@@ -663,7 +609,7 @@ def upgrade(ctx, submodule_path=None, force_branch=None):
             print("-- Path:", submodule.path)
             print("-- Branch:", submodule.branch_name)
             branch = None
-            sub_repo = Repo(submodule.path, path_check=False)
+            sub_repo = pm_utils.Repo(submodule.path, path_check=False)
             try:
                 # First pass to close pr's
                 # But close `merged` PR's only, not `not merged` !
