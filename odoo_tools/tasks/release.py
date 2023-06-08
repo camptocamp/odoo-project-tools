@@ -8,9 +8,9 @@ from distutils.version import StrictVersion
 from invoke import exceptions, task
 from marabunta.version import MarabuntaVersion
 
+from ..config import get_conf_key
 from ..utils.proj import get_project_manifest_key
 from .common import (
-    GIT_C2C_REMOTE_NAME,
     HISTORY_FILE,
     MIGRATION_FILE,
     VERSION_FILE,
@@ -33,6 +33,9 @@ try:
 except ImportError:
     print("Missing clipboard from requirements")
     print("Please run `pip install -r tasks/requirements.txt`")
+
+
+GIT_C2C_REMOTE_NAME = get_conf_key("c2c_git_remote")
 
 
 @task(name="push-branches")
