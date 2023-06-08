@@ -1,7 +1,12 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+import os
 import re
+
+from . import ui
+from .os_exec import run
+from .proj import get_project_manifest_key
 
 
 def parse_github_url(entity_spec):
@@ -44,3 +49,51 @@ def parse_github_url(entity_spec):
         "entity_type": entity_type,
         "entity_id": entity_id,
     }
+
+
+# TODO: add tests
+def get_current_rebase_branch():
+    current_branch = None
+    for rebase_file in ("rebase-merge", "rebase-apply"):
+        # in case of rebase, the ref of the branch is in one of these
+        # directories, in a file named "head-name"
+        path = run("git rev-parse --git-path {}".format(rebase_file))
+        if os.path.exists(path):
+            with open(os.path.join(path, "head-name")) as rf:
+                current_branch = rf.read().strip().replace("refs/heads/", "")
+            break
+    return current_branch
+
+
+# TODO: add tests
+
+
+def get_current_branch():
+    return run("git symbolic-ref --short HEAD")
+
+
+# TODO: add tests
+# TODO: not sure how much of this is needed w/o submodules
+def get_target_branch(target_branch=None):
+    """Gets the branch to push on and checks if we're overriding something.
+
+    If target_branch is given only checks for the override.
+    Otherwise create the branch name and check for the override.
+    """
+    current_branch = get_current_rebase_branch()
+    if not current_branch:
+        current_branch = get_current_branch()
+    project_id = get_project_manifest_key("project_id")
+    if not target_branch:
+        commit = run("git rev-parse HEAD")[:8]
+        target_branch = "merge-branch-{}-{}-{}".format(
+            project_id, current_branch, commit
+        )
+    if current_branch == "master" or re.match(r"\d{1,2}.\d", target_branch):
+        ui.ask_or_abort(
+            "You are on branch {}."
+            " Please confirm override of target branch {}".format(
+                current_branch, target_branch
+            )
+        )
+    return target_branch
