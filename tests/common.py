@@ -1,7 +1,10 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+from contextlib import contextmanager
 from pathlib import PosixPath
+
+from click.testing import CliRunner
 
 from odoo_tools.utils.path import get_root_marker
 
@@ -44,3 +47,14 @@ def make_fake_project_root(marker_file=get_root_marker(), req_file="requirements
         fd.write(FAKE_MANIFEST)
     with open(req_file, "w") as fd:
         fd.write("")
+
+
+@contextmanager
+def fake_project_root(make_root=True):
+    runner = CliRunner()
+    # TODO: do we really need this click util
+    # or tmpfile api is enough?
+    with runner.isolated_filesystem():
+        if make_root:
+            make_fake_project_root()
+        yield runner
