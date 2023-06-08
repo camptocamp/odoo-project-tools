@@ -10,25 +10,16 @@ from contextlib import contextmanager
 
 from invoke import exceptions
 
+from ..utils import ui
 from ..utils.path import build_path
 from ..utils.yaml import yaml_load
-
-
-def exit_msg(message):
-    print(message)
-    raise exceptions.Exit(1)
-
 
 # TODO: change depending on new structure
 # use root_path to get root project directory
 VERSION_FILE = build_path("odoo/VERSION")
 HISTORY_FILE = build_path("HISTORY.rst")
-PENDING_MERGES_DIR = build_path("pending-merges.d")
 MIGRATION_FILE = build_path("odoo/migration.yml")
 GITIGNORE_FILE = build_path(".gitignore")
-GIT_C2C_REMOTE_NAME = "camptocamp"
-TEMPLATE_GIT_REPO_URL = "git@github.com:{}.git"
-TEMPLATE_GIT = TEMPLATE_GIT_REPO_URL.format("camptocamp/odoo-template")
 
 
 def gpg_decrypt_to_file(ctx, file_name, password=False):
@@ -60,26 +51,14 @@ def current_version():
     return version
 
 
-def ask_confirmation(message):
-    """Gently ask user's opinion."""
-    r = input(message + " (y/N) ")
-    return r in ("y", "Y", "yes")
-
-
-def ask_or_abort(message):
-    """Fail (abort) immediately if user disagrees."""
-    if not ask_confirmation(message):
-        exit_msg("Aborted")
-
-
 def check_git_diff(ctx, direct_abort=False):
     try:
         ctx.run("git diff --quiet --exit-code")
         ctx.run("git diff --cached --quiet --exit-code")
     except exceptions.Failure:
         if direct_abort:
-            exit_msg("Your repository has local changes. Abort.")
-        ask_or_abort(
+            ui.exit_msg("Your repository has local changes. Abort.")
+        ui.ask_or_abort(
             "Your repository has local changes, are you sure you want to continue?"
         )
 
@@ -151,7 +130,7 @@ def make_dir(path_dir):
             msg = ("Directory does not exist and could not be created: {}").format(
                 path_dir
             )
-            exit_msg(msg)
+            ui.exit_msg(msg)
         else:
             pass  # directory already exists, nothing to do in this case
 
