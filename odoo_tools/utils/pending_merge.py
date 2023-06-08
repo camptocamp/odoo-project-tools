@@ -16,10 +16,15 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 from ..config import get_conf_key
 from ..exceptions import PathNotFound
 from . import ui
+from .gh import parse_github_url
 from .path import build_path
 from .proj import get_project_manifest_key
 from .yaml import yaml_load
 
+git_aggregator.main.setup_logger()
+
+
+# FIXME: move to yaml utils
 yaml = YAML()
 
 
@@ -33,7 +38,6 @@ branches:
   except:
     - /^merge-branch-.*$/
 """
-# FIXME: move to yaml utils
 
 git_aggregator.main.setup_logger()
 
@@ -99,16 +103,6 @@ class Repo:
         if relative:
             base_path = self.pending_merge_rel_path
         return (base_path / repo_name).with_suffix(".yml")
-
-    def aggregator_config(self):
-        return git_aggregator.config.load_config(self.abs_merges_path)[0]
-
-    def get_aggregator(self, **extra_config):
-        repo_config = self.aggregator_config()
-        repo_config.update(extra_config)
-        repo = git_aggregator.repo.Repo(**repo_config)
-        repo.cwd = self.abs_path
-        return repo
 
     @classmethod
     def repositories_from_pending_folder(cls, path=None):
@@ -322,27 +316,71 @@ class Repo:
         conf["merges"].remove(line_to_drop)
         self.update_merges_config(conf)
 
-    # def add_pending(ctx, entity_url):
-    #     """Add a pending merge using given entity link"""
-    #     # pattern, given an https://github.com/<user>/<repo>/pull/<pr-index>
-    #     # # PR headline
-    #     # # PR link as is
-    #     # - refs/pull/<pr-index>/head
-    #     parts = parse_github_url(entity_url)
+    # aggregator API
+    # TODO: add tests
+    def get_aggregator(self, target_remote=None, target_branch=None, **extra_config):
+        if "target" not in extra_config:
+            extra_config["target"] = {}
+        if target_branch and "branch" not in extra_config["target"]:
+            extra_config["target"]["branch"] = target_branch
+        if target_remote and "remote" not in extra_config["target"]:
+            extra_config["target"]["remote"] = self.c2c_git_remote
+        return RepoAggregator(self, **extra_config)
 
-    #     upstream = parts.get("upstream")
-    #     repo_name = parts.get("repo_name")
-    #     entity_type = parts.get("entity_type")
-    #     entity_id = parts.get("entity_id")
 
-    #     repo = Repo(repo_name, path_check=False)
-    #     if not repo.has_pending_merges():
-    #         repo.generate_pending_merges_file_template(upstream)
+class RepoAggregator(git_aggregator.repo.Repo):
+    def __init__(self, repo, **extra_config):
+        self.pm_repo = repo
+        config = git_aggregator.config.load_config(self.pm_repo.abs_merges_path)[0]
+        config.update(extra_config)
+        super().__init__(**config)
+        self.cwd = self.pm_repo.abs_path
 
-    #     if entity_type == "pull":
-    #         repo.add_pending_pull_request(upstream, entity_id)
-    #     elif entity_type in ("commit", "tree"):
-    #         repo.add_pending_commit(upstream, entity_id)
 
-    #     # write back a file
-    #     sync_remote(ctx, repo=repo)
+def add_pending(entity_url):
+    """Add a pending merge using given entity link"""
+    # pattern, given an https://github.com/<user>/<repo>/pull/<pr-index>
+    # # PR headline
+    # # PR link as is
+    # - refs/pull/<pr-index>/head
+    parts = parse_github_url(entity_url)
+    upstream = parts.get("upstream")
+    repo_name = parts.get("repo_name")
+    entity_type = parts.get("entity_type")
+    entity_id = parts.get("entity_id")
+
+    repo = Repo(repo_name, path_check=False)
+    if not repo.has_pending_merges():
+        repo.generate_pending_merges_file_template(upstream)
+
+    if entity_type == "pull":
+        repo.add_pending_pull_request(upstream, entity_id)
+    elif entity_type in ("commit", "tree"):
+        repo.add_pending_commit(upstream, entity_id)
+    return repo
+
+
+def remove_pending(entity_url):
+    parts = parse_github_url(entity_url)
+    upstream = parts.get("upstream")
+    repo_name = parts.get("repo_name")
+    repo = Repo(repo_name)
+    entity_type = parts.get("entity_type")
+    entity_id = parts.get("entity_id")
+
+    if entity_type == "pull":
+        repo.remove_pending_pull(upstream, entity_id)
+    elif entity_type in ("tree", "commit"):
+        repo.remove_pending_commit(upstream, entity_id)
+
+    # check if that file is useless since it has an empty `merges` section
+    # if it does - drop it instead of writing a new file version
+    # only the upstream branch is present in `merges`
+    # first item is `- oca 11.0` or similar
+    config = repo.merges_config()
+    pending_merges_present = len(config["merges"]) > 1
+    patches = len(config.get("shell_command_after", {}))
+
+    if not pending_merges_present and not patches:
+        os.remove(repo.abs_merges_path)
+    return repo
