@@ -6,7 +6,7 @@ import os
 
 from invoke import task
 
-from .common import build_path
+from ..utils.path import build_path
 
 
 @task(default=True)
@@ -21,10 +21,11 @@ def generate(ctx, addon_path, update_po=True):
     # use root_path to get root project directory
     dbname = "tmp_generate_pot"
     addon = addon_path.strip("/").split("/")[-1]
-    assert os.path.exists(build_path(addon_path)), "%s not found" % addon_path
+    path = build_path(addon_path)
+    assert path.exists(), "%s not found" % addon_path
     container_path = os.path.join("/", addon_path, "i18n")
-    i18n_dir = os.path.join(build_path(addon_path), "i18n")
-    if not os.path.exists(i18n_dir):
+    i18n_dir = path / "i18n"
+    if not i18n_dir.exists():
         os.mkdir(i18n_dir)
     container_po_path = os.path.join(container_path, "%s.po" % addon)
     user_id = ctx.run("id --user", hide="both").stdout.strip()

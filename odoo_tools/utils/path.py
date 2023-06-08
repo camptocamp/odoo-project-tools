@@ -40,6 +40,5 @@ def build_path(path, from_root=True, from_file=None):
     else:
         if from_file is None:
             from_file = __file__
-        base_path = os.path.dirname(os.path.realpath(from_file))
-
-    return os.path.join(base_path, path)
+        base_path = PosixPath(from_file).parent.resolve()
+    return base_path / path

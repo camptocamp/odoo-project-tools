@@ -16,10 +16,10 @@ from ..utils.yaml import yaml_load
 
 # TODO: change depending on new structure
 # use root_path to get root project directory
-VERSION_FILE = build_path("odoo/VERSION")
-HISTORY_FILE = build_path("HISTORY.rst")
-MIGRATION_FILE = build_path("odoo/migration.yml")
-GITIGNORE_FILE = build_path(".gitignore")
+VERSION_FILE = build_path("odoo/VERSION").as_posix()
+HISTORY_FILE = build_path("HISTORY.rst").as_posix()
+MIGRATION_FILE = build_path("odoo/migration.yml").as_posix()
+GITIGNORE_FILE = build_path(".gitignore").as_posix()
 
 
 def gpg_decrypt_to_file(ctx, file_name, password=False):
