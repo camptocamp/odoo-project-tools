@@ -19,17 +19,20 @@ def cli():
 @click.option("-o", "--odoo", "odoo", default=True)
 @click.option("--upgrade", "upgrade", is_flag=True, default=False)
 def add(name, version=None, pr=None, root_path=None, odoo=True, upgrade=False):
-    """Update project requirements for a given package (odoo or not).
+    """Update the project's requirements for a given package (odoo or not).
 
-    * Check the latest version of the module on pypi and use that version if new.
-    * If the module is already present in the requirements.txt file:
+    * If the module is not already listed in the requirements.txt, check the
+      latest version of the module on PyPI and use that version
+
+    * Otherwise:
         * if the version is the same, do nothing. Otherwise, prompt the user
-        * If the addon is present as a PR prompt the user
+        * If the addon is present as a PR, prompt the user
+
     """
     # TODO: get odoo version from project
     click.secho(f"Adding: {name}", fg="green")
     pkg = Package(name, odoo=odoo)
-    click.echo(f"Last pypi version: {pkg.latest_version}")
+    click.echo(f"Last PyPI version: {pkg.latest_version}")
 
     if not pkg.pinned_version:
         # Brand new module: just add it
