@@ -5,15 +5,16 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
 
-## Installing
+## Installation
+This repository contains helper tasks for working with Camptocamp Odoo projects.
 
-### Installing with pip
+Create a virtual environment and activate it, then run:
 
 ```
 pip install --user git+https://github.com/camptocamp/odoo-project-tools.git
 ```
 
-### Installing with [pipx](https://pypa.github.io/pipx/)
+If you use  [pipx](https://pypa.github.io/pipx/) then you can run instead:
 
 ```
 pipx install git+https://github.com/camptocamp/odoo-project-tools.git
@@ -21,7 +22,22 @@ pipx install git+https://github.com/camptocamp/odoo-project-tools.git
 
 ## Usage
 
-TODO
+Note: information below is subject to change.
+
+
+The package brings the following commands:
+
+
+`otools-project`: manage proj
+
+`otools-addons`: tools to work with addons
+
+`otools-release`: bump releases
+
+`otools-tasks`: access to the "old" invoke tasks, being rewritten. 
+
+
+Use `--help` to get the list of subcommands.
 
 ## Project conversion
 
