@@ -34,6 +34,7 @@ dependencies = [
     "cookiecutter",
     "click",
     "importlib_resources; python_version < '3.9'",
+    "requirements-parser",
 ]
 requires-python = ">=3.8"
 dynamic = ["version"]
@@ -52,7 +53,6 @@ otools-addon = "odoo_tools.addon:cli"
 test = [
   "coverage",
   "pytest",
-  "requirements-parser",
   "responses",
 ]
 
