@@ -136,9 +136,9 @@ class Repo:
         with open(self.abs_merges_path, "w") as f:
             yaml.dump(data, f)
 
-    def api_url(self):
+    def api_url(self, upstream=None):
         return "https://api.github.com/repos/{}/{}".format(
-            self.c2c_git_remote, self.name
+            upstream or self.c2c_git_remote, self.name
         )
 
     def ssh_url(self, namespace=None):
@@ -199,7 +199,9 @@ class Repo:
                 )
             )
 
-        response = requests.get("{}/pulls/{}".format(self.api_url(), pull_id))
+        response = requests.get(
+            "{}/pulls/{}".format(self.api_url(upstream=upstream), pull_id)
+        )
 
         # TODO: auth
         base_branch = response.json().get("base", {}).get("ref")
