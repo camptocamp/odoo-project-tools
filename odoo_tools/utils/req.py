@@ -36,7 +36,7 @@ def get_addon_requirement(addon, req_filepath=None):
     req_filepath = req_filepath or get_project_req()
     with open(req_filepath) as fd:
         for req in requirements.parse(fd):
-            if req.name == addon:
+            if req.name in (addon, pkg_name_to_odoo_name(addon)):
                 return req
 
 
