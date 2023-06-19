@@ -33,12 +33,6 @@ try:
 except NameError:
     pass
 
-BRANCH_EXCLUDE = """
-branches:
-  except:
-    - /^merge-branch-.*$/
-"""
-
 git_aggregator.main.setup_logger()
 
 
