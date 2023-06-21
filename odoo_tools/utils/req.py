@@ -90,7 +90,8 @@ def replace_requirement(
         replacement_line = make_requirement_line(pkg_name, version=version)
     for line in fileinput.input(req_filepath, inplace=True):
         # `print` replaces line inside fileinput ctx manager
-        if pkg_name in line:
+        # TODO: add tests for all the forms of requirements
+        if pkg_name in line or pkg_name_to_odoo_name(pkg_name) in line:
             line = replacement_line
         # NOTE: this will add an empty line at the end w/ `\n`
         print(line)
