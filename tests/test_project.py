@@ -13,4 +13,5 @@ def test_init():
     with runner.isolated_filesystem():
         result = runner.invoke(init)
         assert os.path.exists("docker-compose.override.yml")
+        assert os.path.exists(".bumpversion.cfg")
         assert result.exit_code == 0

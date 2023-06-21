@@ -6,13 +6,25 @@ import click
 from .utils.misc import copy_file, get_template_path
 
 DC_EX_FILENAME = "example.docker-compose.override.yml"
-DC_EX_FILE_PATH = get_template_path(DC_EX_FILENAME)
+BUMPVERSION_EX_FILENAME = "example.bumpversion.cfg"
+
+INIT_FILE_TEMPLATES = (
+    {
+        "source": DC_EX_FILENAME,
+        "destination": "./docker-compose.override.yml",
+    },
+    {
+        "source": BUMPVERSION_EX_FILENAME,
+        "destination": "./.bumpversion.cfg",
+    },
+)
 
 
-def create_doco_override():
+def bootstrap_files():
     # TODO: pass destination path
     # or simply guess the root path
-    copy_file(DC_EX_FILE_PATH, "./docker-compose.override.yml")
+    for item in INIT_FILE_TEMPLATES:
+        copy_file(get_template_path(item["source"]), item["destination"])
 
 
 @click.group()
@@ -23,7 +35,7 @@ def cli():
 @cli.command()
 def init():
     click.echo("Preparing project...")
-    create_doco_override()
+    bootstrap_files()
 
 
 if __name__ == '__main__':
