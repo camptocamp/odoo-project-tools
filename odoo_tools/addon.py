@@ -3,7 +3,10 @@
 
 import click
 
+from .utils import pending_merge as pm_utils, ui
+from .utils.os_exec import run
 from .utils.pkg import Package
+from .utils.req import get_project_dev_req
 
 
 @click.group()
@@ -27,6 +30,7 @@ def add(name, version=None, pr=None, root_path=None, odoo=True, upgrade=False):
         * If the addon is present as a PR prompt the user
     """
     # TODO: get odoo version from project
+    # TODO: centralize printing/logging in `ui` utils
     click.secho(f"Adding: {name}", fg="green")
     pkg = Package(name, odoo=odoo)
     click.echo(f"Last pypi version: {pkg.latest_version}")
@@ -66,6 +70,35 @@ def add(name, version=None, pr=None, root_path=None, odoo=True, upgrade=False):
     # (we won't deal with this in this first implementation. Manifestoo could be used here.)
 
 
+@cli.command(name="add-pending")
+@click.argument("ref")
+@click.option("-a", "--addons", "addons")
+@click.option("--editable/--no-editable", "editable", is_flag=True, default=True)
+def add_pending(ref, addons=None, editable=True):
+    """Add a pending PR or commit."""
+    pm_utils.add_pending(ref)
+    click.secho(f"Adding: {ref}", fg="green")
+    # TODO: run git-aggregate if already present
+    addons = [x.strip() for x in addons.split(",") if x.strip()] if addons else []
+    if not addons:
+        ui.exit_msg("No addon specifified. Please update dev requirements manually.")
+
+    # Create req file if missing
+    dev_req_file_path = get_project_dev_req()
+    if not dev_req_file_path.exists():
+        run(f"touch {dev_req_file_path.as_posix()}")
+
+    for name in addons:
+        pkg = Package(name, odoo=True, req_filepath=dev_req_file_path)
+        # TODO: does it work w/ commits?
+        pkg.add_or_replace_requirement(pr=ref, editable=editable)
+
+    ui.exit_msg(f"Updated dev requirements for: {', '.join(addons)}")
+
+    # TODO: stage changes for commit
+
+
+# TODO: centralize ask/confirm/abort in `ui` utils
 def ask_confirm_replace(pkg, msg, version=None):
     if click.confirm(msg, abort=True):
         pkg.replace_requirement(version=version)
