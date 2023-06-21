@@ -11,6 +11,10 @@ def get_root_marker():
     return ".cookiecutter.context.yml"
 
 
+# TODO: consider using `git rev-parse --show-superproject-working-tree / --show-toplevel`
+# to find out the root of the project w/o relying on marker files.
+
+
 def root_path(marker_file=get_root_marker(), raise_if_missing=True):
     current_dir = (
         os.getcwd()
