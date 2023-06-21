@@ -1,6 +1,6 @@
 files: ^odoo_tools/|^tests
 default_language_version:
-  python: python3.9
+  python: python3.10
 
 repos:
 # black
@@ -8,13 +8,11 @@ repos:
   rev: 23.1.0
   hooks:
   - id: black
-    language_version: python3.9
 
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v4.4.0
   hooks:
   - id: debug-statements
-    language_version: python3.9
 
 # Flake8
 - repo: https://github.com/pycqa/flake8
@@ -23,24 +21,20 @@ repos:
   - id: flake8
     name: flake8 except __init__.py
     exclude: __init__.py
-    language_version: python3.9
   - id: flake8
     name: flake8 only __init__.py
     args: [--ignore=F401]  # ignore imported unused in __init__.py
     files: __init__.py
-    language_version: python3.9
 
 # pyupgrade
 - repo: https://github.com/asottile/pyupgrade
   rev: v3.3.1
   hooks:
   - id: pyupgrade
-    language_version: python3.9
 
 # isort
 - repo: https://github.com/PyCQA/isort
   rev: 5.12.0
   hooks:
   - id: isort
-    language_version: python3.9
   
