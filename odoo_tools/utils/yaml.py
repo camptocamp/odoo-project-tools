@@ -17,7 +17,7 @@ def update_yml_file(path, new_data, main_key=None):
     yaml.indent(mapping=2, sequence=4, offset=2)
 
     with open(path) as f:
-        data = yaml_load(f.read())
+        data = yaml_load(f.read()) or {}
         if main_key:
             data[main_key].update(new_data)
         else:
