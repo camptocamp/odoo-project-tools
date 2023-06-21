@@ -33,6 +33,7 @@ dependencies = [
     "wheel",
     "cookiecutter",
     "click",
+    "towncrier",
     "importlib_resources; python_version < '3.9'",
     # Include fix for parsing editable requirements
     # https://github.com/madpah/requirements-parser/pull/85
@@ -73,6 +74,28 @@ line-length = 88
 skip-string-normalization = "True"
 
 [tool.towncrier]
-package = "odoo-project-tools"
+directory = "unreleased"
 filename = "HISTORY.rst"
-template = "template.rst"
+template = ".towncrier-template.rst"
+title_format = ""
+issue_format = "{issue}"
+
+[[tool.towncrier.type]]
+directory = "feature"
+name = "Features and Improvements"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "bugfix"
+name = "Bugfixes"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "doc"
+name = "Documentation"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "build"
+name = "Build"
+showcontent = true
