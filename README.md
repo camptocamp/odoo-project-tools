@@ -3,13 +3,8 @@
 
 #### Installation
 
-directly to os
 
 ```
-pip install --user git+ssh://git@github.com/yankinmax/odoo-project-tasks@BSRD-629#egg=invoke_cli
-```
+pip install --user https://github.com/camptocamp/odoo-project-tools/archive/refs/heads/master.tar.gz"
 
-to virtualenv
-```
-pip install git+ssh://git@github.com/yankinmax/odoo-project-tasks@BSRD-629#egg=invoke_cli
 ```
