@@ -3,15 +3,21 @@
 
 import os
 
-from click.testing import CliRunner
-
 from odoo_tools.project import init
+
+from .common import fake_project_root, get_fixture
 
 
 def test_init():
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        result = runner.invoke(init)
+    with fake_project_root() as runner:
+        result = runner.invoke(init, catch_exceptions=False)
         assert os.path.exists("docker-compose.override.yml")
-        assert os.path.exists(".bumpversion.cfg")
+        with open(".bumpversion.cfg") as fd:
+            content = fd.read()
+            expected = get_fixture("expected.bumpversion.cfg")
+            # Compare line by line to ease debug in case of error
+            for content_line, expected_line in zip(
+                content.splitlines(), expected.splitlines()
+            ):
+                assert content_line == expected_line
         assert result.exit_code == 0
