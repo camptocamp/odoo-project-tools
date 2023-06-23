@@ -21,3 +21,25 @@ def test_init():
             ):
                 assert content_line == expected_line
         assert result.exit_code == 0
+
+
+def test_init_custom_version():
+    with fake_project_root() as runner:
+        result = runner.invoke(
+            init,
+            [
+                "--version",
+                "16.0.1.1.0",
+            ],
+            catch_exceptions=False,
+        )
+        assert os.path.exists("docker-compose.override.yml")
+        with open(".bumpversion.cfg") as fd:
+            content = fd.read()
+            expected = get_fixture("expected.bumpversion.v2.cfg")
+            # Compare line by line to ease debug in case of error
+            for content_line, expected_line in zip(
+                content.splitlines(), expected.splitlines()
+            ):
+                assert content_line == expected_line
+        assert result.exit_code == 0
