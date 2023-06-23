@@ -52,6 +52,7 @@ repository = "https://github.com/camptocamp/odoo-project-tools"
 otools-tasks = "odoo_tools.tasks.main:program.run"
 otools-project = "odoo_tools.project:cli"
 otools-addon = "odoo_tools.addon:cli"
+otools-release = "odoo_tools.release:cli"
 
 [project.optional-dependencies]
 test = [
