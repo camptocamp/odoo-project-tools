@@ -5,6 +5,7 @@ import configparser
 
 import click
 
+from .config import get_conf_key
 from .utils.os_exec import run
 
 
@@ -18,9 +19,9 @@ def parse_bumpversion_cfg(ini_content):
     return config
 
 
-def parse_new_version(cfg_content):
+def get_cfg_key(cfg_content, key):
     cfg = parse_bumpversion_cfg(cfg_content)
-    return cfg.get("bumpversion", "new_version")
+    return cfg.get("bumpversion", key)
 
 
 def make_bumpversion_cmd(rel_type, new_version=None, dry_run=False):
@@ -56,8 +57,14 @@ def bump(rel_type, new_version=None, dry_run=False, commit=False):
     click.echo(f"Running: {cmd}")
     res = run(cmd)
     if dry_run:
-        new_version = parse_new_version(res)
+        new_version = get_cfg_key(res, "new_version")
         click.echo(f"New version: {new_version}")
+    else:
+        with get_conf_key("version_file_rel_path").open() as fd:
+            new_version = fd.read()
+        cmd = make_towncrier_cmd(new_version)
+        click.echo(f"Running: {cmd}")
+        run(cmd)
 
 
 if __name__ == '__main__':
