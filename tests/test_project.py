@@ -3,14 +3,43 @@
 
 import os
 
-from click.testing import CliRunner
-
 from odoo_tools.project import init
+
+from .common import compare_line_by_line, fake_project_root, get_fixture
+from .fixtures import clear_caches  # noqa
 
 
 def test_init():
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        result = runner.invoke(init)
+    with fake_project_root() as runner:
+        result = runner.invoke(init, catch_exceptions=False)
+        paths = (
+            "docker-compose.override.yml",
+            "unreleased/.gitkeep",
+            "towncrier.toml",
+            ".towncrier-template.rst",
+        )
+        for path in paths:
+            assert os.path.exists(path), f"`{path}` missing"
+        with open(".bumpversion.cfg") as fd:
+            content = fd.read()
+            expected = get_fixture("expected.bumpversion.cfg")
+            compare_line_by_line(content, expected)
+        assert result.exit_code == 0
+
+
+def test_init_custom_version():
+    with fake_project_root() as runner:
+        result = runner.invoke(
+            init,
+            [
+                "--version",
+                "16.0.1.1.0",
+            ],
+            catch_exceptions=False,
+        )
         assert os.path.exists("docker-compose.override.yml")
+        with open(".bumpversion.cfg") as fd:
+            content = fd.read()
+            expected = get_fixture("expected.bumpversion.v2.cfg")
+            compare_line_by_line(content, expected)
         assert result.exit_code == 0

@@ -14,8 +14,11 @@ confs = {
     # being submodules or not.
     # FIXME: will be dev-src
     "ext_src_rel_path": "odoo/external-src",
+    # FIXME: will be addons?
     "local_src_rel_path": "odoo/local-src",
     "pending_merge_rel_path": "pending-merges.d",
+    # FIXME: will be VERSION?
+    "version_file_rel_path": "odoo/VERSION",
 }
 
 

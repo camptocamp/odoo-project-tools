@@ -21,3 +21,11 @@ def get_template_path(filepath):
 
 def copy_file(src_path, dest_path):
     shutil.copy(src_path, dest_path)
+
+
+class SmartDict(dict):
+    """Dotted notation dict."""
+
+    def __getattr__(self, attrib):
+        val = self.get(attrib)
+        return self.__class__(val) if type(val) is dict else val

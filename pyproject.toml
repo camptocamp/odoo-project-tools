@@ -35,6 +35,7 @@ dependencies = [
     "click",
     "towncrier",
     "importlib_resources; python_version < '3.9'",
+    "bump2version",
     # Include fix for parsing editable requirements
     # https://github.com/madpah/requirements-parser/pull/85
     "requirements-parser @ https://github.com/simahawk/requirements-parser/archive/refs/heads/fix-editable.tar.gz"
@@ -51,6 +52,7 @@ repository = "https://github.com/camptocamp/odoo-project-tools"
 otools-tasks = "odoo_tools.tasks.main:program.run"
 otools-project = "odoo_tools.project:cli"
 otools-addon = "odoo_tools.addon:cli"
+otools-release = "odoo_tools.release:cli"
 
 [project.optional-dependencies]
 test = [

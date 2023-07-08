@@ -1,0 +1,27 @@
+
+[tool.towncrier]
+directory = "unreleased"
+filename = "HISTORY.rst"
+template = ".towncrier-template.rst"
+title_format = ""
+issue_format = "{issue}"
+
+[[tool.towncrier.type]]
+directory = "feature"
+name = "Features and Improvements"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "bugfix"
+name = "Bugfixes"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "doc"
+name = "Documentation"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "build"
+name = "Build"
+showcontent = true
