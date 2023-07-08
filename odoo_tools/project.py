@@ -8,9 +8,6 @@ from .utils.misc import SmartDict, copy_file, get_template_path
 from .utils.path import build_path
 from .utils.proj import get_project_manifest_key
 
-DC_EX_FILENAME = "example.docker-compose.override.yml"
-BUMPVERSION_EX_FILENAME = "example.bumpversion.cfg"
-
 
 def get_bumpversion_vars(opts):
     # TODO: get version from version file as default
@@ -32,11 +29,11 @@ def get_bumpversion_vars(opts):
 def get_init_template_files():
     return (
         {
-            "source": DC_EX_FILENAME,
+            "source": "docker-compose.override.tmpl.yml",
             "destination": build_path("./docker-compose.override.yml"),
         },
         {
-            "source": BUMPVERSION_EX_FILENAME,
+            "source": ".bumpversion.tmpl.cfg",
             "destination": build_path("./.bumpversion.cfg"),
             "variables_getter": get_bumpversion_vars,
         },
