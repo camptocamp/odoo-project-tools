@@ -12,7 +12,14 @@ from .fixtures import clear_caches  # noqa
 def test_init():
     with fake_project_root() as runner:
         result = runner.invoke(init, catch_exceptions=False)
-        assert os.path.exists("docker-compose.override.yml")
+        paths = (
+            "docker-compose.override.yml",
+            "unreleased/.gitkeep",
+            "towncrier.toml",
+            ".towncrier-template.rst",
+        )
+        for path in paths:
+            assert os.path.exists(path), f"`{path}` missing"
         with open(".bumpversion.cfg") as fd:
             content = fd.read()
             expected = get_fixture("expected.bumpversion.cfg")

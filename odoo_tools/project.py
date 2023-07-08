@@ -1,10 +1,13 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+import os
+
 import click
 
 from .config import get_conf_key
 from .utils.misc import SmartDict, copy_file, get_template_path
+from .utils.os_exec import run
 from .utils.path import build_path
 from .utils.proj import get_project_manifest_key
 
@@ -37,6 +40,14 @@ def get_init_template_files():
             "destination": build_path("./.bumpversion.cfg"),
             "variables_getter": get_bumpversion_vars,
         },
+        {
+            "source": "towncrier.tmpl.toml",
+            "destination": build_path("./towncrier.toml"),
+        },
+        {
+            "source": ".towncrier-template.tmpl.rst",
+            "destination": build_path(".towncrier-template.rst"),
+        },
     )
 
 
@@ -55,6 +66,12 @@ def bootstrap_files(opts):
                     dest_fd.write(content)
         else:
             copy_file(source, dest)
+
+    # towncrier stuff TODO: move to odoo-template?
+    path = build_path("./unreleased/.gitkeep")
+    if not path.exists():
+        os.makedirs(path.parent, exist_ok=True)
+        run(f"touch {path}")
 
 
 @click.group()
