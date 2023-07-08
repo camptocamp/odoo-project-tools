@@ -15,6 +15,7 @@ BUMPVERSION_EX_FILENAME = "example.bumpversion.cfg"
 def get_bumpversion_vars(opts):
     # TODO: get version from version file as default
     version = opts.version or get_project_manifest_key("odoo_version") + ".0.1.0"
+    odoo_major, odoo_minor, __ = version.split(".", 2)
     res = {
         "rel_path_local_addons": get_conf_key("local_src_rel_path").as_posix(),
         "rel_path_version_file": get_conf_key("version_file_rel_path").as_posix(),
@@ -22,6 +23,8 @@ def get_bumpversion_vars(opts):
             get_project_manifest_key("customer_shortname")
         ),
         "current_version": version,
+        "odoo_major": odoo_major,
+        "odoo_minor": odoo_minor,
     }
     return res
 
