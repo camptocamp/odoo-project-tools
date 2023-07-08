@@ -5,7 +5,8 @@ import os
 
 from odoo_tools.project import init
 
-from .common import fake_project_root, get_fixture
+from .common import compare_line_by_line, fake_project_root, get_fixture
+from .fixtures import clear_caches  # noqa
 
 
 def test_init():
@@ -15,11 +16,7 @@ def test_init():
         with open(".bumpversion.cfg") as fd:
             content = fd.read()
             expected = get_fixture("expected.bumpversion.cfg")
-            # Compare line by line to ease debug in case of error
-            for content_line, expected_line in zip(
-                content.splitlines(), expected.splitlines()
-            ):
-                assert content_line == expected_line
+            compare_line_by_line(content, expected)
         assert result.exit_code == 0
 
 
@@ -37,9 +34,5 @@ def test_init_custom_version():
         with open(".bumpversion.cfg") as fd:
             content = fd.read()
             expected = get_fixture("expected.bumpversion.v2.cfg")
-            # Compare line by line to ease debug in case of error
-            for content_line, expected_line in zip(
-                content.splitlines(), expected.splitlines()
-            ):
-                assert content_line == expected_line
+            compare_line_by_line(content, expected)
         assert result.exit_code == 0

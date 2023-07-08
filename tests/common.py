@@ -76,3 +76,11 @@ def fake_project_root(make_root=True, **kw):
         if make_root:
             make_fake_project_root(**kw)
         yield runner
+
+
+def compare_line_by_line(content, expected):
+    content_lines = [x.strip() for x in content.splitlines() if x.strip()]
+    expected_lines = [x.strip() for x in expected.splitlines() if x.strip()]
+    # Compare line by line to ease debug in case of error
+    for content_line, expected_line in zip(content_lines, expected_lines):
+        assert content_line == expected_line
