@@ -71,8 +71,8 @@ def test_bump_changelog():
         # run init to get all files ready (eg: bumpversion)
         runner.invoke(init, catch_exceptions=False)
         changes = (
-            ("Fixed a thing!", "./unreleased/1234.bugfix"),
-            ("Added a thing!", "./unreleased/2345.feature"),
+            ("Fixed a thing!", "./changes.d/1234.bugfix"),
+            ("Added a thing!", "./changes.d/2345.feature"),
         )
         for change, path in changes:
             with open(path, "w") as fd:

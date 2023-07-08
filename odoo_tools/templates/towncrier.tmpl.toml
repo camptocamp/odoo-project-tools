@@ -1,6 +1,6 @@
 
 [tool.towncrier]
-directory = "unreleased"
+directory = "changes.d"
 filename = "HISTORY.rst"
 template = ".towncrier-template.rst"
 title_format = ""
