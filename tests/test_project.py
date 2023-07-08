@@ -14,7 +14,7 @@ def test_init():
         result = runner.invoke(init, catch_exceptions=False)
         paths = (
             "docker-compose.override.yml",
-            "unreleased/.gitkeep",
+            "changes.d/.gitkeep",
             "towncrier.toml",
             ".towncrier-template.rst",
         )

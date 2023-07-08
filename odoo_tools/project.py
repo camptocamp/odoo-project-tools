@@ -68,7 +68,7 @@ def bootstrap_files(opts):
             copy_file(source, dest)
 
     # towncrier stuff TODO: move to odoo-template?
-    path = build_path("./unreleased/.gitkeep")
+    path = build_path("./changes.d/.gitkeep")
     if not path.exists():
         os.makedirs(path.parent, exist_ok=True)
         run(f"touch {path}")
