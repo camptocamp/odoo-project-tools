@@ -16,8 +16,8 @@ def get_bumpversion_vars(opts):
     # TODO: get version from version file as default
     version = opts.version or get_project_manifest_key("odoo_version") + ".0.1.0"
     res = {
-        "rel_path_local_addons": get_conf_key("local_src_rel_path"),
-        "rel_path_version_file": get_conf_key("version_file_rel_path"),
+        "rel_path_local_addons": get_conf_key("local_src_rel_path").as_posix(),
+        "rel_path_version_file": get_conf_key("version_file_rel_path").as_posix(),
         "bundle_addon_name": "{}_bundle".format(
             get_project_manifest_key("customer_shortname")
         ),
@@ -48,8 +48,11 @@ def bootstrap_files(opts):
         if var_getter:
             with open(source) as source_fd:
                 content = source_fd.read()
+                # TODO: use better variable tmpl?
+                for k, v in var_getter(opts).items():
+                    content = content.replace(f"${k}", v)
                 with open(dest, "w") as dest_fd:
-                    dest_fd.write(content.format(**var_getter(opts)))
+                    dest_fd.write(content)
         else:
             copy_file(source, dest)
 
