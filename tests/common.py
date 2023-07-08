@@ -1,11 +1,12 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
-
+import os
 from contextlib import contextmanager
 from pathlib import PosixPath
 
 from click.testing import CliRunner
 
+from odoo_tools.config import get_conf_key
 from odoo_tools.utils.path import get_root_marker
 from odoo_tools.utils.yaml import update_yml_file
 
@@ -44,7 +45,10 @@ FAKE_MANIFEST_DATA = dict(
 
 
 def make_fake_project_root(
-    manifest=None, marker_file=get_root_marker(), req_file="requirements.txt"
+    manifest=None,
+    marker_file=get_root_marker(),
+    req_file="requirements.txt",
+    proj_version="14.0.0.1.0",
 ):
     data = FAKE_MANIFEST_DATA.copy()
     data.update(manifest or {})
@@ -55,14 +59,20 @@ def make_fake_project_root(
     update_yml_file(marker_file, data)
     with open(req_file, "w") as fd:
         fd.write("")
+    # Mock proj version file
+    ver_file = get_conf_key("version_file_rel_path")
+
+    os.makedirs(ver_file.parent.as_posix(), exist_ok=True)
+    with ver_file.open("w") as fd:
+        fd.write(proj_version)
 
 
 @contextmanager
-def fake_project_root(make_root=True, manifest=None):
+def fake_project_root(make_root=True, **kw):
     runner = CliRunner()
     # TODO: do we really need this click util
     # or tmpfile api is enough?
     with runner.isolated_filesystem():
         if make_root:
-            make_fake_project_root(manifest=manifest)
+            make_fake_project_root(**kw)
         yield runner
