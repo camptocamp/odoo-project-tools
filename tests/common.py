@@ -49,6 +49,7 @@ def make_fake_project_root(
     marker_file=get_root_marker(),
     req_file="requirements.txt",
     proj_version="14.0.0.1.0",
+    mock_marabunta_file=False,
 ):
     data = FAKE_MANIFEST_DATA.copy()
     data.update(manifest or {})
@@ -65,6 +66,18 @@ def make_fake_project_root(
     os.makedirs(ver_file.parent.as_posix(), exist_ok=True)
     with ver_file.open("w") as fd:
         fd.write(proj_version)
+
+    if mock_marabunta_file:
+        fake_marabunta_file()
+
+
+def fake_marabunta_file(source_file_path=None):
+    source_file_path = source_file_path or get_fixture_path("fake-marabunta.yml")
+    if not os.path.exists("odoo"):
+        os.mkdir("odoo")
+    with source_file_path.open() as fd_source:
+        with get_conf_key("marabunta_mig_file_rel_path").open("w") as fd_dest:
+            fd_dest.write(fd_source.read())
 
 
 @contextmanager
