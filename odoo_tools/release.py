@@ -6,7 +6,7 @@ import configparser
 import click
 
 from .config import get_conf_key
-from .utils import yaml
+from .utils.marabunta import MarabuntaFileHandler
 from .utils.os_exec import run
 from .utils.path import build_path
 
@@ -40,34 +40,9 @@ def make_towncrier_cmd(version):
     return "towncrier build --yes --version={}".format(version)
 
 
-class MarabuntFileHandler:
-    def __init__(self, path_obj):
-        self.path_obj = path_obj
-
-    def load(self):
-        return yaml.yaml_load(self.path_obj.open())
-
-    def update(self, version, run_click_hook="pre"):
-        data = self.load()
-        versions = data["migration"]["versions"]
-        version_item = [x for x in versions if x["version"] == version]
-        if not version_item:
-            version_item = {"version": version}
-            versions.append(version_item)
-        if not version_item.get("operations"):
-            version_item["operations"] = {}
-        operations = version_item["operations"]
-        cmd = self._make_click_odoo_update_cmd()
-        operations.setdefault(run_click_hook, []).append(cmd)
-        yaml.update_yml_file(self.path_obj, data)
-
-    def _make_click_odoo_update_cmd(self):
-        return "click-odoo-update"
-
-
 def update_marabunta_file(version):
     marabunta_file = build_path(get_conf_key("marabunta_mig_file_rel_path"))
-    handler = MarabuntFileHandler(marabunta_file)
+    handler = MarabuntaFileHandler(marabunta_file)
     handler.update(version)
 
 

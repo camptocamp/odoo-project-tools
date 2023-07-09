@@ -12,18 +12,12 @@ from invoke import exceptions, task
 from ..config import get_conf_key
 from ..utils import pending_merge as pm_utils
 from ..utils.gh import get_target_branch
+from ..utils.marabunta import MarabuntaFileHandler
 from ..utils.os_exec import run
 from ..utils.path import build_path, root_path
 from ..utils.proj import get_project_manifest_key
 from ..utils.yaml import yaml_load
-from .common import (
-    MIGRATION_FILE,
-    ask_confirmation,
-    ask_or_abort,
-    cd,
-    exit_msg,
-    get_migration_file_modules,
-)
+from .common import ask_confirmation, ask_or_abort, cd, exit_msg
 from .module import Module
 
 try:
@@ -502,7 +496,10 @@ def list_external_dependencies_installed(ctx, submodule_path):
     # TODO: change depending on new structure
     # use root_path to get root project directory
     submodule_path = build_path(submodule_path)
-    migration_modules = get_migration_file_modules(MIGRATION_FILE)
+    marabunta_file = get_conf_key("marabunta_mig_file_rel_path")
+    migration_modules = MarabuntaFileHandler(
+        marabunta_file
+    ).get_migration_file_modules()
     print("\nInstalled modules from {}:\n".format(submodule_path))
     modules = []
     with cd(submodule_path):
