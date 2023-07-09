@@ -27,7 +27,9 @@ def test_make_towncrier_cmd():
 
 def test_bump():
     ver_file = get_conf_key("version_file_rel_path")
-    with fake_project_root(proj_version="14.0.0.1.0") as runner:
+    with fake_project_root(
+        proj_version="14.0.0.1.0", mock_marabunta_file=True
+    ) as runner:
         with ver_file.open() as fd:
             assert fd.read() == "14.0.0.1.0"
         # run init to get all files ready (eg: bumpversion)
@@ -67,7 +69,9 @@ def test_bump():
 
 
 def test_bump_changelog():
-    with fake_project_root(proj_version="14.0.0.1.0") as runner:
+    with fake_project_root(
+        proj_version="14.0.0.1.0", mock_marabunta_file=True
+    ) as runner:
         # run init to get all files ready (eg: bumpversion)
         runner.invoke(init, catch_exceptions=False)
         changes = (
@@ -96,5 +100,28 @@ def test_bump_changelog():
         assert result.output.splitlines() == [
             "Running: bumpversion minor",
             "Running: towncrier build --yes --version=14.0.0.2.0",
+            "Updating marabunta migration file",
+        ]
+        assert result.exit_code == 0
+
+
+def test_bump_update_marabunta_file():
+    with fake_project_root(
+        proj_version="14.0.0.1.0", mock_marabunta_file=True
+    ) as runner:
+        # run init to get all files ready (eg: bumpversion)
+        runner.invoke(init, catch_exceptions=False)
+        result = runner.invoke(
+            release.bump, ["--type", "minor"], catch_exceptions=False
+        )
+        with get_conf_key("marabunta_mig_file_rel_path").open() as fd:
+            content = fd.read()
+            # TODO: improve these checks
+            assert "14.0.0.2.0" in content
+            assert "click-odoo-update" in content
+        assert result.output.splitlines() == [
+            "Running: bumpversion minor",
+            "Running: towncrier build --yes --version=14.0.0.2.0",
+            "Updating marabunta migration file",
         ]
         assert result.exit_code == 0

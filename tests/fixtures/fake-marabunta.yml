@@ -1,0 +1,8 @@
+migration:
+  versions:
+    - version: setup
+      addons:
+        upgrade:
+          - foo
+          - baz
+    - version: 14.0.0.1.0 
