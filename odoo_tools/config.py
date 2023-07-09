@@ -19,6 +19,7 @@ confs = {
     "pending_merge_rel_path": "pending-merges.d",
     # FIXME: will be VERSION?
     "version_file_rel_path": "odoo/VERSION",
+    "marabunta_mig_file_rel_path": "odoo/migration.yml",
 }
 
 
