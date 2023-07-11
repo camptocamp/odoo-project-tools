@@ -53,6 +53,7 @@ otools-project = "odoo_tools.cli.project:cli"
 otools-addon = "odoo_tools.cli.addon:cli"
 otools-release = "odoo_tools.cli.release:cli"
 otools-pending = "odoo_tools.cli.pending:cli"
+otools-conversion = "odoo_tools.convert_new_img:main"
 
 [project.optional-dependencies]
 test = [
