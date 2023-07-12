@@ -15,10 +15,10 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from ..config import get_conf_key
 from ..exceptions import PathNotFound
-from . import ui
-from .gh import parse_github_url
-from .path import build_path
-from .proj import get_project_manifest_key
+from . import gh, ui
+from .os_exec import run
+from .path import build_path, cd
+from .proj import get_current_version, get_project_manifest_key
 from .yaml import yaml_load
 
 git_aggregator.main.setup_logger()
@@ -339,7 +339,7 @@ def add_pending(entity_url):
     # # PR headline
     # # PR link as is
     # - refs/pull/<pr-index>/head
-    parts = parse_github_url(entity_url)
+    parts = gh.parse_github_url(entity_url)
     upstream = parts.get("upstream")
     repo_name = parts.get("repo_name")
     entity_type = parts.get("entity_type")
@@ -357,7 +357,7 @@ def add_pending(entity_url):
 
 
 def remove_pending(entity_url):
-    parts = parse_github_url(entity_url)
+    parts = gh.parse_github_url(entity_url)
     upstream = parts.get("upstream")
     repo_name = parts.get("repo_name")
     repo = Repo(repo_name)
@@ -380,3 +380,50 @@ def remove_pending(entity_url):
     if not pending_merges_present and not patches:
         os.remove(repo.abs_merges_path)
     return repo
+
+
+def make_merge_branch_name(version):
+    project_id = get_project_manifest_key("project_id")
+    branch_name = "merge-branch-{}-{}".format(project_id, version)
+    return branch_name
+
+
+def push_branches(force=False):
+    """Push the local branches to the camptocamp remote
+
+    The branch name will be composed of the id of the project and the current
+    version number (the one in odoo/VERSION).
+
+    It should be done at the closing of every release, so we are able
+    to build a new patch branch from the same commits if required.
+    """
+    version = get_current_version()
+    branch_name = make_merge_branch_name(version)
+
+    if not force:
+        # TODO
+        gh.check_git_diff()
+
+    # look through all of the files inside PENDING_MERGES_DIR, push everything
+    impacted_repos = []
+    c2c_git_remote = get_conf_key("c2c_git_remote")
+    for repo in Repo.repositories_from_pending_folder():
+        if not repo.has_pending_merges():
+            continue
+        config = repo.merges_config()
+        impacted_repos.append(repo.path)
+        ui.echo(f"pushing {repo.path}")
+        with cd(repo.abs_path):
+            try:
+                run("git config remote.{}.url".format(c2c_git_remote))
+            except Exception:  # TODO
+                remote_url = config["remotes"][c2c_git_remote]
+                run("git remote add {} {}".format(c2c_git_remote, remote_url))
+            run(
+                "git push -f -v {} HEAD:refs/heads/{}".format(
+                    c2c_git_remote, branch_name
+                )
+            )
+    if impacted_repos:
+        ui.echo("Impacted repos:")
+        ui.echo("\n - ".join(impacted_repos))

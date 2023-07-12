@@ -9,6 +9,7 @@ from .config import get_conf_key
 from .utils.marabunta import MarabuntaFileHandler
 from .utils.os_exec import run
 from .utils.path import build_path
+from .utils.pending_merge import push_branches
 
 
 def parse_bumpversion_cfg(ini_content):
@@ -67,14 +68,17 @@ def bump(rel_type, new_version=None, dry_run=False, commit=False):
     if dry_run:
         new_version = get_cfg_key(res, "new_version")
         click.echo(f"New version: {new_version}")
-    else:
-        with get_conf_key("version_file_rel_path").open() as fd:
-            new_version = fd.read()
-        cmd = make_towncrier_cmd(new_version)
-        click.echo(f"Running: {cmd}")
-        run(cmd)
-        click.echo("Updating marabunta migration file")
-        update_marabunta_file(new_version)
+        return
+    with get_conf_key("version_file_rel_path").open() as fd:
+        new_version = fd.read()
+    cmd = make_towncrier_cmd(new_version)
+    click.echo(f"Running: {cmd}")
+    run(cmd)
+    click.echo("Updating marabunta migration file")
+    update_marabunta_file(new_version)
+
+    if click.confirm("Push local branches?"):
+        push_branches(new_version)
 
 
 if __name__ == '__main__':

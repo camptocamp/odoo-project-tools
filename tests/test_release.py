@@ -101,6 +101,7 @@ def test_bump_changelog():
             "Running: bumpversion minor",
             "Running: towncrier build --yes --version=14.0.0.2.0",
             "Updating marabunta migration file",
+            "Push local branches? [y/N]: ",
         ]
         assert result.exit_code == 0
 
@@ -123,5 +124,6 @@ def test_bump_update_marabunta_file():
             "Running: bumpversion minor",
             "Running: towncrier build --yes --version=14.0.0.2.0",
             "Updating marabunta migration file",
+            "Push local branches? [y/N]: ",
         ]
         assert result.exit_code == 0
