@@ -97,3 +97,16 @@ def get_target_branch(target_branch=None):
             )
         )
     return target_branch
+
+
+def check_git_diff(direct_abort=False):
+    try:
+        run("git diff --quiet --exit-code")
+        run("git diff --cached --quiet --exit-code")
+    except Exception:
+        if direct_abort:
+            ui.exit_msg("Your repository has local changes. Abort.")
+        # FIXME: should be where it gets called
+        ui.ask_or_abort(
+            "Your repository has local changes, are you sure you want to continue?"
+        )

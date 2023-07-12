@@ -12,8 +12,9 @@ from subprocess import PIPE, Popen
 from invoke import task
 from passlib.context import CryptContext
 
+from ..utils import ui
 from ..utils.os_exec import has_exec
-from .common import build_path, exit_msg
+from ..utils.path import build_path
 
 SHARED_C2C_FOLDER_PREFIX = "Shared-C2C-Odoo-External/"
 ODOO_PROJECT_URL = "https://{}.odoo.camptocamp.{{cookiecutter.country}}"
@@ -35,7 +36,7 @@ def put_lp_pwd(project, lp_entry, password):
             "** ERROR : LastPass CLI is not available"
             "please create the entry manually. **"
         )
-        exit_msg(msg)
+        ui.exit_msg(msg)
         return
     project_folder = "{}{}/".format(SHARED_C2C_FOLDER_PREFIX, project)
     entry_name = "{}{}\n".format(project_folder, lp_entry.name)

@@ -14,10 +14,10 @@ from ..utils import pending_merge as pm_utils
 from ..utils.gh import get_target_branch
 from ..utils.marabunta import MarabuntaFileHandler
 from ..utils.os_exec import run
-from ..utils.path import build_path, root_path
+from ..utils.path import build_path, cd, root_path
 from ..utils.proj import get_project_manifest_key
+from ..utils.ui import ask_confirmation, ask_or_abort, exit_msg
 from ..utils.yaml import yaml_load
-from .common import ask_confirmation, ask_or_abort, cd, exit_msg
 from .module import Module
 
 try:
