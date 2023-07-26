@@ -388,7 +388,7 @@ def make_merge_branch_name(version):
     return branch_name
 
 
-def push_branches(force=False):
+def push_branches(version=None, force=False):
     """Push the local branches to the camptocamp remote
 
     The branch name will be composed of the id of the project and the current
@@ -397,9 +397,8 @@ def push_branches(force=False):
     It should be done at the closing of every release, so we are able
     to build a new patch branch from the same commits if required.
     """
-    version = get_current_version()
+    version = version or get_current_version()
     branch_name = make_merge_branch_name(version)
-
     if not force:
         # TODO
         gh.check_git_diff()
@@ -412,7 +411,7 @@ def push_branches(force=False):
             continue
         config = repo.merges_config()
         impacted_repos.append(repo.path)
-        ui.echo(f"pushing {repo.path}")
+        ui.echo(f"Pushing {repo.path}")
         with cd(repo.abs_path):
             try:
                 run("git config remote.{}.url".format(c2c_git_remote))
@@ -426,4 +425,6 @@ def push_branches(force=False):
             )
     if impacted_repos:
         ui.echo("Impacted repos:")
-        ui.echo("\n - ".join(impacted_repos))
+        ui.echo("\n - ".join([x.as_posix() for x in impacted_repos]))
+    else:
+        ui.echo("No repo to push")

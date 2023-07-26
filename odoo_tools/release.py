@@ -66,7 +66,7 @@ def bump(rel_type, new_version=None, dry_run=False, commit=False):
     update_marabunta_file(new_version)
 
     if click.confirm("Push local branches?"):
-        push_branches(new_version)
+        push_branches(version=new_version)
 
 
 if __name__ == '__main__':
