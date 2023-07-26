@@ -14,14 +14,17 @@ class MarabuntaFileHandler:
         data = self.load()
         versions = data["migration"]["versions"]
         version_item = [x for x in versions if x["version"] == version]
-        if not version_item:
+        if version_item:
+            version_item = version_item[0]
+        else:
             version_item = {"version": version}
             versions.append(version_item)
         if not version_item.get("operations"):
             version_item["operations"] = {}
         operations = version_item["operations"]
         cmd = self._make_click_odoo_update_cmd()
-        operations.setdefault(run_click_hook, []).append(cmd)
+        if cmd not in operations.get(run_click_hook, []):
+            operations.setdefault(run_click_hook, []).append(cmd)
         yaml.update_yml_file(self.path_obj, data)
 
     def _make_click_odoo_update_cmd(self):
