@@ -20,3 +20,7 @@ class Exit(_Exit):
         super().__init__(self.exit_code)
         self.message = msg
         print(self.message)
+
+
+# TODO: manage exceptions globally and homogenously.
+# See https://stackoverflow.com/questions/45875930/is-there-a-way-to-handle-exceptions-automatically-with-python-click
