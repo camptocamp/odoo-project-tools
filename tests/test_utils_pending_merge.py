@@ -14,8 +14,6 @@ from .common import fake_project_root
 from .fixtures import clear_caches  # noqa
 
 Repo = pm_utils.Repo
-ext_rel_path = get_conf_key("ext_src_rel_path")
-pending_merge_rel_path = get_conf_key("pending_merge_rel_path")
 
 
 # TODO: reuse everywhere
@@ -42,6 +40,8 @@ PENDING_MERGE_FILE_TMPL = """
 
 def test_repo_base():
     with fake_project_root():
+        ext_rel_path = get_conf_key("ext_src_rel_path")
+        pending_merge_rel_path = get_conf_key("pending_merge_rel_path")
         cwd = PosixPath(os.getcwd())
         repo = Repo("edi", path_check=False)
         expected = {

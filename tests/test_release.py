@@ -26,10 +26,10 @@ def test_make_towncrier_cmd():
 
 
 def test_bump():
-    ver_file = get_conf_key("version_file_rel_path")
     with fake_project_root(
         proj_version="14.0.0.1.0", mock_marabunta_file=True
     ) as runner:
+        ver_file = get_conf_key("version_file_rel_path")
         with ver_file.open() as fd:
             assert fd.read() == "14.0.0.1.0"
         # run init to get all files ready (eg: bumpversion)

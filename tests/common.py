@@ -42,15 +42,32 @@ FAKE_MANIFEST_DATA = dict(
     odoo_aux_langs="fr_CH;it_IT",
     platform_name="azure",
 )
+FAKE_PROJ_CFG_V1 = dict(
+    c2c_git_remote="camptocamp",
+    odoo_src_rel_path="odoo/src",
+    ext_src_rel_path="odoo/external-src",
+    local_src_rel_path="odoo/local-src",
+    pending_merge_rel_path="pending-merges.d",
+    version_file_rel_path="odoo/VERSION",
+    marabunta_mig_file_rel_path="odoo/migration.yml",
+)
 
 
 def make_fake_project_root(
+    proj_cfg=None,
     manifest=None,
     marker_file=get_root_marker(),
     req_file="requirements.txt",
     proj_version="14.0.0.1.0",
     mock_marabunta_file=False,
 ):
+    proj_cfg_data = FAKE_PROJ_CFG_V1.copy()
+    proj_cfg_data.update(proj_cfg or {})
+    with open(".proj.cfg", "w") as fd:
+        content = ["[conf]"]
+        for k, v in proj_cfg_data.items():
+            content.append(f"{k} = {v}")
+        fd.write("\n".join(content))
     data = FAKE_MANIFEST_DATA.copy()
     data.update(manifest or {})
     # create empty file
@@ -91,9 +108,12 @@ def fake_project_root(make_root=True, **kw):
         yield runner
 
 
-def compare_line_by_line(content, expected):
+def compare_line_by_line(content, expected, sort=False):
     content_lines = [x.strip() for x in content.splitlines() if x.strip()]
     expected_lines = [x.strip() for x in expected.splitlines() if x.strip()]
+    if sort:
+        content_lines = sorted(content_lines)
+        expected_lines = sorted(expected_lines)
     # Compare line by line to ease debug in case of error
     for content_line, expected_line in zip(content_lines, expected_lines):
-        assert content_line == expected_line
+        assert content_line == expected_line, f"{content_line} != {expected_line}"
