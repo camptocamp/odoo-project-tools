@@ -2,12 +2,17 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import datetime
+from unittest import mock
 
 from odoo_tools import release
 from odoo_tools.config import get_conf_key
 from odoo_tools.project import init
 
-from .common import compare_line_by_line, fake_project_root
+from .common import (
+    compare_line_by_line,
+    fake_project_root,
+    mock_pending_merge_repo_paths,
+)
 from .fixtures import clear_caches  # noqa
 
 
@@ -26,10 +31,10 @@ def test_make_towncrier_cmd():
 
 
 def test_bump():
-    ver_file = get_conf_key("version_file_rel_path")
     with fake_project_root(
         proj_version="14.0.0.1.0", mock_marabunta_file=True
     ) as runner:
+        ver_file = get_conf_key("version_file_rel_path")
         with ver_file.open() as fd:
             assert fd.read() == "14.0.0.1.0"
         # run init to get all files ready (eg: bumpversion)
@@ -101,6 +106,7 @@ def test_bump_changelog():
             "Running: bumpversion minor",
             "Running: towncrier build --yes --version=14.0.0.2.0",
             "Updating marabunta migration file",
+            "Push local branches? [y/N]: ",
         ]
         assert result.exit_code == 0
 
@@ -123,5 +129,57 @@ def test_bump_update_marabunta_file():
             "Running: bumpversion minor",
             "Running: towncrier build --yes --version=14.0.0.2.0",
             "Updating marabunta migration file",
+            "Push local branches? [y/N]: ",
+        ]
+        assert result.exit_code == 0
+
+
+def test_bump_push_no_repo():
+    with fake_project_root(
+        proj_version="14.0.0.1.0", mock_marabunta_file=True
+    ) as runner:
+        # run init to get all files ready (eg: bumpversion)
+        runner.invoke(init, catch_exceptions=False)
+        result = runner.invoke(
+            release.bump, ["--type", "minor"], catch_exceptions=False, input="y"
+        )
+        assert result.output.splitlines() == [
+            "Running: bumpversion minor",
+            "Running: towncrier build --yes --version=14.0.0.2.0",
+            "Updating marabunta migration file",
+            "Push local branches? [y/N]: y",
+            "No repo to push",
+        ]
+        assert result.exit_code == 0
+
+
+# TODO: test more cases
+def test_bump_push_repo_with_pending_merge():
+    ran_cmd = []
+
+    def mocked_run(cmd):
+        ran_cmd.append(cmd)
+
+    with fake_project_root(
+        proj_version="14.0.0.1.0", mock_marabunta_file=True
+    ) as runner, mock.patch("odoo_tools.utils.pending_merge.run", mocked_run):
+        mock_pending_merge_repo_paths("edi-framework")
+        # run init to get all files ready (eg: bumpversion)
+        runner.invoke(init, catch_exceptions=False)
+        result = runner.invoke(
+            release.bump, ["--type", "minor"], catch_exceptions=False, input="y"
+        )
+        assert result.output.splitlines() == [
+            "Running: bumpversion minor",
+            "Running: towncrier build --yes --version=14.0.0.2.0",
+            "Updating marabunta migration file",
+            "Push local branches? [y/N]: y",
+            'Pushing odoo/external-src/edi-framework',
+            'Impacted repos:',
+            'odoo/external-src/edi-framework',
+        ]
+        assert ran_cmd == [
+            'git config remote.camptocamp.url',
+            'git push -f -v camptocamp HEAD:refs/heads/merge-branch-1234-14.0.0.2.0',
         ]
         assert result.exit_code == 0

@@ -2,9 +2,11 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import os
+from contextlib import contextmanager
 from pathlib import PosixPath
 
 from ..exceptions import ProjectRootFolderNotFound
+from . import ui
 
 
 def get_root_marker():
@@ -46,3 +48,26 @@ def build_path(path, from_root=True, from_file=None):
             from_file = __file__
         base_path = PosixPath(from_file).parent.resolve()
     return base_path / path
+
+
+@contextmanager
+def cd(path):
+    prev = os.getcwd()
+    os.chdir(os.path.expanduser(path))
+    try:
+        yield
+    finally:
+        os.chdir(prev)
+
+
+def make_dir(path_dir):
+    try:
+        os.makedirs(path_dir)
+    except OSError:
+        if not os.path.isdir(path_dir):
+            msg = ("Directory does not exist and could not be created: {}").format(
+                path_dir
+            )
+            ui.exit_msg(msg)
+        else:
+            pass  # directory already exists, nothing to do in this case

@@ -10,12 +10,10 @@ from odoo_tools.config import get_conf_key
 from odoo_tools.exceptions import PathNotFound
 from odoo_tools.utils import pending_merge as pm_utils
 
-from .common import fake_project_root
+from .common import fake_project_root, mock_pending_merge_repo_paths
 from .fixtures import clear_caches  # noqa
 
 Repo = pm_utils.Repo
-ext_rel_path = get_conf_key("ext_src_rel_path")
-pending_merge_rel_path = get_conf_key("pending_merge_rel_path")
 
 
 # TODO: reuse everywhere
@@ -25,23 +23,10 @@ def compare_dict(a, b, keys=None):
         assert a[k] == b[k], f"{k} does not match"
 
 
-PENDING_MERGE_FILE_TMPL = """
-../odoo/external-src/{repo_name}:
-  remotes:
-    camptocamp: git@github.com:camptocamp/{repo_name}.git
-    OCA: git@github.com:OCA/{repo_name}.git
-  target: camptocamp merge-branch-{pid}-master
-  merges:
-  - OCA 14.0
-  - OCA refs/pull/774/head
-  - OCA refs/pull/773/head
-  - OCA refs/pull/663/head
-  - OCA refs/pull/759/head
-"""
-
-
 def test_repo_base():
     with fake_project_root():
+        ext_rel_path = get_conf_key("ext_src_rel_path")
+        pending_merge_rel_path = get_conf_key("pending_merge_rel_path")
         cwd = PosixPath(os.getcwd())
         repo = Repo("edi", path_check=False)
         expected = {
@@ -56,40 +41,24 @@ def test_repo_base():
             assert getattr(repo, k) == v, f"{k} does not match"
 
 
-def mock_repo_paths(cwd, repo_name, src=True, pending=True):
-    """Generate fake paths for given repo."""
-    repo = Repo(repo_name, path_check=False)
-    if src:
-        path = repo.abs_path / ".git"
-        os.makedirs(path, exist_ok=True)
-
-    if pending:
-        path = repo.abs_merges_path
-        os.makedirs(path.parent, exist_ok=True)
-        with open(path, "w") as fd:
-            fd.write(PENDING_MERGE_FILE_TMPL.format(repo_name=repo_name, pid="1234"))
-
-
 def test_repo_check_path():
     name = "edi"
     with fake_project_root():
-        cwd = PosixPath(os.getcwd())
         with pytest.raises(PathNotFound, match="GIT CONFIG*"):
             Repo(name)
         # Add fake git root
-        mock_repo_paths(cwd, name, pending=False)
+        mock_pending_merge_repo_paths(name, pending=False)
         with pytest.raises(PathNotFound, match="MERGES PATH*"):
             Repo(name)
-        mock_repo_paths(cwd, name)
+        mock_pending_merge_repo_paths(name)
         assert Repo(name)
 
 
 def test_repositories_from_pending_folder():
     names = sorted(["edi", "wms", "web-api"])
     with fake_project_root():
-        cwd = PosixPath(os.getcwd())
         for name in names:
-            mock_repo_paths(cwd, name)
+            mock_pending_merge_repo_paths(name)
         repos = Repo.repositories_from_pending_folder()
         assert sorted([x.name for x in repos]) == names
 
@@ -97,8 +66,7 @@ def test_repositories_from_pending_folder():
 def test_has_pending_merges():
     name = "edi"
     with fake_project_root():
-        cwd = PosixPath(os.getcwd())
-        mock_repo_paths(cwd, name)
+        mock_pending_merge_repo_paths(name)
         repo = Repo(name)
         assert repo.has_pending_merges()
 
@@ -106,8 +74,7 @@ def test_has_pending_merges():
 def test_merges_config():
     name = "edi"
     with fake_project_root():
-        cwd = PosixPath(os.getcwd())
-        mock_repo_paths(cwd, name)
+        mock_pending_merge_repo_paths(name)
         repo = Repo(name)
         config = repo.merges_config()
         assert config["remotes"] == {
@@ -120,8 +87,7 @@ def test_merges_config():
 def test_generate_pending_merges_file_template():
     name = "edi"
     with fake_project_root(manifest={"odoo_version": "16.0"}):
-        cwd = PosixPath(os.getcwd())
-        mock_repo_paths(cwd, name, pending=False)
+        mock_pending_merge_repo_paths(name, pending=False)
         repo = Repo(name, path_check=False)
         assert not repo.has_pending_merges()
         repo.generate_pending_merges_file_template("OCA")
@@ -141,8 +107,7 @@ def test_generate_pending_merges_file_template():
 def test_add_pending_pr_from_scratch():
     repo_name = "edi-framework"
     with fake_project_root(manifest=dict(odoo_version="16.0")):
-        cwd = PosixPath(os.getcwd())
-        mock_repo_paths(cwd, repo_name, pending=False)
+        mock_pending_merge_repo_paths(repo_name, pending=False)
         repo = Repo(repo_name, path_check=False)
         repo.generate_pending_merges_file_template("OCA")
         repo.add_pending_pull_request("OCA", 778)
@@ -161,8 +126,7 @@ def test_add_pending_pr_from_scratch():
 def test_add_pending_pr():
     name = "edi"
     with fake_project_root():
-        cwd = PosixPath(os.getcwd())
-        mock_repo_paths(cwd, name)
+        mock_pending_merge_repo_paths(name)
         repo = Repo(name, path_check=False)
         repo.add_pending_pull_request("OCA", 778)
         expected = {
@@ -187,8 +151,7 @@ def test_add_pending_pr():
 def test_remove_pending_pr():
     name = "edi"
     with fake_project_root():
-        cwd = PosixPath(os.getcwd())
-        mock_repo_paths(cwd, name)
+        mock_pending_merge_repo_paths(name)
         repo = Repo(name, path_check=False)
         merges = repo.merges_config().get("merges", [])
         original = [
@@ -214,8 +177,7 @@ def test_remove_pending_pr():
 def __test_add_pending_commit_from_scratch():
     name = "edi"
     with fake_project_root(manifest=dict(odoo_version="16.0")):
-        cwd = PosixPath(os.getcwd())
-        mock_repo_paths(cwd, name, pending=False)
+        mock_pending_merge_repo_paths(name, pending=False)
         repo = Repo(name, path_check=False)
         repo.generate_pending_merges_file_template("OCA")
         sha = "6d35e8d16afaec2f9bf8996defaf0086cd704481"
@@ -239,8 +201,7 @@ def __test_add_pending_commit_from_scratch():
 def test_add_pending_commit():
     name = "edi"
     with fake_project_root():
-        cwd = PosixPath(os.getcwd())
-        mock_repo_paths(cwd, name)
+        mock_pending_merge_repo_paths(name)
         repo = Repo(name, path_check=False)
         sha = "a86f5fe73e1f34f29cb2ad0dca253e47ce625406"
         repo.add_pending_commit("OCA", sha)
@@ -269,8 +230,7 @@ def test_add_pending_commit():
 def test_remove_pending_commit():
     name = "edi"
     with fake_project_root():
-        cwd = PosixPath(os.getcwd())
-        mock_repo_paths(cwd, name)
+        mock_pending_merge_repo_paths(name)
         repo = Repo(name, path_check=False)
         sha = "a86f5fe73e1f34f29cb2ad0dca253e47ce625406"
         repo.add_pending_commit("OCA", sha)

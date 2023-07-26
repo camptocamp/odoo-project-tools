@@ -5,11 +5,15 @@ import os
 
 import click
 
-from .config import get_conf_key
+from .config import PROJ_CFG_FILE, get_conf_key
 from .utils.misc import SmartDict, copy_file, get_template_path
 from .utils.os_exec import run
 from .utils.path import build_path
 from .utils.proj import get_project_manifest_key
+
+
+def get_proj_tmpl_ver():
+    return os.getenv("PROJ_TMPL_VER", "2")
 
 
 def get_bumpversion_vars(opts):
@@ -32,6 +36,11 @@ def get_bumpversion_vars(opts):
 def get_init_template_files():
     return (
         {
+            "source": f".proj.v{get_proj_tmpl_ver()}.cfg",
+            "destination": build_path(f"./{PROJ_CFG_FILE}"),
+            "check": lambda source_path, dest_path: not dest_path.exists(),
+        },
+        {
             "source": "docker-compose.override.tmpl.yml",
             "destination": build_path("./docker-compose.override.yml"),
         },
@@ -52,9 +61,13 @@ def get_init_template_files():
 
 
 def bootstrap_files(opts):
+    # Generate specific templated files
     for item in get_init_template_files():
         source = get_template_path(item["source"])
         dest = item["destination"]
+        check = item.get("check", lambda *p: True)
+        if not check(source, dest):
+            continue
         var_getter = item.get("variables_getter")
         if var_getter:
             with open(source) as source_fd:

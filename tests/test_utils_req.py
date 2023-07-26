@@ -6,7 +6,7 @@ from click.testing import CliRunner
 from odoo_tools.config import get_conf_key
 from odoo_tools.utils import req as req_utils
 
-from .common import get_fixture_path
+from .common import fake_project_root, get_fixture_path
 
 fake_req = get_fixture_path("fake-requirements.txt")
 
@@ -62,13 +62,14 @@ def test_make_requirement_line_for_pr():
 
 
 def test_make_requirement_line_for_pr_editable():
-    make = req_utils.make_requirement_line_for_editable
-    mod_name = "edi_record_metadata_oca"
-    pkg_name = f"odoo14-addon-{mod_name}"
-    pr = "https://github.com/OCA/edi-framework/pull/3"
-    path = get_conf_key("ext_src_rel_path")
-    expected = f"-e {path}/edi-framework/setup/edi_record_metadata_oca"
-    assert make(pkg_name, pr) == expected
+    with fake_project_root():
+        make = req_utils.make_requirement_line_for_editable
+        mod_name = "edi_record_metadata_oca"
+        pkg_name = f"odoo14-addon-{mod_name}"
+        pr = "https://github.com/OCA/edi-framework/pull/3"
+        path = get_conf_key("ext_src_rel_path")
+        expected = f"-e {path}/edi-framework/setup/edi_record_metadata_oca"
+        assert make(pkg_name, pr) == expected
 
 
 def test_add_requirement():
@@ -97,8 +98,7 @@ def test_add_requirement_pr():
 
 
 def test_add_requirement_pr_editable():
-    runner = CliRunner()
-    with runner.isolated_filesystem():
+    with fake_project_root():
         req_path = "./tmp-requirements.txt"
         pr = "https://github.com/OCA/edi-framework/pull/3"
         mod_name = "foo"

@@ -10,8 +10,9 @@ from datetime import datetime
 import psycopg2
 from invoke import task
 
+from ..utils import ui
+from ..utils.path import cd, make_dir
 from ..utils.proj import get_project_manifest_key
-from .common import cd, exit_msg, make_dir
 
 
 def get_default_parameters():
@@ -193,7 +194,9 @@ def download_dump(ctx, platform="", customer="", env="int", dump_name="", dumpdi
             dump_name or _get_list_of_dumps(ctx, p_platform, p_customer, env)[-1]
         )  # get the last
     except IndexError:
-        exit_msg("Dump not found for {} on {} {}".format(p_customer, p_platform, env))
+        ui.exit_msg(
+            "Dump not found for {} on {} {}".format(p_customer, p_platform, env)
+        )
 
     # gpg_fname is like fighting_snail_1024[...].pg.gpg
     gpg_fname = os.path.basename(database_name)

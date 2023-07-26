@@ -1,18 +1,21 @@
 # Copyright 2017 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-import yaml
-
 # TODO: do we really need this to edit such files?
 from ruamel.yaml import YAML
 
+yaml = YAML()
 
-def yaml_load(stream, Loader=None):
-    return yaml.load(stream, Loader=Loader or yaml.FullLoader)
+
+def yaml_load(stream):
+    return yaml.load(stream)
+
+
+def yaml_dump(data, fileob):
+    yaml.dump(data, fileob)
 
 
 def update_yml_file(path, new_data, main_key=None):
-    yaml = YAML()
     # preservation of indentation
     yaml.indent(mapping=2, sequence=4, offset=2)
 

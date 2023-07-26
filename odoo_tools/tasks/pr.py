@@ -5,7 +5,7 @@ import os
 
 from invoke import exceptions, task
 
-from .common import ask_confirmation, check_git_diff, exit_msg
+from ..utils import gh, ui
 from .database import _get_list_of_dumps, download_dump
 from .submodule import init, update
 
@@ -45,7 +45,7 @@ def test(
     elif get_local_db:
         fname = get_local_db
     else:
-        if ask_confirmation(
+        if ui.ask_confirmation(
             "No --get-local-db/--get-remote-db parameter specified - build database from scratch?"
         ):
             _create_db(ctx, "odoodb-{}".format(pr_link))
@@ -149,7 +149,7 @@ def _load_database(ctx, pr_link, fname):
             pass
     else:
         msg = "** Database file for restore is not found**"
-        exit_msg(msg)
+        ui.exit_msg(msg)
         return
     return fname
 
@@ -173,7 +173,7 @@ def _create_db(ctx, database_name):
 
 
 def handle_git_repository(ctx, pr_number, branch):
-    check_git_diff(ctx)
+    gh.check_git_diff(ctx)
     master = "remotes/origin/{}".format(branch)
 
     try:
