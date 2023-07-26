@@ -8,9 +8,6 @@ import git_aggregator.config
 import git_aggregator.main
 import git_aggregator.repo
 import requests
-
-# FIXME: move to yaml utils
-from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from ..config import get_conf_key
@@ -19,13 +16,9 @@ from . import gh, ui
 from .os_exec import run
 from .path import build_path, cd
 from .proj import get_current_version, get_project_manifest_key
-from .yaml import yaml_load
+from .yaml import yaml_dump, yaml_load
 
 git_aggregator.main.setup_logger()
-
-
-# FIXME: move to yaml utils
-yaml = YAML()
 
 
 try:
@@ -134,7 +127,7 @@ class Repo:
         repo_relpath = os.path.join(os.path.pardir, self.path)
         data[repo_relpath] = config
         with open(self.abs_merges_path, "w") as f:
-            yaml.dump(data, f)
+            yaml_dump(data, f)
 
     def api_url(self, upstream=None):
         return "https://api.github.com/repos/{}/{}".format(
