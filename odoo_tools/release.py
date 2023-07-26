@@ -54,11 +54,12 @@ def bump(rel_type, new_version=None, dry_run=False, commit=False):
     click.echo(f"Running: {cmd}")
     res = run(cmd)
     if dry_run:
-        new_version = get_bumpversion_cfg_key(res, "new_version")
+        new_version = get_bumpversion_cfg_key(res, "new_version").strip()
         click.echo(f"New version: {new_version}")
         return
     with get_conf_key("version_file_rel_path").open() as fd:
-        new_version = fd.read()
+        new_version = fd.read().strip()
+
     cmd = make_towncrier_cmd(new_version)
     click.echo(f"Running: {cmd}")
     run(cmd)
