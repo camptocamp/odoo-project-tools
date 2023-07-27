@@ -2,7 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 import os
 
-from odoo_tools import addon
+from odoo_tools.cli import addon
 from odoo_tools.utils.pending_merge import Repo
 from odoo_tools.utils.pkg import Package
 

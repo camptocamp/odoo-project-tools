@@ -3,10 +3,10 @@
 
 import click
 
-from .utils import pending_merge as pm_utils, ui
-from .utils.os_exec import run
-from .utils.pkg import Package
-from .utils.req import get_project_dev_req
+from ..utils import pending_merge as pm_utils, ui
+from ..utils.os_exec import run
+from ..utils.pkg import Package
+from ..utils.req import get_project_dev_req
 
 
 @click.group()

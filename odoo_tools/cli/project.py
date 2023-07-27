@@ -5,11 +5,11 @@ import os
 
 import click
 
-from .config import PROJ_CFG_FILE, get_conf_key
-from .utils.misc import SmartDict, copy_file, get_template_path
-from .utils.os_exec import run
-from .utils.path import build_path
-from .utils.proj import get_project_manifest_key
+from ..config import PROJ_CFG_FILE, get_conf_key
+from ..utils.misc import SmartDict, copy_file, get_template_path
+from ..utils.os_exec import run
+from ..utils.path import build_path
+from ..utils.proj import get_project_manifest_key
 
 
 def get_proj_tmpl_ver():
