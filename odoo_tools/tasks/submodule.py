@@ -42,7 +42,7 @@ branches:
 """
 
 
-GIT_C2C_REMOTE_NAME = get_conf_key("c2c_git_remote")
+GIT_C2C_REMOTE_NAME = get_conf_key("company_git_remote")
 
 
 @task

@@ -54,7 +54,7 @@ def make_requirement_line_for_pr(pkg_name, pr):
 
 
 def make_requirement_line_for_proj_fork(pkg_name, repo_name, branch, upstream=None):
-    upstream = upstream or get_conf_key("c2c_git_remote")
+    upstream = upstream or get_conf_key("company_git_remote")
     mod_name = pkg_name_to_odoo_name(pkg_name)
     parts = {
         "upstream": upstream,

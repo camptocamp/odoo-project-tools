@@ -46,7 +46,7 @@ FAKE_MANIFEST_DATA = dict(
     platform_name="azure",
 )
 FAKE_PROJ_CFG_V1 = dict(
-    c2c_git_remote="camptocamp",
+    company_git_remote="camptocamp",
     odoo_src_rel_path="odoo/src",
     ext_src_rel_path="odoo/external-src",
     local_src_rel_path="odoo/local-src",

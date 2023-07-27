@@ -31,7 +31,7 @@ def test_repo_base():
         repo = Repo("edi", path_check=False)
         expected = {
             "name": "edi",
-            "c2c_git_remote": "camptocamp",
+            "company_git_remote": "camptocamp",
             "path": PosixPath(f"{ext_rel_path}/edi"),
             "abs_path": cwd / f"{ext_rel_path}/edi",
             "merges_path": PosixPath(f"{pending_merge_rel_path}/edi.yml"),

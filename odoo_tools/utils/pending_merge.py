@@ -33,7 +33,7 @@ class Repo:
     """Handle checked out repositories and their pending merges."""
 
     def __init__(self, name_or_path, path_check=True):
-        self.c2c_git_remote = get_conf_key("c2c_git_remote")
+        self.company_git_remote = get_conf_key("company_git_remote")
         self.odoo_src_rel_path = get_conf_key("odoo_src_rel_path")
         self.ext_src_rel_path = get_conf_key("ext_src_rel_path")
         self.pending_merge_rel_path = get_conf_key("pending_merge_rel_path")
@@ -131,11 +131,11 @@ class Repo:
 
     def api_url(self, upstream=None):
         return "https://api.github.com/repos/{}/{}".format(
-            upstream or self.c2c_git_remote, self.name
+            upstream or self.company_git_remote, self.name
         )
 
     def ssh_url(self, namespace=None):
-        namespace = namespace or self.c2c_git_remote
+        namespace = namespace or self.company_git_remote
         return self.build_ssh_url(namespace, self.name)
 
     @classmethod
@@ -155,7 +155,7 @@ class Repo:
             )
 
         remote_upstream_url = self.ssh_url(upstream)
-        remote_c2c_url = self.ssh_url()
+        remote_company_url = self.ssh_url()
         odoo_version = get_project_manifest_key("odoo_version")
         default_target = "merge-branch-{}-master".format(
             get_project_manifest_key("project_id")
@@ -168,12 +168,14 @@ class Repo:
             # odoo/odoo#123 pull request
             remotes.insert(0, "oca", self.build_ssh_url("OCA", "OCB"))
 
-        if upstream != self.c2c_git_remote:
-            # if origin is not the same: add c2c one
-            remotes.insert(0, self.c2c_git_remote, remote_c2c_url)
+        if upstream != self.company_git_remote:
+            # if origin is not the same: add company's one
+            remotes.insert(0, self.company_git_remote, remote_company_url)
         config = CommentedMap()
         config.insert(0, "remotes", remotes)
-        config.insert(1, "target", "{} {}".format(self.c2c_git_remote, default_target))
+        config.insert(
+            1, "target", "{} {}".format(self.company_git_remote, default_target)
+        )
         if oca_ocb_remote:
             base_merge = "{} {}".format("oca", odoo_version)
         else:
@@ -313,7 +315,7 @@ class Repo:
         if target_branch and "branch" not in extra_config["target"]:
             extra_config["target"]["branch"] = target_branch
         if target_remote and "remote" not in extra_config["target"]:
-            extra_config["target"]["remote"] = self.c2c_git_remote
+            extra_config["target"]["remote"] = self.company_git_remote
         return RepoAggregator(self, **extra_config)
 
 
@@ -398,7 +400,7 @@ def push_branches(version=None, force=False):
 
     # look through all of the files inside PENDING_MERGES_DIR, push everything
     impacted_repos = []
-    c2c_git_remote = get_conf_key("c2c_git_remote")
+    company_git_remote = get_conf_key("company_git_remote")
     for repo in Repo.repositories_from_pending_folder():
         if not repo.has_pending_merges():
             continue
@@ -407,13 +409,13 @@ def push_branches(version=None, force=False):
         ui.echo(f"Pushing {repo.path}")
         with cd(repo.abs_path):
             try:
-                run("git config remote.{}.url".format(c2c_git_remote))
+                run("git config remote.{}.url".format(company_git_remote))
             except Exception:  # TODO
-                remote_url = config["remotes"][c2c_git_remote]
-                run("git remote add {} {}".format(c2c_git_remote, remote_url))
+                remote_url = config["remotes"][company_git_remote]
+                run("git remote add {} {}".format(company_git_remote, remote_url))
             run(
                 "git push -f -v {} HEAD:refs/heads/{}".format(
-                    c2c_git_remote, branch_name
+                    company_git_remote, branch_name
                 )
             )
     if impacted_repos:
