@@ -24,8 +24,9 @@ def odoo_name_to_pkg_name(odoo_name, odoo_version=""):
     if odoo_name.startswith("odoo-addon"):
         return odoo_name
     if odoo_version:
-        odoo_version = odoo_version.split(".")[0]
-    return f"odoo-addon{odoo_version}-{odoo_name}"
+        serie = int(odoo_version.split(".")[0])
+        odoo_version = serie if serie < 15 else ""
+    return f"odoo{odoo_version}-addon-{odoo_name}"
 
 
 def pkg_name_to_odoo_name(pkg_name, odoo_version=""):
