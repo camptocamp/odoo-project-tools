@@ -39,7 +39,7 @@ def test_odoo_name_to_pkg_name():
     )
 
 
-def test_odoo_name_to_pkg_name_with_odoo_serie():
+def test_odoo_name_to_pkg_name_with_odoo_version():
     assert (
         pypi_utils.odoo_name_to_pkg_name("edi_oca", odoo_version="13.0")
         == "odoo13-addon-edi_oca"
@@ -54,5 +54,24 @@ def test_odoo_name_to_pkg_name_with_odoo_serie():
     )
     assert (
         pypi_utils.odoo_name_to_pkg_name("edi_oca", odoo_version="16.0")
+        == "odoo-addon-edi_oca"
+    )
+
+
+def test_odoo_name_to_pkg_name_with_odoo_serie():
+    assert (
+        pypi_utils.odoo_name_to_pkg_name("edi_oca", odoo_serie="13")
+        == "odoo13-addon-edi_oca"
+    )
+    assert (
+        pypi_utils.odoo_name_to_pkg_name("edi_oca", odoo_serie="14")
+        == "odoo14-addon-edi_oca"
+    )
+    assert (
+        pypi_utils.odoo_name_to_pkg_name("edi_oca", odoo_serie="15")
+        == "odoo-addon-edi_oca"
+    )
+    assert (
+        pypi_utils.odoo_name_to_pkg_name("edi_oca", odoo_serie="16")
         == "odoo-addon-edi_oca"
     )
