@@ -1,6 +1,7 @@
 # Copyright 2017 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+import logging
 import os
 from pathlib import PosixPath
 
@@ -317,6 +318,84 @@ class Repo:
         if target_remote and "remote" not in extra_config["target"]:
             extra_config["target"]["remote"] = self.company_git_remote
         return RepoAggregator(self, **extra_config)
+
+    # TODO: add tests
+    def show_prs(self, state=None, purge=None):
+        """Show all pull requests in pending merges.
+
+        :param state: list only matching states
+        :param purge: purge matching states
+        """
+        if purge:
+            assert purge in ("closed", "merged")
+        logging.getLogger("requests").setLevel(logging.ERROR)
+
+        # NOTE: to collect all this info you must provide your GITHUB_TOKEN.
+        # See git-aggregator README.
+        pr_info_msg = (
+            "#{number} {title}\n"
+            "      State: {state} ({merged})\n"
+            "      Updated at: {updated_at}\n"
+            "      View: {html_url}\n"
+            "      Shortcut: {shortcut}\n"
+        )
+        all_repos_prs = {}
+        aggregator = self.get_aggregator()
+        ui.echo("--")
+        ui.echo("Checking:", self.name)
+        ui.echo("Path:", self.path)
+        ui.echo("Merge file:", self.merges_path)
+        all_prs = aggregator.collect_prs_info()
+        if state is not None:
+            # filter only our state
+            all_prs = {k: v for k, v in all_prs.items() if k == state}
+        for pr_state, prs in all_prs.items():
+            ui.echo("State:", pr_state)
+            for i, pr_info in enumerate(prs, 1):
+                all_repos_prs.setdefault(pr_state, []).append(pr_info)
+                pr_info["raw"].update(pr_info)
+                ui.echo(
+                    "  {})".format(str(i).zfill(2)),
+                    pr_info_msg.format(**pr_info["raw"]),
+                )
+        if purge and all_repos_prs.get("closed", []):
+            kw = {f"purge_{purge}": True}
+            self._purge_closed_prs(all_repos_prs, **kw)
+            # TODO: ask for re-aggregate?
+        return all_repos_prs
+
+    # TODO: add tests
+    def _purge_closed_prs(self, all_repos_prs, purge_merged=False, purge_closed=False):
+        assert purge_closed or purge_merged
+        closed_prs = all_repos_prs.get("closed", [])
+        closed_unmerged_prs = [
+            pr for pr in closed_prs if pr.get("merged") == "not merged"
+        ]
+        closed_merged_prs = [pr for pr in closed_prs if pr.get("merged") == "merged"]
+
+        # This list will receive all closed and unmerged pr's url to return
+        # If purge_closed is set to True, removed prs will not be returned
+        unmerged_prs_urls = [pr.get("url") for pr in closed_unmerged_prs]
+
+        if closed_unmerged_prs and purge_closed:
+            ui.echo("Purging closed ones...")
+            for closed_pr_info in closed_unmerged_prs:
+                try:
+                    self.remove_pending(
+                        closed_pr_info["owner"], closed_pr_info["shortcut"]
+                    )
+                    unmerged_prs_urls.remove(closed_pr_info.get("url"))
+                except Exception as e:
+                    ui.echo(
+                        "An error occurs during '{}' removal : {}".format(
+                            closed_pr_info.get("url"), e
+                        )
+                    )
+        if closed_merged_prs and purge_merged:
+            ui.echo("Purging merged ones...")
+            for closed_pr_info in closed_merged_prs:
+                self.remove_pending(closed_pr_info["owner"], closed_pr_info["shortcut"])
+        return unmerged_prs_urls
 
 
 class RepoAggregator(git_aggregator.repo.Repo):

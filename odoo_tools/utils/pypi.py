@@ -20,13 +20,13 @@ def get_last_pypi_version(pkg_name, odoo=True):
     return latest_version
 
 
-def odoo_name_to_pkg_name(odoo_name, odoo_version=""):
+def odoo_name_to_pkg_name(odoo_name, odoo_version="", odoo_serie=""):
     if odoo_name.startswith("odoo-addon"):
         return odoo_name
-    if odoo_version:
-        serie = int(odoo_version.split(".")[0])
-        odoo_version = serie if serie < 15 else ""
-    return f"odoo{odoo_version}-addon-{odoo_name}"
+    if not odoo_serie and odoo_version:
+        odoo_serie = odoo_version.split(".")[0]
+    odoo_serie = odoo_serie if odoo_serie and int(odoo_serie) < 15 else ""
+    return f"odoo{odoo_serie}-addon-{odoo_name}"
 
 
 def pkg_name_to_odoo_name(pkg_name, odoo_version=""):
