@@ -18,6 +18,7 @@ from dataclasses import dataclass
 import odoorpc
 
 from ..utils.path import root_path
+from ..utils.pending_merge import Repo
 from ..utils.proj import get_current_version
 from ..utils.pypi import odoo_name_to_pkg_name
 from ..utils.req import make_requirement_line_for_proj_fork
@@ -111,7 +112,6 @@ class Submodule:
                             )
                         )
                     else:
-                        # FIXME : check for pending merges
                         require.append(
                             f"{addon_pypi_name} >= {version}, == {version}.*"
                         )
@@ -125,6 +125,7 @@ def remove_submodules(installed_modules):
     parser = configparser.ConfigParser()
     requirements_fp = open("requirements.txt", "a")
     parser.read(".gitmodules")
+    repos_with_pending_merges = []
     for section in parser:
         if section.startswith("submodule"):
             print(section)
@@ -137,6 +138,10 @@ def remove_submodules(installed_modules):
             requirements = submodule.generate_requirements(installed_modules)
             requirements_fp.write(requirements)
             requirements_fp.write("\n")
+            repo = Repo(name)
+            if repo.has_pending_merges():
+                repos_with_pending_merges.append(name)
+
     parser = configparser.ConfigParser(strict=False)
     parser.read(".git/config")
     for section in submodules:
@@ -147,6 +152,12 @@ def remove_submodules(installed_modules):
     subprocess.run(["git", "rm", "-f", ".gitmodules"])
     requirements_fp.close()
     subprocess.run(["git", "add", "requirements.txt"])
+
+    if repos_with_pending_merges:
+        print("===== Repo with pending merges to review =====")
+        print("\n -".join(repos_with_pending_merges))
+        print("")
+        print("You can check PRs with: otools-pending show path/to/repo ")
 
 
 def move_files():
@@ -219,9 +230,7 @@ def copy_dockerfile():
 
 
 def print_message():
-    version = open('VERSION').read().strip()
-    odoo_version = int(version.split(".")[0])
-    message = f"""\
+    message = """\
 Next steps
 ==========
 
@@ -248,25 +257,22 @@ if you have some pending merges, for instance in pending-merges/bank-payment.yml
     OCA: git@github.com:OCA/bank-payment.git
   target: camptocamp merge-branch-12345-master
   merges:
-  - OCA {odoo_version}
+  - OCA $pinned-base
   - OCA refs/pull/978/head
 ```
 
 you need to do the following:
 1. check which addon is affected by the PR
-2. edit the line of that addon in requirements.txt change it from
+2. run
 
-    odoo-addon-default-register-payment-mode=={odoo_version}.1.2.0
+    otools-addon add mod1 https://github.com/OCA/bank-payment/pull/978
+    otools-addon add mod2 https://github.com/OCA/bank-payment/pull/978
 
-to
+If you need/want to add requirements manually you can use
 
-{odoo_name_to_pkg_name('default_register_payment_mode')} @ git+https://github.com/camptocamp/bank-payment@merge-branch-12345-{odoo_version}.2.0.5#subdirectory=setup/default_register_payment_mode
+    otools-addon print-req mod1 [-p $pr] [-b $branch] [...]
 
-the format is:
-
-{odoo_name_to_pkg_name('<addon_name>')} @ git+https://github.com/camptocamp/<repository>@merge-branch-<project_id>-{version}#subdirectory=setup/<addon_name>
-
-
+to generate the line to add.
 """
     print(message)
 
