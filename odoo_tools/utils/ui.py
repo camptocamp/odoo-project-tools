@@ -22,5 +22,8 @@ def ask_or_abort(message):
         exit_msg("Aborted")
 
 
-def echo(msg):
-    click.echo(msg)
+def echo(msg, *pa, **kw):
+    cmd = click.echo
+    if kw.get("fg"):
+        cmd = click.secho
+    cmd(msg, *pa, **kw)
