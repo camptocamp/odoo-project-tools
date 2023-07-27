@@ -6,19 +6,22 @@ import os
 import click
 
 from ..config import PROJ_CFG_FILE, get_conf_key
+from ..utils import ui
 from ..utils.misc import SmartDict, copy_file, get_template_path
 from ..utils.os_exec import run
 from ..utils.path import build_path
-from ..utils.proj import get_project_manifest_key
+from ..utils.proj import get_current_version, get_project_manifest_key
 
 
 def get_proj_tmpl_ver():
-    return os.getenv("PROJ_TMPL_VER", "2")
+    ver = os.getenv("PROJ_TMPL_VER")
+    if ver:
+        ui.echo(f"Proj version override: {ver}", fg="red")
+    return ver
 
 
 def get_bumpversion_vars(opts):
-    # TODO: get version from version file as default
-    version = opts.version or get_project_manifest_key("odoo_version") + ".0.1.0"
+    version = opts.version or get_current_version()
     odoo_major, odoo_minor, __ = version.split(".", 2)
     res = {
         "rel_path_local_addons": get_conf_key("local_src_rel_path").as_posix(),
