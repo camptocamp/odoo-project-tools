@@ -12,6 +12,7 @@ pip install --user https://github.com/camptocamp/odoo-project-tools/archive/refs
 
 Go to the root of the project, and 
 
+* pip install odoo-project-tools[convert]  # FIXME
 * run otools-project init
 * start a local instance with a copy of the production database
 * run `otools-conversion -i localhost -p 80 -d odoodb`
