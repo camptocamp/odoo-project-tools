@@ -13,10 +13,14 @@ import os.path as osp
 import re
 import shutil
 import subprocess
-import sys
 from dataclasses import dataclass
 
 import odoorpc
+
+from ..utils.path import root_path
+from ..utils.proj import get_current_version
+from ..utils.pypi import odoo_name_to_pkg_name
+from ..utils.req import make_requirement_line_for_proj_fork
 
 
 def main(args=None):
@@ -33,7 +37,8 @@ def main(args=None):
             args.admin_login,
             args.admin_password,
         )
-    ensure_project_root()
+    # ensure project root is found
+    root_path()
     move_files()
     remove_submodules(installed_modules)
     remove_files()
@@ -57,17 +62,6 @@ def get_installed_modules(host, port, dbname, login, password):
     return installed_modules
 
 
-def ensure_project_root():
-    """move up in the directory tree until we are in a directory containing .gitmodule"""
-    look_for = ".gitmodules"
-    while not osp.isfile(look_for) and os.getcwd() != "/":
-        os.chdir("..")
-    if os.getcwd() == "/":
-        sys.exit(
-            "Unable to find project root. Relaunch command from the root of a customer project."
-        )
-
-
 @dataclass
 class Submodule:
     name: str
@@ -80,8 +74,7 @@ class Submodule:
 
         The block has 1 line per module which is in the repository
         """
-        project_odoo_version = str(get_odoo_version())
-        pypi_prefix = get_pypi_prefix()
+        project_odoo_version = str(get_current_version())
         if self.name in ("odoo/src", "odoo/external-src/enterprise"):
             return ""
         manifests = glob.glob(self.path + "/*/__manifest__.py")
@@ -90,7 +83,9 @@ class Submodule:
             addon = osp.basename(osp.dirname(manifest))
             if addon.startswith('test_'):
                 continue
-            addon_pypi_name = '{}-{}'.format(pypi_prefix, addon.replace('_', '-'))
+            addon_pypi_name = odoo_name_to_pkg_name(
+                addon, odoo_version=project_odoo_version
+            )
             # an empty installed_modules set means we disabled fetching
             # installed modules -> in that case we get everything
             if installed_modules and addon not in installed_modules:
@@ -109,7 +104,11 @@ class Submodule:
                     if self.name == "odoo/external-src/odoo-cloud-platform":
                         # XXX to rework when these are published on pypi (we will still probably need to force a version
                         require.append(
-                            f"{addon_pypi_name} @ git+https://github.com/camptocamp/odoo-cloud-platform@{project_odoo_version}#subdirectory=setup/{addon}"
+                            make_requirement_line_for_proj_fork(
+                                addon_pypi_name,
+                                "odoo-cloud-platform",
+                                project_odoo_version,
+                            )
                         )
                     else:
                         # FIXME : check for pending merges
@@ -219,25 +218,9 @@ def copy_dockerfile():
     subprocess.run(["git", "rm", "-f", "odoo/Dockerfile"])
 
 
-def get_odoo_version():
-    version = open('VERSION').read().strip()
-    odoo_version = int(version.split(".")[0])
-    return odoo_version
-
-
-def get_pypi_prefix():
-    odoo_version = get_odoo_version()
-    if odoo_version >= 15:
-        prefix = "odoo-addon"
-    else:
-        prefix = "odoo-addon-%d" % odoo_version
-    return prefix
-
-
 def print_message():
     version = open('VERSION').read().strip()
     odoo_version = int(version.split(".")[0])
-    prefix = get_pypi_prefix()
     message = f"""\
 Next steps
 ==========
@@ -277,11 +260,11 @@ you need to do the following:
 
 to
 
-{prefix}-default-register-payment-mode @ git+https://github.com/camptocamp/bank-payment@merge-branch-12345-{odoo_version}.2.0.5#subdirectory=setup/default_register_payment_mode
+{odoo_name_to_pkg_name('default_register_payment_mode')} @ git+https://github.com/camptocamp/bank-payment@merge-branch-12345-{odoo_version}.2.0.5#subdirectory=setup/default_register_payment_mode
 
 the format is:
 
-{prefix}--<addon_name with "_" replaced with "-"> @ git+https://github.com/camptocamp/<repository>@merge-branch-<project_id>-{version}#subdirectory=setup/<addon_name>
+{odoo_name_to_pkg_name('<addon_name>')} @ git+https://github.com/camptocamp/<repository>@merge-branch-<project_id>-{version}#subdirectory=setup/<addon_name>
 
 
 """

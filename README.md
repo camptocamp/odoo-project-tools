@@ -10,9 +10,13 @@ pip install --user https://github.com/camptocamp/odoo-project-tools/archive/refs
 
 ## Project conversion
 
-Go to the root of the project, and start a local instance with a copy of the
-production database, then run `otools-conversion -i localhost -p 80 -d
-odoodb`. You will get prompted for the admin password (should be `admin` if you
+Go to the root of the project, and 
+
+* run otools-project init
+* start a local instance with a copy of the production database
+* run `otools-conversion -i localhost -p 80 -d odoodb`
+
+You will get prompted for the admin password (should be `admin` if you
 are running locally in DEV mode.
 
 The script will move things around, figure out which OCA addons are installed
