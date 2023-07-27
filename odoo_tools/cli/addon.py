@@ -3,10 +3,20 @@
 
 import click
 
-from ..utils import pending_merge as pm_utils, ui
+from ..utils import pending_merge as pm_utils, req as req_utils, ui
+from ..utils.misc import SmartDict
 from ..utils.os_exec import run
 from ..utils.pkg import Package
-from ..utils.req import get_project_dev_req
+from ..utils.proj import get_current_version
+from ..utils.pypi import odoo_name_to_pkg_name
+
+
+# TODO: centralize ask/confirm/abort in `ui` utils
+def ask_confirm_replace(pkg, msg, version=None):
+    if click.confirm(msg, abort=True):
+        pkg.replace_requirement(version=version)
+        click.echo("Requirement replaced")
+        raise click.exceptions.Exit(0)
 
 
 @click.group()
@@ -18,10 +28,9 @@ def cli():
 @click.argument("name")
 @click.option("-v", "--version", "version")
 @click.option("-p", "--pr", "pr")
-@click.option("-r", "--root-path", "root_path")
 @click.option("-o", "--odoo", "odoo", default=True)
 @click.option("--upgrade", "upgrade", is_flag=True, default=False)
-def add(name, version=None, pr=None, root_path=None, odoo=True, upgrade=False):
+def add(name, version=None, pr=None, odoo=True, upgrade=False):
     """Update project requirements for a given package (odoo or not).
 
     * Check the latest version of the module on pypi and use that version if new.
@@ -84,7 +93,7 @@ def add_pending(ref, addons=None, editable=True):
         ui.exit_msg("No addon specifified. Please update dev requirements manually.")
 
     # Create req file if missing
-    dev_req_file_path = get_project_dev_req()
+    dev_req_file_path = req_utils.get_project_dev_req()
     if not dev_req_file_path.exists():
         run(f"touch {dev_req_file_path.as_posix()}")
 
@@ -98,12 +107,35 @@ def add_pending(ref, addons=None, editable=True):
     # TODO: stage changes for commit
 
 
-# TODO: centralize ask/confirm/abort in `ui` utils
-def ask_confirm_replace(pkg, msg, version=None):
-    if click.confirm(msg, abort=True):
-        pkg.replace_requirement(version=version)
-        click.echo("Requirement replaced")
-        raise click.exceptions.Exit(0)
+@cli.command(name="print-req")
+@click.argument("name")
+@click.option("-v", "--version", "version")
+@click.option("-p", "--pr", "pr")
+@click.option("-b", "--branch", "branch")
+@click.option("-r", "--repo-name", "repo_name")
+@click.option("-u", "--upstream", "upstream")
+@click.option("-o", "--odoo", "odoo", default=True)
+def print_requirement(name, **kw):
+    """Print requirement line."""
+    opts = SmartDict(kw)
+    pkg_name = odoo_name_to_pkg_name(
+        name, odoo_serie=get_current_version(serie_only=True)
+    )
+    if opts.pr:
+        line = req_utils.make_requirement_line_for_pr(pkg_name, opts.pr)
+    elif opts.branch:
+        if not opts.repo_name:
+            ui.exit_msg("Repo name is required")
+        line = req_utils.make_requirement_line_for_proj_fork(
+            pkg_name, opts.repo_name, opts.branch, upstream=opts.upstream
+        )
+    else:
+        line = req_utils.make_requirement_line(pkg_name, version=opts.version)
+
+    click.secho(f"Requirement line for: {name}", fg="green")
+    ui.echo("")
+    ui.echo(line)
+    ui.echo("")
 
 
 if __name__ == "__main__":
