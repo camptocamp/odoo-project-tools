@@ -4,7 +4,7 @@
 import os
 from unittest import mock
 
-from odoo_tools.project import init
+from odoo_tools.cli.project import init
 
 from .common import compare_line_by_line, fake_project_root, get_fixture
 from .fixtures import clear_caches  # noqa

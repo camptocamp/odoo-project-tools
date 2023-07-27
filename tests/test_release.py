@@ -4,9 +4,9 @@
 import datetime
 from unittest import mock
 
-from odoo_tools import release
+from odoo_tools.cli import release
+from odoo_tools.cli.project import init
 from odoo_tools.config import get_conf_key
-from odoo_tools.project import init
 
 from .common import (
     compare_line_by_line,

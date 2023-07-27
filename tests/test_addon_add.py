@@ -1,7 +1,7 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-from odoo_tools import addon
+from odoo_tools.cli import addon
 
 from .common import fake_project_root, mock_pypi_version_cache
 

@@ -53,6 +53,18 @@ def make_requirement_line_for_pr(pkg_name, pr):
     return f"{pkg_name} @ {uri}#subdirectory=setup/{mod_name}"
 
 
+def make_requirement_line_for_proj_fork(pkg_name, repo_name, branch, upstream=None):
+    upstream = upstream or get_conf_key("company_git_remote")
+    mod_name = pkg_name_to_odoo_name(pkg_name)
+    parts = {
+        "upstream": upstream,
+        "branch": branch,
+        "repo_name": repo_name,
+    }
+    uri = "git+https://github.com/{upstream}/{repo_name}@{branch}".format(**parts)
+    return f"{pkg_name} @ {uri}#subdirectory=setup/{mod_name}"
+
+
 def make_requirement_line_for_editable(pkg_name, pr=None, repo_name=None, dev_src=None):
     assert pr or repo_name
     if pr:

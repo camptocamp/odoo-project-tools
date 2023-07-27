@@ -129,3 +129,14 @@ def test_allowed_version():
     assert req_utils.allowed_version(a2, "1.8.0")
     assert not req_utils.allowed_version(a2, "2.0.1")
     assert not req_utils.allowed_version(a2, "2.1.0")
+
+
+def test_make_requirement_line_for_proj_fork():
+    with fake_project_root():
+        r1 = req_utils.make_requirement_line_for_proj_fork(
+            "odoo-addon-name2", "social", "14.0"
+        )
+        assert (
+            r1
+            == "odoo-addon-name2 @ git+https://github.com/camptocamp/social@14.0#subdirectory=setup/name2"
+        )

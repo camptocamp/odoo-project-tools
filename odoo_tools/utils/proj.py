@@ -18,7 +18,10 @@ def get_project_manifest_key(key):
     return get_project_manifest()[key]
 
 
-def get_current_version():
+def get_current_version(serie_only=False):
     ver_file = build_path(get_conf_key("version_file_rel_path"))
     with ver_file.open() as fd:
-        return fd.read().strip()
+        ver = fd.read().strip()
+    if serie_only:
+        ver = ver.split(".")[0]
+    return ver

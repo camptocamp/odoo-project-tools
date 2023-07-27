@@ -3,12 +3,12 @@
 
 import click
 
-from .config import get_conf_key
-from .utils.marabunta import MarabuntaFileHandler
-from .utils.misc import get_ini_cfg_key
-from .utils.os_exec import run
-from .utils.path import build_path
-from .utils.pending_merge import push_branches
+from ..config import get_conf_key
+from ..utils.marabunta import MarabuntaFileHandler
+from ..utils.misc import get_ini_cfg_key
+from ..utils.os_exec import run
+from ..utils.path import build_path
+from ..utils.pending_merge import push_branches
 
 
 def get_bumpversion_cfg_key(cfg_content, key):
