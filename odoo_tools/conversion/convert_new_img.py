@@ -26,6 +26,93 @@ from ..utils.proj import get_current_version
 from ..utils.pypi import odoo_name_to_pkg_name
 from ..utils.req import make_requirement_line_for_proj_fork
 
+REPORT = []
+
+
+def report(msg):
+    global REPORT
+    REPORT.append(msg)
+
+
+def generate_report():
+    global REPORT
+    content = "\n".join(REPORT)
+    print("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    print(content)
+    print("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    next_steps_todo = "V2_MIG_NEXT_STEPS.todo"
+    with open(next_steps_todo, "w") as fd:
+        fd.write(content)
+    print(
+        "You can find this summary in", next_steps_todo, "file at the root of the proj."
+    )
+
+
+NEXT_STEPS_MSG = """\
+Next steps
+==========
+
+1. check the diff between Dockerfile and Dockerfile.bak.
+   Look especially for
+
+    * the environment variables
+    * ADDONS_PATH
+
+   meld Dockerfile Dockerfile.bak
+
+2. check the diff between docker-compose.yml and docker-compose.yml.bak
+
+    meld docker-compose.yml docker-compose.yml.bak
+
+3. check for pending merges in the OCA addons, and edit requirements.txt to match these (see below)
+4. check for pending merges in odoo or enterprise and find a way to cope with this XXXXX
+5. run docker build . and fix any build issues
+6. run your project and be happy!
+
+Try building the image with:
+
+docker build .
+
+"""
+
+PENDING_MERGE_MSG = """
+Repo(s) with pending merges
+===========================
+
+{repos_with_pending_merges}
+
+You can check PRs with: `otools-pending show path/to/repo`.
+
+Handling pending merges
+=======================
+
+If you have some pending merges, for instance in pending-merges/bank-payment.yml:
+
+```
+../odoo/external-src/bank-payment:
+  remotes:
+    camptocamp: git@github.com:camptocamp/bank-payment.git
+    OCA: git@github.com:OCA/bank-payment.git
+  target: camptocamp merge-branch-12345-master
+  merges:
+  - OCA $pinned-base
+  - OCA refs/pull/978/head
+```
+
+you need to do the following:
+1. check which addon is affected by the PR
+2. run
+
+    otools-addon add mod1 https://github.com/OCA/bank-payment/pull/978
+    otools-addon add mod2 https://github.com/OCA/bank-payment/pull/978
+
+If you need/want to add requirements manually you can use
+
+    otools-addon print-req mod1 [-p $pr] [-b $branch] [...]
+
+to generate the line to add.
+"""
+
 
 def main(args=None):
     if get_conf_key("template_version") == "2":
@@ -53,7 +140,8 @@ def main(args=None):
     remove_submodules(submodules)
     remove_files()
     copy_dockerfile()
-    print_message()
+    report(NEXT_STEPS_MSG)
+    generate_report()
 
 
 def get_installed_modules(host, port, dbname, login, password):
@@ -163,16 +251,13 @@ def handle_submodule_requirements(submodules, installed_modules):
     subprocess.run(["git", "add", "requirements.txt"])
 
     if repos_with_pending_merges:
-        print("")
-        print("++++++++++++++++++++++++++++++++++++++++++++++")
-        print("===== Repo with pending merges to review =====")
-        print("\n -".join(repos_with_pending_merges))
-        print("")
+        report(
+            PENDING_MERGE_MSG.format(
+                repos_with_pending_merges='\n -'.join(repos_with_pending_merges)
+            )
+        )
         # TODO: if we delete submodules before reaching this point
         # devs will have to switch back to master to do such checks.
-        print("You can check PRs with: otools-pending show path/to/repo ")
-        print("++++++++++++++++++++++++++++++++++++++++++++++")
-        print("")
 
 
 def init_proj_v2():
@@ -249,58 +334,6 @@ def remove_files():
 def copy_dockerfile():
     shutil.move('odoo/Dockerfile', 'Dockerfile.bak')
     subprocess.run(["git", "rm", "-f", "odoo/Dockerfile"])
-
-
-def print_message():
-    message = """\
-
-
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-Next steps
-==========
-
-1. check the diff between Dockerfile and Dockerfile.bak (especially the environment variables)
-2. check the diff between docker-compose.yml and docker-compose.yml.bak
-3. check for pending merges in the OCA addons, and edit requirements.txt to match these (see below)
-4. check for pending merges in odoo or enterprise and find a way to cope with this XXXXX
-5. run docker build . and fix any build issues
-6. run your project and be happy!
-
-Try building the image with:
-
-docker build .
-
-Handling pending merges
-=======================
-
-if you have some pending merges, for instance in pending-merges/bank-payment.yml:
-
-```
-../odoo/external-src/bank-payment:
-  remotes:
-    camptocamp: git@github.com:camptocamp/bank-payment.git
-    OCA: git@github.com:OCA/bank-payment.git
-  target: camptocamp merge-branch-12345-master
-  merges:
-  - OCA $pinned-base
-  - OCA refs/pull/978/head
-```
-
-you need to do the following:
-1. check which addon is affected by the PR
-2. run
-
-    otools-addon add mod1 https://github.com/OCA/bank-payment/pull/978
-    otools-addon add mod2 https://github.com/OCA/bank-payment/pull/978
-
-If you need/want to add requirements manually you can use
-
-    otools-addon print-req mod1 [-p $pr] [-b $branch] [...]
-
-to generate the line to add.
-"""
-    print(message)
 
 
 def parse_args():
