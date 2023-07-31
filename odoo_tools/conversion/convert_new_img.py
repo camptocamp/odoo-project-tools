@@ -5,6 +5,7 @@ Helper to migrate "old" format project to the new image format.
 Please delete this when our last project has been converted.
 """
 import argparse
+import ast
 import configparser
 import getpass
 import glob
@@ -83,47 +84,40 @@ class Submodule:
 
         The block has 1 line per module which is in the repository
         """
-        project_odoo_version = str(get_current_version())
+        odoo_serie = get_current_version(serie_only=True)
         if self.name in ("odoo/src", "odoo/external-src/enterprise"):
             return ""
-        manifests = glob.glob(self.path + "/*/__manifest__.py")
+        manifest_paths = glob.glob(self.path + "/*/__manifest__.py")
         require = [f"# {self.name}"]
-        for manifest in manifests:
-            addon = osp.basename(osp.dirname(manifest))
+        for manifest_path in manifest_paths:
+            addon = osp.basename(osp.dirname(manifest_path))
             if addon.startswith('test_'):
                 continue
-            addon_pypi_name = odoo_name_to_pkg_name(
-                addon, odoo_version=project_odoo_version
-            )
             # an empty installed_modules set means we disabled fetching
             # installed modules -> in that case we get everything
             if installed_modules and addon not in installed_modules:
                 # skip uninstalled addons
                 continue
-            with open(manifest) as man_fp:
-                for line in man_fp:
-                    mo = re.match(
-                        r"""\s*['"]version["']\s*:\s*["']([\w.-]+)["']""", line
+            addon_pypi_name = odoo_name_to_pkg_name(addon, odoo_serie=odoo_serie)
+            with open(manifest_path) as man_fp:
+                manifest = ast.literal_eval(man_fp.read())
+
+            version = manifest["version"]
+            if not version.startswith(odoo_serie):
+                continue
+            if self.name.endswith("odoo-cloud-platform"):
+                # XXX to rework when these are published on pypi (we will still probably need to force a version
+                branch = f"{odoo_serie}.0"  # FIXME: use target branch
+                require.append(
+                    make_requirement_line_for_proj_fork(
+                        addon_pypi_name,
+                        "odoo-cloud-platform",
+                        branch,
                     )
-                    if not mo:
-                        continue
-                    version = mo.groups(1)[0]
-                    if not version.startswith(project_odoo_version):
-                        continue
-                    if self.name == "odoo/external-src/odoo-cloud-platform":
-                        # XXX to rework when these are published on pypi (we will still probably need to force a version
-                        require.append(
-                            make_requirement_line_for_proj_fork(
-                                addon_pypi_name,
-                                "odoo-cloud-platform",
-                                project_odoo_version,
-                            )
-                        )
-                    else:
-                        require.append(
-                            f"{addon_pypi_name} >= {version}, == {version}.*"
-                        )
-                    break
+                )
+            else:
+                require.append(f"{addon_pypi_name} >= {version}, == {version}.*")
+            break
         return "\n".join(require)
 
 
