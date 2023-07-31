@@ -46,9 +46,10 @@ def main(args=None):
     # ensure project root is found
     root_path()
     move_files()
-    submodules = remove_submodules()
+    submodules = collect_submodules()
     init_proj_v2()
-    handle_submodule_requirements(submodules, installed_modules)
+    handle_submodule_requirements(submodules.values(), installed_modules)
+    remove_submodules(submodules)
     remove_files()
     copy_dockerfile()
     print_message()
@@ -126,7 +127,7 @@ class Submodule:
         return "\n".join(require)
 
 
-def remove_submodules():
+def collect_submodules():
     """remove the submodules from the project"""
     submodules = {}
     parser = configparser.ConfigParser()
@@ -140,6 +141,10 @@ def remove_submodules():
             for fieldname, value in parser[section].items():
                 print(fieldname, value)
                 submodule.__setattr__(fieldname, value)
+    return submodules
+
+
+def remove_submodules(submodules):
     parser = configparser.ConfigParser(strict=False)
     parser.read(".git/config")
     for section in submodules:
@@ -148,7 +153,6 @@ def remove_submodules():
         shutil.rmtree(submodules[section].path)
     parser.write(open(".git/config2", "w"))
     subprocess.run(["git", "rm", "-f", ".gitmodules"])
-    return submodules.values()
 
 
 def handle_submodule_requirements(submodules, installed_modules):
