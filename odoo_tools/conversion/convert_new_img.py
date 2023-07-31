@@ -60,6 +60,9 @@ Next steps
 
    meld Dockerfile Dockerfile.bak
 
+
+# TODO: there's no such backup file -> the sync will replace it
+
 2. check the diff between docker-compose.yml and docker-compose.yml.bak
 
     meld docker-compose.yml docker-compose.yml.bak
