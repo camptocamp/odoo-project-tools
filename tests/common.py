@@ -54,9 +54,20 @@ FAKE_PROJ_CFG_V1 = dict(
     version_file_rel_path="odoo/VERSION",
     marabunta_mig_file_rel_path="odoo/migration.yml",
 )
+FAKE_PROJ_CFG_V2 = dict(
+    company_git_remote="camptocamp",
+    odoo_src_rel_path="odoo/src",
+    ext_src_rel_path="odoo/external-src",
+    local_src_rel_path="odoo/addons",
+    pending_merge_rel_path="pending-merges.d",
+    version_file_rel_path="VERSION",
+    marabunta_mig_file_rel_path="migration.yml",
+)
+FAKE_PROJ_CFG_BY_VER = {"1": FAKE_PROJ_CFG_V1, "2": FAKE_PROJ_CFG_V2}
 
 
 def make_fake_project_root(
+    proj_tmpl_ver="1",
     proj_cfg=None,
     manifest=None,
     marker_file=get_root_marker(),
@@ -64,7 +75,7 @@ def make_fake_project_root(
     proj_version="14.0.0.1.0",
     mock_marabunta_file=False,
 ):
-    proj_cfg_data = FAKE_PROJ_CFG_V1.copy()
+    proj_cfg_data = FAKE_PROJ_CFG_BY_VER[proj_tmpl_ver].copy()
     proj_cfg_data.update(proj_cfg or {})
     with open(".proj.cfg", "w") as fd:
         content = ["[conf]"]

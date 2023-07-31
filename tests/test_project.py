@@ -10,8 +10,9 @@ from .common import compare_line_by_line, fake_project_root, get_fixture
 from .fixtures import clear_caches  # noqa
 
 
+@mock.patch.dict(os.environ, {"PROJ_TMPL_VER": "2"}, clear=True)
 def test_init():
-    with fake_project_root() as runner:
+    with fake_project_root(proj_tmpl_ver="2", proj_version="16.0.1.1.0") as runner:
         # Drop mocked cfg (necessary to make fake_project_root work before)
         os.remove(".proj.cfg")
         result = runner.invoke(init, catch_exceptions=False)
@@ -26,7 +27,7 @@ def test_init():
             assert os.path.exists(path), f"`{path}` missing"
         with open(".bumpversion.cfg") as fd:
             content = fd.read()
-            expected = get_fixture("expected.bumpversion.cfg")
+            expected = get_fixture("expected.bumpversion.v2.cfg")
             compare_line_by_line(content, expected)
         with open(".proj.cfg") as fd:
             content = fd.read()
@@ -75,7 +76,7 @@ def test_init_proj_conf_already_existing():
 
 
 def test_init_custom_version():
-    with fake_project_root() as runner:
+    with fake_project_root(proj_tmpl_ver="2") as runner:
         result = runner.invoke(
             init,
             [
