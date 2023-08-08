@@ -37,7 +37,10 @@ dependencies = [
     "bump2version",
     # Include fix for parsing editable requirements
     # https://github.com/madpah/requirements-parser/pull/85
-    "requirements-parser @ https://github.com/simahawk/requirements-parser/archive/refs/heads/fix-editable.tar.gz"
+    "requirements-parser @ https://github.com/simahawk/requirements-parser/archive/refs/heads/fix-editable.tar.gz",
+    # FIXME: merge upstream PR once considered stable enough
+    # https://github.com/OCA/oca-port/pull/26
+    "oca-port @ git+https://github.com/OCA/oca-port.git@refs/pull/26/head",
 ]
 requires-python = ">=3.8"
 dynamic = ["version"]
