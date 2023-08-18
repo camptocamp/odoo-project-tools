@@ -189,11 +189,12 @@ class Repo:
         odoo_version = get_project_manifest_key("odoo_version")
         pending_mrg_line = "{} refs/pull/{}/head".format(upstream, pull_id)
         if pending_mrg_line in conf.get("merges", {}):
-            ui.exit_msg(
+            ui.echo(
                 "Requested pending merge is already mentioned in {} ".format(
                     self.abs_merges_path
                 )
             )
+            return True
 
         response = requests.get(
             "{}/pulls/{}".format(self.api_url(upstream=upstream), pull_id)
@@ -209,9 +210,9 @@ class Repo:
                         " current project's major version. Proceed?"
                     )
         else:
-            print(
-                "Github API call failed ({}):"
-                " skipping target branch validation.".format(response.status_code)
+            ui.echo(
+                f"Github API call failed ({response.status_code}):"
+                " skipping target branch validation."
             )
 
         # TODO: handle comment
@@ -233,6 +234,7 @@ class Repo:
         # straight after `OCA basebranch` merge item.
         conf["merges"].insert(1, pending_mrg_line)
         self.update_merges_config(conf)
+        return True
 
     def add_pending_commit(self, upstream, commit_sha, skip_questions=True):
         conf = self.merges_config()
@@ -249,11 +251,12 @@ class Repo:
         )
 
         if pending_mrg_line in conf.get("shell_command_after", {}):
-            ui.exit_msg(
+            ui.echo(
                 "Requested pending merge is mentioned in {} already".format(
                     self.abs_merges_path
                 )
             )
+            return True
         if "shell_command_after" not in conf:
             conf["shell_command_after"] = CommentedSeq()
 
@@ -270,7 +273,8 @@ class Repo:
             pos, before=comment, indent=2
         )
         self.update_merges_config(conf)
-        print("📋 cherry pick {}/{} has been added".format(upstream, commit_sha))
+        ui.echo(f"📋 cherry pick {upstream}/{commit_sha} has been added")
+        return True
 
     def remove_pending_commit(self, upstream, commit_sha):
         conf = self.merges_config()
