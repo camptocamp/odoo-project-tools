@@ -40,14 +40,14 @@ def test_add_new_pending_with_addon_editable():
         assert not repo.has_pending_merges()
         assert not pkg.is_editable()
         assert not pkg.is_local()
-        assert not os.path.exists(os.getcwd() + "/dev-requirements.txt")
+        assert not os.path.exists(os.getcwd() + "/dev_requirements.txt")
         result = runner.invoke(addon.add_pending, [pr, "-a", addon_name])
         expected = [
             "Adding: https://github.com/OCA/edi-framework/pull/1",
             f"Updated dev requirements for: {addon_name}",
         ]
         assert result.output.splitlines() == expected
-        assert os.path.exists(os.getcwd() + "/dev-requirements.txt")
+        assert os.path.exists(os.getcwd() + "/dev_requirements.txt")
         assert repo.has_pending_merges()
         assert pkg.is_editable()
         assert pkg.is_local()
@@ -64,7 +64,7 @@ def test_add_new_pending_with_addon_not_editable():
         assert not pkg.has_pending_merge()
         assert not pkg.is_editable()
         assert not pkg.is_local()
-        assert not os.path.exists(os.getcwd() + "/dev-requirements.txt")
+        assert not os.path.exists(os.getcwd() + "/dev_requirements.txt")
         result = runner.invoke(
             addon.add_pending, [pr, "-a", addon_name, "--no-editable"]
         )
@@ -73,7 +73,7 @@ def test_add_new_pending_with_addon_not_editable():
             f"Updated dev requirements for: {addon_name}",
         ]
         assert result.output.splitlines() == expected
-        assert os.path.exists(os.getcwd() + "/dev-requirements.txt")
+        assert os.path.exists(os.getcwd() + "/dev_requirements.txt")
         assert repo.has_pending_merges()
         assert not pkg.is_editable()
         assert not pkg.is_local()
