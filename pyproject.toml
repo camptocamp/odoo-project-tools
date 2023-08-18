@@ -53,6 +53,7 @@ otools-project = "odoo_tools.cli.project:cli"
 otools-addon = "odoo_tools.cli.addon:cli"
 otools-release = "odoo_tools.cli.release:cli"
 otools-pending = "odoo_tools.cli.pending:cli"
+otools-conversion = "odoo_tools.conversion.convert_new_img:main"
 
 [project.optional-dependencies]
 test = [
@@ -60,7 +61,9 @@ test = [
   "pytest",
   "responses",
 ]
-
+convert = [
+  "odoorpc"
+]
 [build-system]
 requires = ["setuptools>=64", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"

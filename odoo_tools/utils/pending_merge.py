@@ -342,22 +342,21 @@ class Repo:
         all_repos_prs = {}
         aggregator = self.get_aggregator()
         ui.echo("--")
-        ui.echo("Checking:", self.name)
-        ui.echo("Path:", self.path)
-        ui.echo("Merge file:", self.merges_path)
+        ui.echo(f"Checking: {self.name}")
+        ui.echo(f"Path: {self.path}")
+        ui.echo(f"Merge file: {self.merges_path}")
         all_prs = aggregator.collect_prs_info()
         if state is not None:
             # filter only our state
             all_prs = {k: v for k, v in all_prs.items() if k == state}
         for pr_state, prs in all_prs.items():
-            ui.echo("State:", pr_state)
+            ui.echo(f"State: {pr_state}")
             for i, pr_info in enumerate(prs, 1):
                 all_repos_prs.setdefault(pr_state, []).append(pr_info)
                 pr_info["raw"].update(pr_info)
-                ui.echo(
-                    "  {})".format(str(i).zfill(2)),
-                    pr_info_msg.format(**pr_info["raw"]),
-                )
+                nr = str(i).zfill(2)
+                pr = pr_info_msg.format(**pr_info["raw"])
+                ui.echo(f"  {nr}) {pr}")
         if purge and all_repos_prs.get("closed", []):
             kw = {f"purge_{purge}": True}
             self._purge_closed_prs(all_repos_prs, **kw)
