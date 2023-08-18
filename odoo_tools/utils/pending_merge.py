@@ -317,10 +317,12 @@ class Repo:
     def get_aggregator(self, target_remote=None, target_branch=None, **extra_config):
         if "target" not in extra_config:
             extra_config["target"] = {}
+        target_branch = target_branch or gh.get_target_branch()
         if target_branch and "branch" not in extra_config["target"]:
             extra_config["target"]["branch"] = target_branch
+        target_remote = target_remote or self.company_git_remote
         if target_remote and "remote" not in extra_config["target"]:
-            extra_config["target"]["remote"] = self.company_git_remote
+            extra_config["target"]["remote"] = target_remote
         return RepoAggregator(self, **extra_config)
 
     # TODO: add tests
