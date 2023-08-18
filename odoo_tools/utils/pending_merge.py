@@ -412,7 +412,7 @@ class RepoAggregator(git_aggregator.repo.Repo):
         self.cwd = self.pm_repo.abs_path
 
 
-def add_pending(entity_url):
+def add_pending(entity_url, aggregate=True):
     """Add a pending merge using given entity link"""
     # pattern, given an https://github.com/<user>/<repo>/pull/<pr-index>
     # # PR headline
@@ -432,6 +432,9 @@ def add_pending(entity_url):
         repo.add_pending_pull_request(upstream, entity_id)
     elif entity_type in ("commit", "tree"):
         repo.add_pending_commit(upstream, entity_id)
+    if aggregate:
+        aggregator = repo.get_aggregator()
+        aggregator.aggregate()
     return repo
 
 
