@@ -20,7 +20,7 @@ def get_project_req():
 
 
 def get_project_dev_req():
-    return root_path() / "dev-requirements.txt"
+    return root_path() / "dev_requirements.txt"
 
 
 def get_requirements(req_filepath=None):
