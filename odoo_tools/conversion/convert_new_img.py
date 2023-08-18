@@ -238,6 +238,7 @@ def remove_submodules(submodules):
         shutil.rmtree(submodules[section].path)
     parser.write(open(".git/config2", "w"))
     subprocess.run(["git", "rm", "-f", ".gitmodules"])
+    subprocess.run(["git", "rm", "-f", ".git/modules/odoo"])
 
 
 def handle_submodule_requirements(submodules, installed_modules):
