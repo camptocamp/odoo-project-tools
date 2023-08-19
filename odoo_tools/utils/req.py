@@ -8,6 +8,7 @@ import os
 import requirements
 
 from ..config import get_conf_key
+from . import ui
 from .gh import parse_github_url
 from .path import root_path
 from .pypi import pkg_name_to_odoo_name
@@ -106,7 +107,7 @@ def replace_requirement(
         if pkg_name in line or pkg_name_to_odoo_name(pkg_name) in line:
             line = replacement_line
         # NOTE: this will add an empty line at the end w/ `\n`
-        print(line)
+        ui.echo(line)
 
 
 OP = {
