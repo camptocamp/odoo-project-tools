@@ -69,6 +69,10 @@ def bump(rel_type, new_version=None, dry_run=False, commit=False):
     if click.confirm("Push local branches?"):
         push_branches(version=new_version)
 
+    # TODO + run pip freeze and override requirements.txt
+    # docker-compose build --build-arg DEV_MODE=1 odoo
+    # doco --rm run odoo pip freeze > requirements.txt
+
 
 if __name__ == '__main__':
     cli()

@@ -13,8 +13,7 @@ class Package:
         if self.odoo:
             self.pypi_name = pypi.odoo_name_to_pkg_name(name)
         self.latest_version = pypi.get_last_pypi_version(self.pypi_name)
-
-    _req = None
+        self._req = None
 
     @property
     def req(self):
@@ -40,6 +39,7 @@ class Package:
             version=version or self.latest_version,
             pr=pr,
             editable=editable,
+            req_filepath=self.req_filepath,
         )
         self._req = None
 
@@ -49,6 +49,7 @@ class Package:
             version=version or self.latest_version,
             pr=pr,
             editable=editable,
+            req_filepath=self.req_filepath,
         )
         self._req = None
 
@@ -59,7 +60,9 @@ class Package:
             self.add_requirement(version=version, pr=pr, editable=editable)
 
     def has_pending_merge(self):
-        return "refs/pull" in self.req.line if self.req else False
+        return (
+            "refs/pull" in self.req.line if self.req else False
+        ) or self.is_editable()
 
     def has_requirement(self):
         return bool(self.pinned_version)

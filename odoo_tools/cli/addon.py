@@ -83,14 +83,18 @@ def add(name, version=None, pr=None, odoo=True, upgrade=False):
 @click.argument("ref")
 @click.option("-a", "--addons", "addons")
 @click.option("--editable/--no-editable", "editable", is_flag=True, default=True)
-def add_pending(ref, addons=None, editable=True):
+@click.option("--aggregate/--no-aggregate", "aggregate", is_flag=True, default=True)
+def add_pending(ref, addons=None, editable=True, aggregate=True):
     """Add a pending PR or commit."""
-    pm_utils.add_pending(ref)
-    click.secho(f"Adding: {ref}", fg="green")
+
+    pm_utils.add_pending(ref, aggregate=aggregate)
+
     # TODO: run git-aggregate if already present
     addons = [x.strip() for x in addons.split(",") if x.strip()] if addons else []
     if not addons:
         ui.exit_msg("No addon specifified. Please update dev requirements manually.")
+
+    ui.echo(f"Adding: {', '.join(addons)} from {ref}")
 
     # Create req file if missing
     dev_req_file_path = req_utils.get_project_dev_req()
@@ -102,7 +106,7 @@ def add_pending(ref, addons=None, editable=True):
         # TODO: does it work w/ commits?
         pkg.add_or_replace_requirement(pr=ref, editable=editable)
 
-    ui.exit_msg(f"Updated dev requirements for: {', '.join(addons)}")
+    ui.echo(f"Updated dev requirements for: {', '.join(addons)}", fg="green")
 
     # TODO: stage changes for commit
 

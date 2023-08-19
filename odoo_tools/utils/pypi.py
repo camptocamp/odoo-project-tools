@@ -1,9 +1,13 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+import logging
+
 import requests
 
 TMP_CACHE = {}
+
+_logger = logging.getLogger(__name__)
 
 
 def get_last_pypi_version(pkg_name, odoo=True):
@@ -13,7 +17,13 @@ def get_last_pypi_version(pkg_name, odoo=True):
         pkg_name = odoo_name_to_pkg_name(pkg_name)
     if pkg_name in TMP_CACHE:
         return TMP_CACHE[pkg_name]
-    response = requests.get(f"https://pypi.org/pypi/{pkg_name}/json")
+    url = f"https://pypi.org/pypi/{pkg_name}/json"
+    response = requests.get(url)
+    try:
+        response.raise_for_status()
+    except requests.HTTPError:
+        _logger.debug("%s not found on pypy at %s", pkg_name, url)
+        return None
     data = response.json()
     latest_version = data["info"]["version"]
     TMP_CACHE[pkg_name] = latest_version

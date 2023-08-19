@@ -189,11 +189,12 @@ class Repo:
         odoo_version = get_project_manifest_key("odoo_version")
         pending_mrg_line = "{} refs/pull/{}/head".format(upstream, pull_id)
         if pending_mrg_line in conf.get("merges", {}):
-            ui.exit_msg(
+            ui.echo(
                 "Requested pending merge is already mentioned in {} ".format(
                     self.abs_merges_path
                 )
             )
+            return True
 
         response = requests.get(
             "{}/pulls/{}".format(self.api_url(upstream=upstream), pull_id)
@@ -209,9 +210,9 @@ class Repo:
                         " current project's major version. Proceed?"
                     )
         else:
-            print(
-                "Github API call failed ({}):"
-                " skipping target branch validation.".format(response.status_code)
+            ui.echo(
+                f"Github API call failed ({response.status_code}):"
+                " skipping target branch validation."
             )
 
         # TODO: handle comment
@@ -233,6 +234,7 @@ class Repo:
         # straight after `OCA basebranch` merge item.
         conf["merges"].insert(1, pending_mrg_line)
         self.update_merges_config(conf)
+        return True
 
     def add_pending_commit(self, upstream, commit_sha, skip_questions=True):
         conf = self.merges_config()
@@ -249,11 +251,12 @@ class Repo:
         )
 
         if pending_mrg_line in conf.get("shell_command_after", {}):
-            ui.exit_msg(
+            ui.echo(
                 "Requested pending merge is mentioned in {} already".format(
                     self.abs_merges_path
                 )
             )
+            return True
         if "shell_command_after" not in conf:
             conf["shell_command_after"] = CommentedSeq()
 
@@ -270,7 +273,8 @@ class Repo:
             pos, before=comment, indent=2
         )
         self.update_merges_config(conf)
-        print("📋 cherry pick {}/{} has been added".format(upstream, commit_sha))
+        ui.echo(f"📋 cherry pick {upstream}/{commit_sha} has been added")
+        return True
 
     def remove_pending_commit(self, upstream, commit_sha):
         conf = self.merges_config()
@@ -313,10 +317,12 @@ class Repo:
     def get_aggregator(self, target_remote=None, target_branch=None, **extra_config):
         if "target" not in extra_config:
             extra_config["target"] = {}
+        target_branch = target_branch or gh.get_target_branch()
         if target_branch and "branch" not in extra_config["target"]:
             extra_config["target"]["branch"] = target_branch
+        target_remote = target_remote or self.company_git_remote
         if target_remote and "remote" not in extra_config["target"]:
-            extra_config["target"]["remote"] = self.company_git_remote
+            extra_config["target"]["remote"] = target_remote
         return RepoAggregator(self, **extra_config)
 
     # TODO: add tests
@@ -406,7 +412,7 @@ class RepoAggregator(git_aggregator.repo.Repo):
         self.cwd = self.pm_repo.abs_path
 
 
-def add_pending(entity_url):
+def add_pending(entity_url, aggregate=True):
     """Add a pending merge using given entity link"""
     # pattern, given an https://github.com/<user>/<repo>/pull/<pr-index>
     # # PR headline
@@ -426,6 +432,9 @@ def add_pending(entity_url):
         repo.add_pending_pull_request(upstream, entity_id)
     elif entity_type in ("commit", "tree"):
         repo.add_pending_commit(upstream, entity_id)
+    if aggregate:
+        aggregator = repo.get_aggregator()
+        aggregator.aggregate()
     return repo
 
 
