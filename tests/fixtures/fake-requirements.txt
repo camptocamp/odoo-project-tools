@@ -1,5 +1,5 @@
 odoo-addon-name1 == 1.0.0
 odoo-addon-name2 < 2.0.0
-# -e path/to/local/module
+-e path/to/local/nice_addon
 -e git+git://github.com/OCA/oca-port@xyz123#egg=oca-port
 odoo14-addon-edi_state_oca @ git+https://github.com/OCA/edi-framework@refs/pull/2/head#subdirectory=setup/edi_state_oca

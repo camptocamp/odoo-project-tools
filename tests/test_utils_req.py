@@ -40,6 +40,8 @@ def test_get_requirements():
     # 'subdirectory': None,
     # 'uri': None,
     # 'vcs': None}
+    a5 = reqs["nice_addon"]
+    assert a5.editable
 
 
 def test_get_addon_requirement():

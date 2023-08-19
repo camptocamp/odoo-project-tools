@@ -60,7 +60,9 @@ class Package:
             self.add_requirement(version=version, pr=pr, editable=editable)
 
     def has_pending_merge(self):
-        return "refs/pull" in self.req.line if self.req else False
+        return (
+            "refs/pull" in self.req.line if self.req else False
+        ) or self.is_editable()
 
     def has_requirement(self):
         return bool(self.pinned_version)
