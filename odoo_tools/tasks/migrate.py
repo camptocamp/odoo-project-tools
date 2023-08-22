@@ -161,7 +161,7 @@ class AnalyzeAddons:
                 )
         return addons_to_analyze
 
-    def _get_analyzed_addons(self, addons_to_analyze):
+    def _get_analyzed_addons(self, addons_to_analyze, dependencies):
         analyzed_addons = collections.defaultdict(dict)
         addons_counter = 0
         enum_addons_to_check = enumerate(addons_to_analyze.items(), start=1)
@@ -203,12 +203,13 @@ class AnalyzeAddons:
                     }
                 else:
                     data = json.loads(app.run())
+                data["dependencies"] = dependencies[addon]
                 addons_counter += 1
                 analyzed_addons[repo_id][addon] = data
                 fetch = False
         return addons_counter, analyzed_addons
 
-    def _generate_csv_report(self, analyzed_addons, dependencies):
+    def _generate_csv_report(self, analyzed_addons):
         report_path = f"{self.database_name}_oca_report"
         report_csv_path = f"{report_path}.csv"
         with open(report_csv_path, "w") as file_:
@@ -246,7 +247,7 @@ class AnalyzeAddons:
                     row = {
                         "oca_repository": repo_name,
                         "addon": addon,
-                        "dependencies": "\n".join(dependencies[addon]),
+                        "dependencies": "\n".join(data["dependencies"]),
                         "status": data["process"],
                         "info": info,
                         "warning": data.get("warning", ""),
@@ -276,7 +277,9 @@ class AnalyzeAddons:
             f"submodules + {len(local_addons)} local addons to migrate..."
         )
         # Analyse external addons
-        addons_counter, analyzed_addons = self._get_analyzed_addons(addons_to_analyze)
+        addons_counter, analyzed_addons = self._get_analyzed_addons(
+            addons_to_analyze, dependencies
+        )
         print(f"{addons_counter} external addons have been analyzed.")
         # Add local addons to the analyzed addons list (they have to be migrated for sure)
         for addon in local_addons:
@@ -285,7 +288,7 @@ class AnalyzeAddons:
                 "results": {},
             }
         # Generate the reports
-        report_csv_path = self._generate_csv_report(analyzed_addons, dependencies)
+        report_csv_path = self._generate_csv_report(analyzed_addons)
         report_json_path = self._generate_json_report(analyzed_addons)
         print(f"Reports generated:\n- {report_csv_path}\n- {report_json_path}")
 
