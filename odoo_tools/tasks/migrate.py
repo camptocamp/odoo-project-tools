@@ -11,6 +11,7 @@ import git
 import oca_port
 from invoke import task
 
+from ..config import get_conf_key
 from ..utils.path import cd
 from .database import get_db_request_result
 
@@ -35,11 +36,21 @@ class AnalyzeAddons:
     could to be migrated, or if some commits/PRs could be ported.
     """
 
-    def __init__(self, ctx, from_branch, to_branch, database_name):
+    def __init__(
+        self,
+        ctx,
+        from_branch,
+        to_branch,
+        database_name,
+        local_src=None,
+        external_src=None,
+    ):
         self.ctx = ctx
         self.from_branch = from_branch
         self.to_branch = to_branch
         self.database_name = database_name
+        self.local_src = local_src or get_conf_key("local_src_rel_path")
+        self.external_src = external_src or get_conf_key("ext_src_rel_path")
         if not os.environ.get("GITHUB_TOKEN"):
             sys.exit(
                 "Please set your GitHub token in the GITHUB_TOKEN environment variable."
@@ -49,7 +60,7 @@ class AnalyzeAddons:
         # Get the local addons
         local_addons = [
             os.path.basename(addon)
-            for addon in os.scandir("./odoo/local-src/")
+            for addon in os.scandir(self.local_src)
             if addon.is_dir()
         ]
         sql = """
@@ -69,7 +80,7 @@ class AnalyzeAddons:
         """Return all addons located in `odoo/external-src/`."""
         external_addons = {}
         external_addons_by_repo = collections.defaultdict(list)
-        for repo in os.scandir("./odoo/external-src/"):
+        for repo in os.scandir(self.external_src):
             repo_name = os.path.basename(repo)
             if repo_name in ("enterprise",) or not repo.is_dir():
                 continue
@@ -132,7 +143,7 @@ class AnalyzeAddons:
             sorted(external_addons.items(), key=lambda e: e[1])
         )
         for addon, repo_name in ordered_external_addons.items():
-            addon_path = os.path.join("odoo", "external-src", repo_name, addon)
+            addon_path = os.path.join(self.external_src, repo_name, addon)
             addon_repo_path = os.path.normpath(os.path.join(addon_path, ".."))
             if repo_name in ANALYZE_SUBMODULES_TO_SKIP:
                 del external_addons[addon]
