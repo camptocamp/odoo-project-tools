@@ -7,6 +7,9 @@ from invoke import exceptions, task
 
 from ..utils import gh, ui
 from .database import _get_list_of_dumps, download_dump
+
+# FIXME: these tasks are not registered because the `submodule` part has been trashed.
+# Must be refactored into a new cli tool.
 from .submodule import init, update
 
 
