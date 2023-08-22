@@ -10,6 +10,7 @@ import sys
 import git
 import oca_port
 from invoke import task
+from odoo_addons_analyzer import RepositoryAnalysis
 
 from ..config import get_conf_key
 from ..utils.path import cd
@@ -178,11 +179,22 @@ class AnalyzeAddons:
         enum_addons_to_check = enumerate(addons_to_analyze.items(), start=1)
         for i, ((repo_path, remote, upstream_org), addons) in enum_addons_to_check:
             print(f"{i}) Analyze {repo_path}...")
+            repo_analysis = RepositoryAnalysis(repo_path)
+            repo_analysis_data = repo_analysis.to_dict()
             repo_name = os.path.basename(repo_path)
             repo_id = f"{upstream_org}/{repo_name}"
             # Fetch the source & target branches on the first iteration
             fetch = True
             for addon in addons:
+                data = analyzed_addons[repo_id].setdefault(addon, {})
+                # Add code analysis data
+                analysis = repo_analysis_data.get(addon)
+                if analysis:
+                    for language in repo_analysis.languages:
+                        data[language] = analysis["code"][language]
+                # TODO: filter dependencies from `analysis['manifest']['depends']`
+                # to not depend on 'dependencies' coming from the database
+                data["dependencies"] = dependencies[addon]
                 # Initialize the oca-port app
                 params = {
                     "from_branch": self.from_branch,
@@ -198,25 +210,26 @@ class AnalyzeAddons:
                 try:
                     app = oca_port.App(**params)
                 except git.exc.GitCommandError as exc:
-                    data = {
-                        "process": "migrate",
-                        "results": {},
-                        "warning": str(exc),
-                    }
+                    data.update(
+                        {
+                            "process": "migrate",
+                            "results": {},
+                            "warning": str(exc),
+                        }
+                    )
                     addons_counter += 1
-                    analyzed_addons[repo_id][addon] = data
                     continue
                 if not app.check_addon_exists_from_branch():
-                    data = {
-                        "process": "migrate",
-                        "results": {},
-                        "warning": f"not merged in {self.from_branch} yet",
-                    }
+                    data.update(
+                        {
+                            "process": "migrate",
+                            "results": {},
+                            "warning": f"not merged in {self.from_branch} yet",
+                        }
+                    )
                 else:
-                    data = json.loads(app.run())
-                data["dependencies"] = dependencies[addon]
+                    data.update(json.loads(app.run()))
                 addons_counter += 1
-                analyzed_addons[repo_id][addon] = data
                 fetch = False
         return addons_counter, analyzed_addons
 
@@ -228,6 +241,10 @@ class AnalyzeAddons:
                 "oca_repository",
                 "addon",
                 "dependencies",
+                "Python",
+                "XML",
+                "JavaScript",
+                "CSS",
                 "status",
                 "info",
                 "warning",
@@ -237,9 +254,9 @@ class AnalyzeAddons:
             for repo_name in analyzed_addons:
                 for addon in analyzed_addons[repo_name]:
                     data = analyzed_addons[repo_name][addon]
-                    if not data:
+                    if not data.get("process"):
                         # Nothing to migrate/port, but list the module anyway
-                        data = {"process": "available"}
+                        data["process"] = "available"
                     info = ""
                     if data["process"] == "migrate":
                         if data["results"].get("existing_pr"):
@@ -259,6 +276,10 @@ class AnalyzeAddons:
                         "oca_repository": repo_name,
                         "addon": addon,
                         "dependencies": "\n".join(data["dependencies"]),
+                        "Python": data["Python"],
+                        "XML": data["XML"],
+                        "JavaScript": data["JavaScript"],
+                        "CSS": data["CSS"],
                         "status": data["process"],
                         "info": info,
                         "warning": data.get("warning", ""),
@@ -293,11 +314,23 @@ class AnalyzeAddons:
         )
         print(f"{addons_counter} external addons have been analyzed.")
         # Add local addons to the analyzed addons list (they have to be migrated for sure)
+        local_analysis = RepositoryAnalysis(self.local_src)
+        local_analysis_data = local_analysis.to_dict()
         for addon in local_addons:
             analyzed_addons["local-src"][addon] = {
                 "process": "migrate",
                 "results": {},
+                "dependencies": [],
             }
+            analysis = local_analysis_data.get(addon)
+            if analysis:
+                data = analyzed_addons["local-src"][addon]
+                for language in local_analysis.languages:
+                    data[language] = analysis["code"][language]
+            # TODO: filter dependencies from `analysis['manifest']['depends']`
+            # to not depend on 'dependencies' coming from the database
+            data["dependencies"] = dependencies[addon]
+        print(f"{len(local_addons)} local addons have been analyzed.")
         # Generate the reports
         report_csv_path = self._generate_csv_report(analyzed_addons)
         report_json_path = self._generate_json_report(analyzed_addons)
