@@ -5,7 +5,6 @@ import collections
 import csv
 import json
 import os
-import sys
 
 import git
 import oca_port
@@ -13,6 +12,7 @@ from invoke import task
 from odoo_addons_analyzer import RepositoryAnalysis
 
 from ..config import get_conf_key
+from ..utils import ui
 from ..utils.path import cd
 from .database import get_db_request_result
 
@@ -53,7 +53,7 @@ class AnalyzeAddons:
         self.local_src = local_src or get_conf_key("local_src_rel_path")
         self.external_src = external_src or get_conf_key("ext_src_rel_path")
         if not os.environ.get("GITHUB_TOKEN"):
-            sys.exit(
+            ui.exit_msg(
                 "Please set your GitHub token in the GITHUB_TOKEN environment variable."
             )
 
