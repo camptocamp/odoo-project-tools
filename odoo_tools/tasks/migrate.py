@@ -5,6 +5,7 @@ import collections
 import csv
 import json
 import os
+import pathlib
 
 import git
 import oca_port
@@ -43,6 +44,7 @@ class AnalyzeAddons:
         from_branch,
         to_branch,
         database_name,
+        odoo_src=None,
         local_src=None,
         external_src=None,
     ):
@@ -50,6 +52,7 @@ class AnalyzeAddons:
         self.from_branch = from_branch
         self.to_branch = to_branch
         self.database_name = database_name
+        self.odoo_src = odoo_src or get_conf_key("odoo_src_rel_path")
         self.local_src = local_src or get_conf_key("local_src_rel_path")
         self.external_src = external_src or get_conf_key("ext_src_rel_path")
         if not os.environ.get("GITHUB_TOKEN"):
@@ -57,25 +60,67 @@ class AnalyzeAddons:
                 "Please set your GitHub token in the GITHUB_TOKEN environment variable."
             )
 
-    def _get_installed_local_addons(self):
+    def _get_installed_addons(self):
+        sql = """
+            SELECT name
+            FROM ir_module_module
+            WHERE state IN ('to install', 'to upgrade', 'installed')
+            ORDER BY name;
+        """
+        return [
+            row[0] for row in get_db_request_result(self.ctx, self.database_name, sql)
+        ]
+
+    def _get_installed_local_addons(self, installed_addons):
         # Get the local addons
         local_addons = [
             os.path.basename(addon)
             for addon in os.scandir(self.local_src)
             if addon.is_dir()
         ]
-        sql = """
-            SELECT name
-            FROM ir_module_module
-            WHERE state IN ('to install', 'to upgrade', 'installed')
-            AND name IN {addons}
-            ORDER BY name;
-        """.format(
-            addons=tuple(local_addons)
-        )
-        return [
-            row[0] for row in get_db_request_result(self.ctx, self.database_name, sql)
-        ]
+        return sorted(set(local_addons) & set(installed_addons))
+
+    def _get_all_standard_addons(self):
+        """Return all addons located in `odoo/src/`."""
+        base_repo = pathlib.Path(self.odoo_src, "odoo", "addons")
+        addons_repo = pathlib.Path(self.odoo_src, "addons")
+        std_addons = set()
+        for repo in (base_repo, addons_repo):
+            if not repo.is_dir():
+                continue
+            for addon_dir in os.scandir(repo):
+                addon = os.path.basename(addon_dir)
+                if not addon_dir.is_dir():
+                    continue
+                addon_files = [f.name for f in os.scandir(addon_dir)]
+                if "__manifest__.py" in addon_files:
+                    std_addons.add(addon)
+        return sorted(std_addons)
+
+    def _get_installed_standard_addons(self, installed_addons):
+        """Return installed standard addons."""
+        standard_addons = self._get_all_standard_addons()
+        return sorted(set(standard_addons) & set(installed_addons))
+
+    def _get_all_enterprise_addons(self):
+        """Return all addons located in `odoo/external-src/enterprise`."""
+        repo = pathlib.Path(self.external_src, "enterprise")
+        if not repo.is_dir():
+            return []
+        std_addons = set()
+        for addon_dir in os.scandir(repo):
+            addon = os.path.basename(addon_dir)
+            if not addon_dir.is_dir():
+                continue
+            addon_files = [f.name for f in os.scandir(addon_dir)]
+            if "__manifest__.py" in addon_files:
+                std_addons.add(addon)
+        return sorted(std_addons)
+
+    def _get_installed_enterprise_addons(self, installed_addons):
+        """Return installed enterprise addons."""
+        enterprise_addons = self._get_all_enterprise_addons()
+        return sorted(set(enterprise_addons) & set(installed_addons))
 
     def _get_all_external_addons(self):
         """Return all addons located in `odoo/external-src/`."""
@@ -173,8 +218,11 @@ class AnalyzeAddons:
                 )
         return addons_to_analyze
 
-    def _get_analyzed_addons(self, addons_to_analyze, dependencies):
-        analyzed_addons = collections.defaultdict(dict)
+    def _get_analyzed_addons(
+        self, addons_to_analyze, dependencies, analyzed_addons=None
+    ):
+        if analyzed_addons is None:
+            analyzed_addons = collections.defaultdict(dict)
         addons_counter = 0
         enum_addons_to_check = enumerate(addons_to_analyze.items(), start=1)
         for i, ((repo_path, remote, upstream_org), addons) in enum_addons_to_check:
@@ -276,10 +324,10 @@ class AnalyzeAddons:
                         "oca_repository": repo_name,
                         "addon": addon,
                         "dependencies": "\n".join(data["dependencies"]),
-                        "Python": data["Python"],
-                        "XML": data["XML"],
-                        "JavaScript": data["JavaScript"],
-                        "CSS": data["CSS"],
+                        "Python": data.get("Python", 0),
+                        "XML": data.get("XML", 0),
+                        "JavaScript": data.get("JavaScript", 0),
+                        "CSS": data.get("CSS", 0),
                         "status": data["process"],
                         "info": info,
                         "warning": data.get("warning", ""),
@@ -298,19 +346,41 @@ class AnalyzeAddons:
         # Get all external addons (even not installed ones) TODO to remove? not used
         # all_external_addons_by_repo, all_external_addons = self._get_all_external_addons()
         # Get external addons (OCA and non-OCA)
+        installed_addons = self._get_installed_addons()
+        standard_addons = self._get_installed_standard_addons(installed_addons)
+        enterprise_addons = self._get_installed_enterprise_addons(installed_addons)
         external_addons_by_repo, external_addons = self._get_installed_external_addons()
-        local_addons = self._get_installed_local_addons()
+        local_addons = self._get_installed_local_addons(installed_addons)
         dependencies = self._get_addons_dependencies(
             list(external_addons) + local_addons
         )
         addons_to_analyze = self._get_addons_to_analyze(external_addons)
+        print(f"- {len(standard_addons)} standard addons installed")
+        print(f"- {len(enterprise_addons)} enterprise addons installed")
         print(
-            f"{len(external_addons)} external addons to check in {len(addons_to_analyze)} "
-            f"submodules + {len(local_addons)} local addons to migrate..."
+            f"- {len(external_addons)} external addons to check in {len(addons_to_analyze)} "
+            f"submodules + {len(local_addons)} local addons to migrate"
         )
+        print(f"- {len(local_addons)} local addons to migrate")
+        analyzed_addons = collections.defaultdict(dict)
+        # Add standard addons to the analyzed addons list (useful for
+        # functional analysis, the migration is however done by Odoo S.A.)
+        for addon in standard_addons:
+            analyzed_addons["odoo/odoo"][addon] = {
+                "process": "available",
+                "results": {},
+                "dependencies": [],
+            }
+        # Add enterprise addons to the analyzed addons list (same story)
+        for addon in enterprise_addons:
+            analyzed_addons["odoo/enterprise"][addon] = {
+                "process": "available",
+                "results": {},
+                "dependencies": [],
+            }
         # Analyse external addons
         addons_counter, analyzed_addons = self._get_analyzed_addons(
-            addons_to_analyze, dependencies
+            addons_to_analyze, dependencies, analyzed_addons=analyzed_addons
         )
         print(f"{addons_counter} external addons have been analyzed.")
         # Add local addons to the analyzed addons list (they have to be migrated for sure)
