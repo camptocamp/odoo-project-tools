@@ -106,8 +106,8 @@ you need to do the following:
 1. check which addon is affected by the PR
 2. run
 
-    otools-addon add mod1 https://github.com/OCA/bank-payment/pull/978
-    otools-addon add mod2 https://github.com/OCA/bank-payment/pull/978
+    otools-addon add mod1 -p https://github.com/OCA/bank-payment/pull/978
+    otools-addon add mod2 -p https://github.com/OCA/bank-payment/pull/978
 
 If you need/want to add requirements manually you can use
 
