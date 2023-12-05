@@ -41,6 +41,11 @@ Use `--help` to get the list of subcommands.
 
 ## Project conversion
 
+Create a new checkout of the project you are working on, with the submodules
+up-to-date (you will need to start an instance later in the process to get the
+installed addons, and at that stage of the conversion, the project will not be
+runnable yet).
+
 Go to the root of your project and follow the steps below:
 
 1. Run sync from Vincent's fork of odoo-template
@@ -62,7 +67,9 @@ Go to the root of your project and follow the steps below:
     git commit -m "Initialize project v1"
     ```
 
-    You can always reset hard to this commit when trying the conversion to v2 ;)
+    You can always reset hard to this commit when trying the conversion to v2
+    ;) (don't forget to update the project submodules again, as they will
+    certainly have been reset)
 
 4. Install conversion tools
 
@@ -84,9 +91,10 @@ Go to the root of your project and follow the steps below:
     CONV_ADMIN_PWD=admin otools-conversion -p 8069
     ```
 
-    The script will move things around, figure out which OCA addons are installed
-    on your instance, and when done display a message about what further manual
-    steps are required, and what you need to check for.
+    The script will move things around, figure out which OCA addons are
+    installed on your instance, and when done display a message about what
+    further manual steps are required, and what you need to check for. These
+    steps will also be saved to a file (see step 8 below).
 
 7. Stage all changes and commit
 

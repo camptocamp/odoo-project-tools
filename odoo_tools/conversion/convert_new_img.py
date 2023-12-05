@@ -208,7 +208,6 @@ class Submodule:
                 )
             else:
                 require.append(f"{addon_pypi_name} >= {version}, == {version}.*")
-            break
         return "\n".join(require)
 
 

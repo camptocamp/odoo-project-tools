@@ -17,8 +17,8 @@ classifiers = [
 ]
 dependencies = [
     "invoke==2.0.0",
-    "requests",
-    "git-aggregator",
+    "requests==2.31.0",
+    "git-aggregator>=4.0",
     "git-autoshare",
     "passlib",
     "clipboard",
@@ -28,7 +28,7 @@ dependencies = [
     "gitpython",
     "pyyaml>6.0.0",
     "ruamel.yaml",
-    "kaptan",
+    "kaptan==0.6.0",
     "wheel",
     "cookiecutter",
     "click",
