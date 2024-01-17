@@ -2,8 +2,12 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import logging
+import re
 
 import requests
+from packaging.version import Version
+
+from .proj import get_current_version
 
 TMP_CACHE = {}
 
@@ -14,7 +18,8 @@ def get_last_pypi_version(pkg_name, odoo=True):
     # NOTE: this resp might be very big.
     # If it gets slow or burns too much mem try to find another way.
     if odoo:
-        pkg_name = odoo_name_to_pkg_name(pkg_name)
+        odoo_serie = get_current_version(serie_only=True)
+        pkg_name = odoo_name_to_pkg_name(pkg_name, odoo_serie=odoo_serie)
     if pkg_name in TMP_CACHE:
         return TMP_CACHE[pkg_name]
     url = f"https://pypi.org/pypi/{pkg_name}/json"
@@ -25,13 +30,21 @@ def get_last_pypi_version(pkg_name, odoo=True):
         _logger.debug("%s not found on pypy at %s", pkg_name, url)
         return None
     data = response.json()
-    latest_version = data["info"]["version"]
+    if odoo:
+        versions = [
+            Version(version)
+            for version in data["releases"]
+            if version.startswith(odoo_serie)
+        ]
+        latest_version = str(max(versions))
+    else:
+        latest_version = data["info"]["version"]
     TMP_CACHE[pkg_name] = latest_version
     return latest_version
 
 
 def odoo_name_to_pkg_name(odoo_name, odoo_version="", odoo_serie=""):
-    if odoo_name.startswith("odoo-addon"):
+    if re.match(r"odoo(\d\d)?-addon", odoo_name):
         return odoo_name
     if not odoo_serie and odoo_version:
         odoo_serie = odoo_version.split(".")[0]

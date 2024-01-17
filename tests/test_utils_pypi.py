@@ -5,6 +5,8 @@ import responses
 
 from odoo_tools.utils import pypi as pypi_utils
 
+from .common import fake_project_root
+
 # NOTE: run this test only locally as it makes a real call to pypi
 # def test_get_last_pypi_version_real():
 #     pkg_name = "odoo-addon-edi_oca"
@@ -14,17 +16,28 @@ from odoo_tools.utils import pypi as pypi_utils
 
 def test_get_last_pypi_version():
     pkg_name = "odoo-addon-edi-oca"
-    data = {"info": {"version": "15.0.1.6.0"}}
+    data = {
+        "info": {"version": "15.0.1.6.0"},
+        "releases": {
+            "15.0.1.0.0": [],
+            "15.0.1.2.0": [],
+            "15.0.1.6.0": [],
+            "16.0.1.0.0": [],
+        },
+    }
     with responses.RequestsMock() as rsps:
-        rsps.add(
-            responses.GET,
-            f"https://pypi.org/pypi/{pkg_name}/json",
-            json=data,
-            status=200,
-            content_type="application/json",
-        )
-        latest_version = pypi_utils.get_last_pypi_version(pkg_name)
-        assert latest_version == "15.0.1.6.0"
+        with fake_project_root(
+            manifest=dict(odoo_version="15.0"), proj_version="15.0.0.1.0"
+        ):
+            rsps.add(
+                responses.GET,
+                f"https://pypi.org/pypi/{pkg_name}/json",
+                json=data,
+                status=200,
+                content_type="application/json",
+            )
+            latest_version = pypi_utils.get_last_pypi_version(pkg_name)
+            assert latest_version == "15.0.1.6.0"
 
 
 def test_odoo_name_to_pkg_name():
