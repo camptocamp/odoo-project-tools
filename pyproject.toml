@@ -31,7 +31,7 @@ dependencies = [
     "kaptan",
     "wheel",
     "cookiecutter",
-    "click",
+    "click>=8.1",
     "towncrier",
     "importlib_resources; python_version < '3.9'",
     "bump2version",
