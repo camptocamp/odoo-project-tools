@@ -79,7 +79,9 @@ Next steps
 3. check for pending merges in the OCA addons, and edit requirements.txt to match these (see below)
 4. check for pending merges in odoo or enterprise and find a way to cope with this XXXXX
 5. run docker build . and fix any build issues
-6. run your project and be happy!
+6. configure github actions on your repository -> see
+   https://confluence.camptocamp.com/confluence/display/DEV/How+to+deploy+Github+Actions+on+odoo+projects
+7. run your project and be happy!
 
 Try building the image with:
 
