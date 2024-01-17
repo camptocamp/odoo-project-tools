@@ -17,7 +17,16 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
-import odoorpc
+try:
+    import odoorpc
+except ImportError:
+    print(
+        "WARNING: odoorpc is not available, you will not be able to fetch "
+        "the list of installed modules from a running instance. "
+        "To fix this, run `pip install odoorpc`.",
+        file=sys.stderr,
+    )
+    odoorpc = None
 
 from ..config import get_conf_key
 from ..utils.path import root_path
@@ -103,8 +112,11 @@ If you have some pending merges, for instance in pending-merges/bank-payment.yml
 ```
 
 you need to do the following:
-1. check which addon is affected by the PR
-2. run
+1. check which addon is affected by the PR.
+   If the PR has been merged, then you can check which version of the module was created after the merge,
+   and use that version in requirements.txt.
+
+2. Otherwise, run
 
     otools-addon add mod1 -p https://github.com/OCA/bank-payment/pull/978
     otools-addon add mod2 -p https://github.com/OCA/bank-payment/pull/978
@@ -143,6 +155,7 @@ def main(args=None):
     remove_submodules(submodules)
     remove_files()
     copy_dockerfile()
+    final_add_files_to_github()
     report(NEXT_STEPS_MSG)
     generate_report()
 
@@ -339,9 +352,23 @@ def copy_dockerfile():
     subprocess.run(["git", "rm", "-f", "odoo/Dockerfile"])
 
 
+def final_add_files_to_github():
+    subprocess.run(
+        [
+            "git",
+            "add",
+            ".bumpversion",
+            ".proj.cfg",
+        ]
+    )
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
-        "Project Converter", "Tool to convert projects to the new docker image format"
+        "Project Converter",
+        "Tool to convert projects to the new docker image format",
+        epilog="For a step by step guide on how to use this tool, check "
+        "https://github.com/camptocamp/odoo-project-tools#project-conversion",
     )
     parser.add_argument(
         "-n",
@@ -356,6 +383,7 @@ def parse_args():
         action="store",
         dest="instance_host",
         default="localhost",
+        help="the name or ip address of a server running the unmigrated instance (used for fetching the list of installed modules)",
     )
     parser.add_argument(
         "-p",
@@ -364,13 +392,25 @@ def parse_args():
         type=int,
         dest="instance_port",
         default=443,
+        help="the port on which the server running the unmigrated instance is listening",
     )
     parser.add_argument(
-        "-d", "--database", action="store", dest="instance_database", default="odoodb"
+        "-d",
+        "--database",
+        action="store",
+        dest="instance_database",
+        default="odoodb",
+        help="the name of the database of the running unmigrated instance",
     )
     parser.add_argument(
-        "-a", "--admin", action="store", dest="admin_login", default="admin"
+        "-a",
+        "--admin",
+        action="store",
+        dest="admin_login",
+        default="admin",
+        help="the login of an admin user on the unmigrated instance",
     )
+
     args = parser.parse_args()
     if not args.disable_module_fetching:
         admin_password = os.getenv("CONV_ADMIN_PWD") or getpass.getpass(
