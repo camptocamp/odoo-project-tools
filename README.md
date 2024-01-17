@@ -99,11 +99,19 @@ Go to the root of your project and follow the steps below:
     Be careful, if you need to redo these steps, the submodules will have 
     been removed by the script, you will need to run `git submodule update -i` again. 
 
-7. Stage all changes and commit
+7. Install pre-commit and run it on all files
+
+    ```
+    pre-commit install
+    pre-commit run --all-files
+    ```
+    Manually fix the issues that pre-commit is unable to fix by itself
+
+8. Stage all changes and commit
 
     ```
     git add .
     git commit -m "Convert to proj v2"
     ```
-
-8. Follow the steps in the generated `V2_MIG_NEXT_STEPS.todo` file
+ 
+9. Follow the steps in the generated `V2_MIG_NEXT_STEPS.todo` file
