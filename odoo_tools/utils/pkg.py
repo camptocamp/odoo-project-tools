@@ -31,7 +31,7 @@ class Package:
     def allowed_version(self, version):
         if not self.pinned_version:
             return True
-        return req.allowed_version(version)
+        return req.allowed_version(self.req, version)
 
     def add_requirement(self, version=None, pr=None, editable=False):
         req.add_requirement(
