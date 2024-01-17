@@ -50,11 +50,11 @@ def add(name, version=None, pr=None, odoo=True, upgrade=False):
       latest version of the module on PyPI and use that version
 
     * Otherwise:
+
         * if the version is the same, do nothing. Otherwise, prompt the user
         * If the addon is present as a PR, prompt the user
 
     """
-    # TODO: get odoo version from project
     # TODO: centralize printing/logging in `ui` utils
     click.secho(f"Adding: {name}", fg="green")
     pkg = Package(name, odoo=odoo)
@@ -118,7 +118,11 @@ def add_pending(ref, addons=None, editable=True, aggregate=True):
         run(f"touch {dev_req_file_path.as_posix()}")
 
     for name in addons:
-        pkg = Package(name, odoo=True, req_filepath=dev_req_file_path)
+        pkg = Package(
+            name,
+            odoo=True,
+            req_filepath=dev_req_file_path,
+        )
         # TODO: does it work w/ commits?
         pkg.add_or_replace_requirement(pr=ref, editable=editable)
 

@@ -26,6 +26,7 @@ dependencies = [
     "pre-commit",
     "psycopg2-binary>=2.7.6",
     "gitpython",
+    "packaging",
     "pyyaml>6.0.0",
     "ruamel.yaml",
     "kaptan",

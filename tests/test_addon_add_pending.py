@@ -14,7 +14,9 @@ from .fixtures import clear_caches  # noqa
 def test_add_new_pending_no_addons():
     pr = "https://github.com/OCA/edi-framework/pull/1"
     repo_name = "edi-framework"
-    with fake_project_root(manifest=dict(odoo_version="16.0")) as runner:
+    with fake_project_root(
+        manifest=dict(odoo_version="16.0"), proj_version="16.0.0.1.0"
+    ) as runner:
         repo = Repo(repo_name, path_check=False)
         assert not repo.has_pending_merges()
         result = runner.invoke(
@@ -32,7 +34,9 @@ def test_add_new_pending_with_addon_editable():
     pr = "https://github.com/OCA/edi-framework/pull/1"
     repo_name = "edi-framework"
     addon_name = "edi_oca"
-    with fake_project_root(manifest=dict(odoo_version="16.0")) as runner:
+    with fake_project_root(
+        manifest=dict(odoo_version="16.0"), proj_version="16.0.0.1.0"
+    ) as runner:
         repo = Repo(repo_name, path_check=False)
         req_path = get_project_dev_req()
         assert not req_path.exists()
@@ -56,7 +60,9 @@ def test_add_new_pending_with_addon_not_editable():
     pr = "https://github.com/OCA/edi-framework/pull/1"
     repo_name = "edi-framework"
     addon_name = "edi_oca"
-    with fake_project_root(manifest=dict(odoo_version="16.0")) as runner:
+    with fake_project_root(
+        manifest=dict(odoo_version="16.0"), proj_version="16.0.0.1.0"
+    ) as runner:
         repo = Repo(repo_name, path_check=False)
         req_path = get_project_dev_req()
         assert not req_path.exists()
