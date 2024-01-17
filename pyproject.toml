@@ -38,8 +38,8 @@ dependencies = [
     "bump2version",
     # Include fix for parsing editable requirements
     # https://github.com/madpah/requirements-parser/pull/85
-    "requirements-parser @ https://github.com/simahawk/requirements-parser/archive/refs/heads/fix-editable.tar.gz"
-]
+    "requirements-parser @ https://github.com/simahawk/requirements-parser/archive/refs/heads/fix-editable.tar.gz",
+    ]
 requires-python = ">=3.8"
 dynamic = ["version"]
 

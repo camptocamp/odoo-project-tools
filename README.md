@@ -96,6 +96,9 @@ Go to the root of your project and follow the steps below:
     further manual steps are required, and what you need to check for. These
     steps will also be saved to a file (see step 8 below).
 
+    Be careful, if you need to redo these steps, the submodules will have 
+    been removed by the script, you will need to run `git submodule update -i` again. 
+
 7. Stage all changes and commit
 
     ```
