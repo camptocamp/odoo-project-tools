@@ -155,7 +155,6 @@ def main(args=None):
     remove_submodules(submodules)
     remove_files()
     copy_dockerfile()
-    final_add_files_to_github()
     report(NEXT_STEPS_MSG)
     generate_report()
 
@@ -184,7 +183,7 @@ class Submodule:
     branch: str = ""
 
     def generate_requirements(self, installed_modules):
-        """return a block concerning the submodule thatn can be inserted in a requirements.txt file.
+        """return a block concerning the submodule that can be inserted in a requirements.txt file.
 
         The block has 1 line per module which is in the repository
         """
@@ -280,6 +279,14 @@ def init_proj_v2():
     subprocess.run(["rm", ".proj.cfg"])
     env = dict(os.environ, PROJ_TMPL_VER="2")
     subprocess.run(["otools-project", "init"], env=env)
+    subprocess.run(
+        [
+            "git",
+            "add",
+            ".bumpversion.cfg",
+            ".proj.cfg",
+        ]
+    )
 
 
 def move_files():
@@ -350,17 +357,6 @@ def remove_files():
 def copy_dockerfile():
     shutil.move('odoo/Dockerfile', 'Dockerfile.bak')
     subprocess.run(["git", "rm", "-f", "odoo/Dockerfile"])
-
-
-def final_add_files_to_github():
-    subprocess.run(
-        [
-            "git",
-            "add",
-            ".bumpversion",
-            ".proj.cfg",
-        ]
-    )
 
 
 def parse_args():
