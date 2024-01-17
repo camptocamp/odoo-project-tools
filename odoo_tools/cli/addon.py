@@ -26,10 +26,23 @@ def cli():
 
 @cli.command()
 @click.argument("name")
-@click.option("-v", "--version", "version")
-@click.option("-p", "--pr", "pr")
-@click.option("-o", "--odoo", "odoo", default=True)
-@click.option("--upgrade", "upgrade", is_flag=True, default=False)
+@click.option(
+    "-v", "--version", "version", help="the version of the addon you want to install"
+)
+@click.option("-p", "--pr", "pr", help="the URL of the pull request you want to add")
+@click.option(
+    "--odoo/--no-odoo",
+    "odoo",
+    default=True,
+    help="use --no-odoo to install a python module which is not an Odoo addon",
+)
+@click.option(
+    "--upgrade",
+    "upgrade",
+    is_flag=True,
+    default=False,
+    help="upgrade will update the addon to the latest available version on PyPI",
+)
 def add(name, version=None, pr=None, odoo=True, upgrade=False):
     """Update the project's requirements for a given package (odoo or not).
 
@@ -121,7 +134,12 @@ def add_pending(ref, addons=None, editable=True, aggregate=True):
 @click.option("-b", "--branch", "branch")
 @click.option("-r", "--repo-name", "repo_name")
 @click.option("-u", "--upstream", "upstream")
-@click.option("-o", "--odoo", "odoo", default=True)
+@click.option(
+    "--odoo/--no-odoo",
+    "odoo",
+    default=True,
+    help="use --no-odoo to install a python module which is not an Odoo addon",
+)
 def print_requirement(name, **kw):
     """Print requirement line."""
     opts = SmartDict(kw)
