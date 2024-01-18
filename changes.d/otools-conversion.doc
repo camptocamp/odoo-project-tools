@@ -1,2 +1,2 @@
 * Improve the documented process in the project README file to mention when pre-commit should be enabled.
-* Document how to configure the CI with Github Actions on the projectgu
+* Document how to configure the CI with Github Actions on the project
