@@ -1,3 +1,1 @@
-* fix an issue preventing more than 1 addon in a given external-src subdirectory from being added to the requirements of the project. 
-* don't crash if odoorpc is not installed (esp. allow to call otools-conversion --help in that configuration)
-* stage some missed out files created / modified during the conversion process
+otools-conversion: fix an issue preventing more than 1 addon in a given external-src subdirectory from being added to the requirements of the project. 

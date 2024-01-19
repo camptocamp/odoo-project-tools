@@ -44,12 +44,19 @@ def cli():
 @click.option(
     "--type",
     "rel_type",
+    help="version increment to use",
     type=click.Choice(['major', 'minor', 'patch'], case_sensitive=False),
 )
-@click.option("--new-version", "new_version")
-@click.option("--dry-run", "dry_run", is_flag=True)
-@click.option("--commit/--no-commit", default=False)
+@click.option("--new-version", "new_version", help="explicit new version to create")
+@click.option(
+    "--dry-run",
+    "dry_run",
+    is_flag=True,
+    help="only display the version number which would be generated",
+)
+# @click.option("--commit/--no-commit", default=False, help="if set, then the changes are committed, otherwise you will need to do it yourself. ")
 def bump(rel_type, new_version=None, dry_run=False, commit=False):
+    """Prepare a new release"""
     cmd = make_bumpversion_cmd(rel_type, new_version=new_version, dry_run=dry_run)
     click.echo(f"Running: {cmd}")
     res = run(cmd)

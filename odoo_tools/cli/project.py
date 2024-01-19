@@ -96,8 +96,14 @@ def cli():
 
 
 @cli.command()
-@click.option("-v", "--version", "version")
+@click.option(
+    "-v",
+    "--version",
+    "version",
+    help="Use 1 for a project using the 'old image' format, and 2 for 'new image'",
+)
 def init(**kw):
+    """Initialize a project"""
     click.echo("Preparing project...")
     bootstrap_files(SmartDict(kw))
 
