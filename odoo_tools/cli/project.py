@@ -5,9 +5,15 @@ import os
 
 import click
 
-from ..config import PROJ_CFG_FILE, load_config
-from ..utils import ui
-from ..utils.misc import SmartDict, copy_file, get_template_path
+
+from ..config import PROJ_CFG_FILE, get_conf_key, load_config
+from ..utils import git, ui
+from ..utils.misc import (
+    SmartDict,
+    copy_file,
+    get_docker_image_commit_hashes,
+    get_template_path,
+)
 from ..utils.os_exec import run
 from ..utils.path import build_path
 from ..utils.proj import get_current_version, get_project_manifest_key
@@ -107,6 +113,55 @@ def init(**kw):
     """Initialize a project"""
     click.echo("Preparing project...")
     bootstrap_files(SmartDict(kw))
+
+
+@cli.command()
+@click.option(
+    "--odoo-hash",
+    help="the commit hash to use for Odoo core. If not provided the docker image will be introspected.",
+)
+@click.option(
+    "--enterprise-hash",
+    help="the commit hash to use for Odoo Enterprise. If not provided the docker image will be introspected.",
+)
+def local_odoo(odoo_hash=None, enterprise_hash=None):
+    """checkout odoo core and odoo enterprise in the working directory
+
+    This can be used to test odoo core/enterprise patches inside docker (the tool will suggest how to change your
+    docker-compose file to mount the checkouts inside the image), or to develop without Odoo using the same version
+    as the one used in the image."""
+    version = get_current_version(serie_only=True)
+    branch = f"{version}.0"
+    if odoo_hash is None or enterprise_hash is None:
+        image_odoo_hash, image_enterprise_hash = get_docker_image_commit_hashes()
+        odoo_hash = odoo_hash or image_odoo_hash
+        enterprise_hash = enterprise_hash or image_enterprise_hash
+    if odoo_hash:
+        git.get_odoo_core(odoo_hash, dest='src/odoo', branch=branch)
+    else:
+        ui.exit_msg("Unable to find the commit hash of odoo core")
+
+    if enterprise_hash:
+        git.get_odoo_enterprise(enterprise_hash, dest='src/enterprise', branch=branch)
+    else:
+        ui.exit_msg("Unable to find the commit hash of odoo enterprise")
+    ui.echo(
+        '\nYou can add the following lines to docker-compose.override.yml, in the odoo service section:'
+    )
+    ui.echo(
+        """
+    volumes:
+      - "./src/odoo:/odoo/src/odoo"
+      - "./src/enterprise:/odoo/src/enterprise"
+      """
+    )
+    ui.echo(
+        """
+Then run:
+
+docker-compose run --rm odoo pip install --user -e /odoo/src/odoo
+"""
+    )
 
 
 if __name__ == '__main__':
