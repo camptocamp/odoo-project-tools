@@ -116,16 +116,18 @@ If you have some pending merges, for instance in pending-merges/bank-payment.yml
 you need to do the following:
 1. check which addon is affected by the PR.
    If the PR has been merged, then you can check which version of the module was created after the merge,
-   and use that version in requirements.txt.
+   and use that version in requirements.txt, then remove the line from the aggregation file
 
 2. Otherwise, run
 
-    otools-addon add mod1 -p https://github.com/OCA/bank-payment/pull/978
-    otools-addon add mod2 -p https://github.com/OCA/bank-payment/pull/978
+    otools-addon add mod1 --pr https://github.com/OCA/bank-payment/pull/978
+    otools-addon add mod2 --pr https://github.com/OCA/bank-payment/pull/978
+
+   then remove the file from the aggregation file
 
 If you need/want to add requirements manually you can use
 
-    otools-addon print-req mod1 [-p $pr] [-b $branch] [...]
+    otools-addon print-req mod1 [--pr $pr] [--branch $branch] addon_name
 
 to generate the line to add.
 """

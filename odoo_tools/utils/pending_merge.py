@@ -413,7 +413,14 @@ class RepoAggregator(git_aggregator.repo.Repo):
 
 
 def add_pending(entity_url, aggregate=True):
-    """Add a pending merge using given entity link"""
+    """Add a pending merge using the given entity url.
+
+    Adds the pending merge in the appropriate aggregation file (under pending-merges.d),
+    creating a new file if necessary. Optionally run git aggregate using that file.
+
+    :param entity_url: url of a pull request (e.g. https://github.com/<user>/<repo>/pull/<pr-index>)
+    :param aggregate: if True, run git aggregate after editing the file
+    """
     # pattern, given an https://github.com/<user>/<repo>/pull/<pr-index>
     # # PR headline
     # # PR link as is

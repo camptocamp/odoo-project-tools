@@ -96,21 +96,40 @@ def add(name, version=None, pr=None, odoo=True, upgrade=False):
 
 
 @cli.command(name="add-pending")
-@click.argument("ref")
-@click.option("-a", "--addons", "addons")
-@click.option("--editable/--no-editable", "editable", is_flag=True, default=True)
-@click.option("--aggregate/--no-aggregate", "aggregate", is_flag=True, default=True)
-def add_pending(ref, addons=None, editable=True, aggregate=True):
-    """Add a pending PR or commit."""
+@click.argument("pr_url")
+@click.option("-a", "--addons", "addons", help="comma separated list of addon names")
+@click.option(
+    "--aggregate/--no-aggregate",
+    "aggregate",
+    help="run git aggregate. This is the default behavior.",
+    is_flag=True,
+    default=True,
+)
+@click.option(
+    "--editable/--no-editable",
+    "editable",
+    help="install the addon in editable mode (pip install -e). This is the default behavior.",
+    is_flag=True,
+    default=True,
+)
+def add_pending(pr_url, addons=None, editable=True, aggregate=True):
+    """Add a pending PR or commit.
 
-    pm_utils.add_pending(ref, aggregate=aggregate)
+    This command will create or update an aggregation file corresponding to the
+    repository  in the pending-merges.d directory to add the specified.
 
-    # TODO: run git-aggregate if already present
+    If the pr_url is really a pull request, then the pull request is aggregated.
+    If it is a commit url, then the commit is cherry picked.
+
+    If addons are listed, they are added to the dev-requirements.txt file."""
+
+    pm_utils.add_pending(pr_url, aggregate=aggregate)
+
     addons = [x.strip() for x in addons.split(",") if x.strip()] if addons else []
     if not addons:
         ui.exit_msg("No addon specifified. Please update dev requirements manually.")
 
-    ui.echo(f"Adding: {', '.join(addons)} from {ref}")
+    ui.echo(f"Adding: {', '.join(addons)} from {pr_url}")
 
     # Create req file if missing
     dev_req_file_path = req_utils.get_project_dev_req()
@@ -124,7 +143,7 @@ def add_pending(ref, addons=None, editable=True, aggregate=True):
             req_filepath=dev_req_file_path,
         )
         # TODO: does it work w/ commits?
-        pkg.add_or_replace_requirement(pr=ref, editable=editable)
+        pkg.add_or_replace_requirement(pr=pr_url, editable=editable)
 
     ui.echo(f"Updated dev requirements for: {', '.join(addons)}", fg="green")
 
