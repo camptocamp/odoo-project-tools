@@ -3,6 +3,7 @@
 
 import configparser
 import shutil
+import subprocess
 
 PKG_NAME = "odoo_tools"
 try:
@@ -46,3 +47,24 @@ def parse_ini_cfg(ini_content, header):
 def get_ini_cfg_key(cfg_content, header, key):
     cfg = parse_ini_cfg(cfg_content, header)
     return cfg.get(header, key)
+
+
+def get_docker_image_commit_hashes():
+    """retrieve the odoo core and odoo enterprise commit hashes used in the project image"""
+    process = subprocess.run(
+        ["docker-compose", "run", "--rm", "odoo", "printenv"],
+        check=True,
+        stdout=subprocess.PIPE,
+    )
+    output = process.stdout.decode('utf-8')
+    variables = {}
+    for line in output.splitlines():
+        try:
+            name, value = line.strip().split('=', maxsplit=1)
+        except ValueError:
+            # not formatted as an environment variable, we can ignore
+            continue
+        variables[name] = value
+    odoo_hash = variables.get("CORE_HASH")
+    enterprise_hash = variables.get("ENTERPRISE_HASH")
+    return odoo_hash, enterprise_hash
