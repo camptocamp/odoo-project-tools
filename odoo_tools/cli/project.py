@@ -16,7 +16,12 @@ from ..utils.misc import (
 )
 from ..utils.os_exec import run
 from ..utils.path import build_path
-from ..utils.proj import get_current_version, get_project_manifest_key
+from ..utils.proj import (
+    generate_odoo_config_file,
+    get_current_version,
+    get_project_manifest_key,
+    setup_venv,
+)
 
 
 def get_proj_tmpl_ver():
@@ -118,50 +123,74 @@ def init(**kw):
 @cli.command()
 @click.option(
     "--odoo-hash",
+    type=str,
     help="the commit hash to use for Odoo core. If not provided the docker image will be introspected.",
 )
 @click.option(
     "--enterprise-hash",
+    type=str,
     help="the commit hash to use for Odoo Enterprise. If not provided the docker image will be introspected.",
 )
-def local_odoo(odoo_hash=None, enterprise_hash=None):
+@click.option(
+    "--venv",
+    type=str,
+    help="setup a virtual environment useable to work without docker",
+)
+def local_odoo(odoo_hash=None, enterprise_hash=None, venv=None):
     """checkout odoo core and odoo enterprise in the working directory
 
     This can be used to test odoo core/enterprise patches inside docker (the tool will suggest how to change your
-    docker-compose file to mount the checkouts inside the image), or to develop without Odoo using the same version
-    as the one used in the image."""
+    docker-compose file to mount the checkouts inside the image), or to develop without Docker using the same version
+    as the one used in the image.
+
+    To develop without Docker you can call `otools-project local-odoo --venv .venv`: this will setup or update a
+    virtual environment in the directory with the required tools installed to run Odoo locally (you will still need
+    docker to get the correct versions of the source code, unless you pass the hashes on the command line).
+    """
     version = get_current_version(serie_only=True)
+    odoo_src_path = get_conf_key("odoo_src_rel_path")
+    if get_conf_key("template_version") == 1:
+        ui.exit_msg("This command is not support on this project version;")
+    odoo_enterprise_path = os.path.join(odoo_src_path, "..", "enterprise")
     branch = f"{version}.0"
     if odoo_hash is None or enterprise_hash is None:
         image_odoo_hash, image_enterprise_hash = get_docker_image_commit_hashes()
         odoo_hash = odoo_hash or image_odoo_hash
         enterprise_hash = enterprise_hash or image_enterprise_hash
     if odoo_hash:
-        git.get_odoo_core(odoo_hash, dest='src/odoo', branch=branch)
+        git.get_odoo_core(odoo_hash, dest=odoo_src_path, branch=branch)
     else:
         ui.exit_msg("Unable to find the commit hash of odoo core")
 
     if enterprise_hash:
-        git.get_odoo_enterprise(enterprise_hash, dest='src/enterprise', branch=branch)
+        git.get_odoo_enterprise(
+            enterprise_hash, dest=odoo_enterprise_path, branch=branch
+        )
     else:
         ui.exit_msg("Unable to find the commit hash of odoo enterprise")
-    ui.echo(
-        '\nYou can add the following lines to docker-compose.override.yml, in the odoo service section:'
-    )
-    ui.echo(
-        """
+
+    if venv is not None:
+        setup_venv(venv)
+        generate_odoo_config_file(venv, odoo_src_path, odoo_enterprise_path)
+        ui.echo("\nOdoo is now installed and available in `{venv}/bin/odoo`")
+    else:
+        ui.echo(
+            '\nYou can add the following lines to docker-compose.override.yml, in the odoo service section:'
+        )
+        ui.echo(
+            """
     volumes:
       - "./src/odoo:/odoo/src/odoo"
       - "./src/enterprise:/odoo/src/enterprise"
       """
-    )
-    ui.echo(
-        """
+        )
+        ui.echo(
+            """
 Then run:
 
 docker-compose run --rm odoo pip install --user -e /odoo/src/odoo
 """
-    )
+        )
 
 
 if __name__ == '__main__':
