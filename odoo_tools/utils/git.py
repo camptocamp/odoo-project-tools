@@ -9,14 +9,14 @@ from .path import build_path
 
 
 def get_odoo_core(hash, dest="src/odoo", org="odoo", branch=None):
-    dest = build_path(dest)
+    dest = str(build_path(dest))
     _clone_or_fetch_repo(org, "odoo", branch, dest)
     ui.echo(f"Checking out {hash}")
     subprocess.run(["git", "-C", dest, "checkout", hash], check=True)
 
 
 def get_odoo_enterprise(hash, dest="src/enterprise", org="odoo", branch=None):
-    dest = build_path(dest)
+    dest = str(build_path(dest))
     _clone_or_fetch_repo(org, "enterprise", branch, dest)
     ui.echo(f"Checking out {hash}")
     subprocess.run(["git", "-C", dest, "checkout", hash])

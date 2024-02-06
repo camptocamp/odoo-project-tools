@@ -55,10 +55,10 @@ def get_docker_image_commit_hashes():
         ["docker-compose", "run", "--rm", "odoo", "printenv"],
         check=True,
         stdout=subprocess.PIPE,
+        text=True,
     )
-    output = process.stdout.decode('utf-8')
     variables = {}
-    for line in output.splitlines():
+    for line in process.stdout.splitlines():
         try:
             name, value = line.strip().split('=', maxsplit=1)
         except ValueError:
