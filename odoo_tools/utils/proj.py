@@ -76,7 +76,7 @@ def generate_odoo_config_file(
         odoo = build_path(venv_dir) / "bin/odoo"
         addons_dir = build_path("odoo/addons")
 
-        subprocess.call(
+        subprocess.run(
             [
                 odoo,
                 "--save",
