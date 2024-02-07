@@ -259,7 +259,6 @@ def test_local_odoo_venv():
                     "--enterprise-hash",
                     "56789",
                     '--venv',
-                    '.venv',
                 ],
                 catch_exceptions=False,
             )
