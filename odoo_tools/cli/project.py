@@ -133,10 +133,17 @@ def init(**kw):
 )
 @click.option(
     "--venv",
-    type=str,
+    type=bool,
+    default=False,
     help="setup a virtual environment useable to work without docker",
 )
-def local_odoo(odoo_hash=None, enterprise_hash=None, venv=None):
+@click.option(
+    "--venv-path",
+    type=str,
+    default=".venv",
+    help="Directory to use for the virtualenv",
+)
+def local_odoo(odoo_hash=None, enterprise_hash=None, venv=False, venv_path=".venv"):
     """checkout odoo core and odoo enterprise in the working directory
 
     This can be used to test odoo core/enterprise patches inside docker (the tool will suggest how to change your
@@ -169,9 +176,9 @@ def local_odoo(odoo_hash=None, enterprise_hash=None, venv=None):
     else:
         ui.exit_msg("Unable to find the commit hash of odoo enterprise")
 
-    if venv is not None:
-        setup_venv(venv)
-        generate_odoo_config_file(venv, odoo_src_path, odoo_enterprise_path)
+    if venv:
+        setup_venv(venv_path)
+        generate_odoo_config_file(venv_path, odoo_src_path, odoo_enterprise_path)
         ui.echo("\nOdoo is now installed and available in `{venv}/bin/odoo`")
     else:
         ui.echo(
