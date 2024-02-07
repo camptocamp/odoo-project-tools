@@ -100,7 +100,6 @@ def test_init_custom_version():
         assert result.exit_code == 0
 
 
-@mock.patch.dict(os.environ, {"PROJ_TMPL_VER": "2"}, clear=True)
 def test_local_odoo():
     with fake_project_root(proj_tmpl_ver="2", proj_version="16.0.1.1.0") as runner:
         odoo_src_path = str(build_path(get_conf_key("odoo_src_rel_path")))
@@ -165,7 +164,6 @@ def test_local_odoo():
             )
 
 
-@mock.patch.dict(os.environ, {"PROJ_TMPL_VER": "2"}, clear=True)
 def test_local_odoo_venv():
     with fake_project_root(proj_tmpl_ver="2", proj_version="16.0.1.1.0") as runner:
         odoo_src_path = str(build_path(get_conf_key("odoo_src_rel_path")))

@@ -1,7 +1,6 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-import os
 from unittest import mock
 
 from odoo_tools.config import get_conf_key
@@ -58,7 +57,6 @@ def test_get_project_manifest_key():
         assert proj_utils.get_project_manifest_key("customer_shortname") == "acme"
 
 
-@mock.patch.dict(os.environ, {"PROJ_TMPL_VER": "2"}, clear=True)
 def test_generate_odoo_config_file():
     with fake_project_root(proj_tmpl_ver="2", proj_version="16.0.1.1.0"):
         odoo_src_path = build_path(get_conf_key("odoo_src_rel_path"))
