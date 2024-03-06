@@ -70,9 +70,9 @@ class Repo:
     def make_repo_path(self, name_or_path):
         """Return a submodule path by a submodule name."""
         submodule_name = self._safe_repo_name(name_or_path)
-        is_src = submodule_name in ("odoo", "ocb", "src")
+        is_src = submodule_name in ("odoo", "enterprise")
         if is_src:
-            relative_path = self.odoo_src_rel_path
+            relative_path = self.odoo_src_rel_path / submodule_name
         else:
             relative_path = self.ext_src_rel_path / submodule_name
         return relative_path
@@ -84,9 +84,8 @@ class Repo:
         as it is known at Github
         """
         repo_name = self._safe_repo_name(name_or_path)
-        if repo_name.lower() in ("odoo", "ocb"):
-            # FIXME: not sure this will be the path
-            repo_name = "src"
+        if repo_name.lower() in ("odoo", "enterprise"):
+            repo_name = repo_name.lower()
         base_path = self.pending_merge_abs_path
         if relative:
             base_path = self.pending_merge_rel_path
@@ -149,12 +148,6 @@ class Repo:
         if not os.path.exists(self.pending_merge_abs_path):
             os.makedirs(self.pending_merge_abs_path)
 
-        oca_ocb_remote = False
-        if self.path == self.odoo_src_rel_path and upstream == "odoo":
-            oca_ocb_remote = not ui.ask_confirmation(
-                "Use odoo:odoo instead of OCA/OCB?"
-            )
-
         remote_upstream_url = self.ssh_url(upstream)
         remote_company_url = self.ssh_url()
         odoo_version = get_project_manifest_key("odoo_version")
@@ -164,11 +157,6 @@ class Repo:
         remotes = CommentedMap()
         remotes.insert(0, upstream, remote_upstream_url)
 
-        if oca_ocb_remote:
-            # use the oca remote as base even if we are adding an
-            # odoo/odoo#123 pull request
-            remotes.insert(0, "oca", self.build_ssh_url("OCA", "OCB"))
-
         if upstream != self.company_git_remote:
             # if origin is not the same: add company's one
             remotes.insert(0, self.company_git_remote, remote_company_url)
@@ -177,10 +165,7 @@ class Repo:
         config.insert(
             1, "target", "{} {}".format(self.company_git_remote, default_target)
         )
-        if oca_ocb_remote:
-            base_merge = "{} {}".format("oca", odoo_version)
-        else:
-            base_merge = "{} {}".format(upstream, odoo_version)
+        base_merge = "{} {}".format(upstream, odoo_version)
         config.insert(2, "merges", CommentedSeq([base_merge]))
         self.update_merges_config(config)
 
@@ -436,6 +421,8 @@ def add_pending(entity_url, aggregate=True):
         repo.generate_pending_merges_file_template(upstream)
 
     if entity_type == "pull":
+        if upstream == "odoo" and repo_name in ("odoo", "enterprise"):
+            ui.exit_msg("Sorry, not possible. TODO")
         repo.add_pending_pull_request(upstream, entity_id)
     elif entity_type in ("commit", "tree"):
         repo.add_pending_commit(upstream, entity_id)
