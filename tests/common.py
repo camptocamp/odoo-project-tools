@@ -56,8 +56,8 @@ FAKE_PROJ_CFG_V1 = dict(
 )
 FAKE_PROJ_CFG_V2 = dict(
     company_git_remote="camptocamp",
-    odoo_src_rel_path="odoo/src",
-    ext_src_rel_path="odoo/external-src",
+    odoo_src_rel_path="src",
+    ext_src_rel_path="odoo/dev-src",
     local_src_rel_path="odoo/addons",
     pending_merge_rel_path="pending-merges.d",
     version_file_rel_path="VERSION",
