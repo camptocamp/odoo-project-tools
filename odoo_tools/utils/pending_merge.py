@@ -5,6 +5,7 @@ import logging
 import os
 from pathlib import PosixPath
 
+import click
 import git_aggregator.config
 import git_aggregator.main
 import git_aggregator.repo
@@ -13,6 +14,7 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from ..config import get_conf_key
 from ..exceptions import PathNotFound
+from ..utils.misc import get_docker_image_commit_hashes
 from . import gh, ui
 from .os_exec import run
 from .path import build_path, cd
@@ -34,6 +36,7 @@ class Repo:
     """Handle checked out repositories and their pending merges."""
 
     def __init__(self, name_or_path, path_check=True):
+        self.template_version = get_conf_key("template_version") or 1
         self.company_git_remote = get_conf_key("company_git_remote")
         self.odoo_src_rel_path = get_conf_key("odoo_src_rel_path")
         self.ext_src_rel_path = get_conf_key("ext_src_rel_path")
@@ -68,12 +71,11 @@ class Repo:
     def make_repo_path(self, name_or_path):
         """Return a submodule path by a submodule name."""
         submodule_name = self._safe_repo_name(name_or_path)
-        is_src = submodule_name in ("odoo", "ocb", "src")
-        if is_src:
-            relative_path = self.odoo_src_rel_path
-        else:
-            relative_path = self.ext_src_rel_path / submodule_name
-        return relative_path
+        if self.template_version == 1 and submodule_name in ("odoo", "ocb", "src"):
+            return self.odoo_src_rel_path
+        elif self.template_version == 2 and submodule_name in ("odoo", "enterprise"):
+            return self.odoo_src_rel_path / submodule_name
+        return self.ext_src_rel_path / submodule_name
 
     def make_repo_merges_path(self, name_or_path, relative=False):
         """Return a pending-merges file for a given repo.
@@ -82,8 +84,7 @@ class Repo:
         as it is known at Github
         """
         repo_name = self._safe_repo_name(name_or_path)
-        if repo_name.lower() in ("odoo", "ocb"):
-            # FIXME: not sure this will be the path
+        if self.template_version == 1 and repo_name.lower() in ("odoo", "ocb"):
             repo_name = "src"
         base_path = self.pending_merge_abs_path
         if relative:
@@ -146,7 +147,11 @@ class Repo:
             os.makedirs(self.pending_merge_abs_path)
 
         oca_ocb_remote = False
-        if self.path == self.odoo_src_rel_path and upstream == "odoo":
+        if (
+            self.template_version == 1
+            and upstream.lower() == "odoo"
+            and self.path == self.odoo_src_rel_path
+        ):
             oca_ocb_remote = not ui.ask_confirmation(
                 "Use odoo:odoo instead of OCA/OCB?"
             )
@@ -171,14 +176,56 @@ class Repo:
         config = CommentedMap()
         config.insert(0, "remotes", remotes)
         config.insert(1, "target", f"{self.company_git_remote} {default_target}")
-        if oca_ocb_remote:
-            base_merge = "{} {}".format("oca", odoo_version)
-        else:
-            base_merge = f"{upstream} {odoo_version}"
+
+        base_merge = f"{upstream} {odoo_version}"
+        if self.template_version == 1:
+            if oca_ocb_remote:
+                base_merge = "{} {}".format("oca", odoo_version)
+        elif self.template_version == 2:
+            if self.name.lower() in ("odoo", "enterprise"):
+                odoo_hash, enterprise_hash = get_docker_image_commit_hashes()
+                hashes = {"odoo": odoo_hash, "enterprise": enterprise_hash}
+                base_merge = f"{upstream} {hashes[self.name.lower()]}"
+
         config.insert(2, "merges", CommentedSeq([base_merge]))
         self.update_merges_config(config)
 
+    def update_pending_merges_file_base_merge(self, skip_questions: bool = False):
+        """Checks that the base merge for an odoo/enterprise repository us up-to-date"""
+        if self.template_version == 1:
+            return
+        if self.name.lower() not in ("odoo", "enterprise"):
+            return
+        if not self.has_pending_merges():
+            return
+        # Get the image commit hashes
+        odoo_hash, enterprise_hash = get_docker_image_commit_hashes()
+        hashes = {"odoo": odoo_hash, "enterprise": enterprise_hash}
+        # Get the pending merge base merge reference
+        config = self.merges_config()
+        base_merge = config["merges"][0]
+        upstream, ref = base_merge.split()
+        # Check if the base merge is up-to-date
+        if upstream == "odoo" and ref == hashes[self.name.lower()]:
+            return
+        # Ask confirmation is required
+        if not skip_questions and not click.confirm(
+            f"The base merge for {self.name} ({base_merge}) is not up-to-date.\n"
+            f"The base image current hash is {hashes[self.name.lower()]}.\n"
+            f"Do you want to update it?",
+            default=True,
+        ):
+            return
+        # Update it
+        config["merges"][0] = f"{upstream} {hashes[self.name.lower()]}"
+        self.update_merges_config(config)
+
     def add_pending_pull_request(self, upstream, pull_id):
+        if self.template_version == 2 and self.name.lower() in ("odoo", "enterprise"):
+            ui.exit_msg(
+                "Sorry, adding a pending Pull Request to Odoo repositories is not "
+                "supported. Please add a pending commit instead."
+            )
         conf = self.merges_config()
         odoo_version = get_project_manifest_key("odoo_version")
         pending_mrg_line = f"{upstream} refs/pull/{pull_id}/head"
@@ -226,6 +273,30 @@ class Repo:
         self.update_merges_config(conf)
         return True
 
+    def _get_pending_commit_lines(self, upstream: str, commit_sha: str):
+        """Return the lines to add to the merges file for a given commit."""
+        if self.template_version == 1:
+            return [
+                f'git fetch {upstream} {commit_sha}',
+                f'git am "$(git format-patch -1 {commit_sha} -o ../patches)"',
+            ]
+        # self.template_version == 2
+        if self.name.lower() in ("odoo", "enterprise"):
+            # For Odoo repositories, we store the patch in a subdirectory
+            # This patch will be applied when the image is built.
+            patch_dir = f"../../patches/{self.name}"
+            return [
+                f'git fetch {upstream} {commit_sha}',
+                f'git am "$(git format-patch -1 {commit_sha} -o {patch_dir})"',
+            ]
+        else:
+            # For external repositories, we just cherry-pick the commit,
+            # as we don't need to store the patch file.
+            return [
+                f'git fetch {upstream} {commit_sha}',
+                f'git cherry-pick {commit_sha}',
+            ]
+
     def add_pending_commit(self, upstream, commit_sha, skip_questions=True):
         conf = self.merges_config()
         # TODO search in local git history for full hash
@@ -235,8 +306,9 @@ class Repo:
                 "It's recommended to use fully qualified 40-digit hashes though.\n"
                 "Continue?"
             )
-        fetch_commit_line = f"git fetch {upstream} {commit_sha}"
-        pending_mrg_line = f'git am "$(git format-patch -1 {commit_sha} -o ../patches)"'
+        fetch_commit_line, pending_mrg_line = self._get_pending_commit_lines(
+            upstream, commit_sha
+        )
 
         if pending_mrg_line in conf.get("shell_command_after", {}):
             ui.echo(
@@ -250,24 +322,22 @@ class Repo:
         comment = ""
         if not skip_questions:
             comment = input(
-                "Comment? " "(would appear just above new pending merge, optional):\n"
+                "Comment? (would appear just above new pending merge, optional):\n"
             )
         conf["shell_command_after"].extend([fetch_commit_line, pending_mrg_line])
         # Add a comment in the list of shell commands
-        pos = conf["shell_command_after"].index(fetch_commit_line)
-        conf["shell_command_after"].yaml_set_comment_before_after_key(
-            pos, before=comment, indent=2
-        )
+        if comment:
+            pos = conf["shell_command_after"].index(fetch_commit_line)
+            conf["shell_command_after"].yaml_set_comment_before_after_key(
+                pos, before=comment, indent=2
+            )
         self.update_merges_config(conf)
         ui.echo(f"📋 cherry pick {upstream}/{commit_sha} has been added")
         return True
 
     def remove_pending_commit(self, upstream, commit_sha):
         conf = self.merges_config()
-        lines_to_drop = [
-            f"git fetch {upstream} {commit_sha}",
-            f'git am "$(git format-patch -1 {commit_sha} -o ../patches)"',
-        ]
+        lines_to_drop = self._get_pending_commit_lines(upstream, commit_sha)
         if lines_to_drop[0] not in conf.get(
             "shell_command_after", {}
         ) and lines_to_drop[1] not in conf.get("shell_command_after", {}):
@@ -418,6 +488,9 @@ def add_pending(entity_url, aggregate=True):
     repo = Repo(repo_name, path_check=False)
     if not repo.has_pending_merges():
         repo.generate_pending_merges_file_template(upstream)
+
+    if repo.template_version == 2:
+        repo.update_pending_merges_file_base_merge()
 
     if entity_type == "pull":
         repo.add_pending_pull_request(upstream, entity_id)

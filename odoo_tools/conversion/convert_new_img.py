@@ -135,7 +135,7 @@ to generate the line to add.
 
 
 def main(args=None):
-    if get_conf_key("template_version") == "2":
+    if get_conf_key("template_version") == 2:
         print("Project already migrated")
         return sys.exit(0)
     if args is None:
