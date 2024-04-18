@@ -11,7 +11,6 @@ from odoo_tools.exceptions import PathNotFound
 from odoo_tools.utils import pending_merge as pm_utils
 
 from .common import fake_project_root, mock_pending_merge_repo_paths
-from .fixtures import clear_caches  # noqa
 
 Repo = pm_utils.Repo
 

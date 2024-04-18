@@ -13,7 +13,6 @@ from .common import (
     fake_project_root,
     mock_pending_merge_repo_paths,
 )
-from .fixtures import clear_caches  # noqa
 
 
 def test_make_bumpversion_cmd():
