@@ -8,7 +8,6 @@ from odoo_tools.utils import proj as proj_utils
 from odoo_tools.utils.path import build_path
 
 from .common import compare_line_by_line, fake_project_root, mock_subprocess_run
-from .fixtures import clear_caches  # noqa
 
 
 def test_get_project_manifest_1():

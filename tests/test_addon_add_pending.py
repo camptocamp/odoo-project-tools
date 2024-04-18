@@ -6,7 +6,6 @@ from odoo_tools.utils.pkg import Package
 from odoo_tools.utils.req import get_project_dev_req
 
 from .common import fake_project_root
-from .fixtures import clear_caches  # noqa
 
 # TODO: test w/ aggregate
 

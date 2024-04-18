@@ -14,7 +14,6 @@ from .common import (
     get_fixture,
     mock_subprocess_run,
 )
-from .fixtures import clear_caches  # noqa
 
 
 @mock.patch.dict(os.environ, {"PROJ_TMPL_VER": "2"}, clear=True)
