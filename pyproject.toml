@@ -74,6 +74,10 @@ find = {}
 
 [tool.setuptools_scm]
 
+[tool.pytest.ini_options]
+markers = [
+    "project_setup",
+]
 
 [tool.black]
 line-length = 88

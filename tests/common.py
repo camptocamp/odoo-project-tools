@@ -75,7 +75,7 @@ def make_fake_project_root(
     proj_version="14.0.0.1.0",
     mock_marabunta_file=False,
 ):
-    proj_cfg_data = FAKE_PROJ_CFG_BY_VER[proj_tmpl_ver].copy()
+    proj_cfg_data = FAKE_PROJ_CFG_BY_VER[str(proj_tmpl_ver)].copy()
     proj_cfg_data.update(proj_cfg or {})
     with open(".proj.cfg", "w") as fd:
         content = ["[conf]"]
