@@ -11,6 +11,7 @@ from odoo_tools.utils.req import get_project_dev_req
 # TODO: test w/ aggregate
 
 
+@pytest.mark.usefixtures("all_template_versions")
 @pytest.mark.project_setup(
     manifest=dict(odoo_version="16.0"), proj_version="16.0.0.1.0"
 )
@@ -30,6 +31,7 @@ def test_add_new_pending_no_addons(project):
     assert repo.has_pending_merges()
 
 
+@pytest.mark.usefixtures("all_template_versions")
 @pytest.mark.project_setup(
     manifest=dict(odoo_version="16.0"), proj_version="16.0.0.1.0"
 )
@@ -54,6 +56,7 @@ def test_add_new_pending_with_addon_editable(project):
     assert pkg.is_local()
 
 
+@pytest.mark.usefixtures("all_template_versions")
 @pytest.mark.project_setup(
     manifest=dict(odoo_version="16.0"), proj_version="16.0.0.1.0"
 )
