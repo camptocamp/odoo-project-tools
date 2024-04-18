@@ -46,6 +46,7 @@ FAKE_MANIFEST_DATA = dict(
     platform_name="azure",
 )
 FAKE_PROJ_CFG_V1 = dict(
+    template_version="1",
     company_git_remote="camptocamp",
     odoo_src_rel_path="odoo/src",
     ext_src_rel_path="odoo/external-src",
@@ -55,6 +56,7 @@ FAKE_PROJ_CFG_V1 = dict(
     marabunta_mig_file_rel_path="odoo/migration.yml",
 )
 FAKE_PROJ_CFG_V2 = dict(
+    template_version="2",
     company_git_remote="camptocamp",
     odoo_src_rel_path="src",
     ext_src_rel_path="odoo/dev-src",
@@ -134,7 +136,7 @@ def compare_line_by_line(content, expected, sort=False):
 
 
 PENDING_MERGE_FILE_TMPL = """
-../odoo/external-src/{repo_name}:
+../{ext_src_rel_path}/{repo_name}:
   remotes:
     camptocamp: git@github.com:camptocamp/{repo_name}.git
     OCA: git@github.com:OCA/{repo_name}.git
@@ -159,7 +161,13 @@ def mock_pending_merge_repo_paths(repo_name, src=True, pending=True):
         path = repo.abs_merges_path
         os.makedirs(path.parent, exist_ok=True)
         with open(path, "w") as fd:
-            fd.write(PENDING_MERGE_FILE_TMPL.format(repo_name=repo_name, pid="1234"))
+            fd.write(
+                PENDING_MERGE_FILE_TMPL.format(
+                    ext_src_rel_path=repo.ext_src_rel_path,
+                    repo_name=repo_name,
+                    pid="1234",
+                )
+            )
 
 
 class MockCompletedProcess:

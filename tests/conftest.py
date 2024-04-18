@@ -39,6 +39,32 @@ def project(request, runner):
     return runner
 
 
+@pytest.fixture(
+    params=[
+        pytest.param(1, marks=pytest.mark.project_setup(proj_tmpl_ver=1)),
+        pytest.param(2, marks=pytest.mark.project_setup(proj_tmpl_ver=2)),
+    ],
+    ids=[
+        "proj_tmpl_ver=1",
+        "proj_tmpl_ver=2",
+    ],
+)
+def all_template_versions(project):
+    """Fixture to test all versions
+
+    .. code-block:: python
+
+        @pytest.mark.project_setup(
+            manifest=dict(odoo_version="16.0"),
+            proj_version="16.0.1.1.0",
+        )
+        @pytest.mark.usefixtures("all_template_versions")
+        def test_something(project):
+            pass
+    """
+    return project
+
+
 @pytest.fixture(autouse=True)
 def clear_caches():
     get_project_manifest.cache_clear()
