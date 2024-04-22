@@ -139,18 +139,18 @@ PENDING_MERGE_FILE_TMPL = """
 ../{ext_src_rel_path}/{repo_name}:
   remotes:
     camptocamp: git@github.com:camptocamp/{repo_name}.git
-    OCA: git@github.com:OCA/{repo_name}.git
+    {org_name}: git@github.com:{org_name}/{repo_name}.git
   target: camptocamp merge-branch-{pid}-master
   merges:
-  - OCA 14.0
-  - OCA refs/pull/774/head
-  - OCA refs/pull/773/head
-  - OCA refs/pull/663/head
-  - OCA refs/pull/759/head
+  - {org_name} 14.0
+  - {org_name} refs/pull/774/head
+  - {org_name} refs/pull/773/head
+  - {org_name} refs/pull/663/head
+  - {org_name} refs/pull/759/head
 """
 
 
-def mock_pending_merge_repo_paths(repo_name, src=True, pending=True):
+def mock_pending_merge_repo_paths(repo_name, org_name="OCA", src=True, pending=True):
     """Generate fake paths for given repo."""
     repo = Repo(repo_name, path_check=False)
     if src:
@@ -165,6 +165,7 @@ def mock_pending_merge_repo_paths(repo_name, src=True, pending=True):
                 PENDING_MERGE_FILE_TMPL.format(
                     ext_src_rel_path=repo.ext_src_rel_path,
                     repo_name=repo_name,
+                    org_name=org_name,
                     pid="1234",
                 )
             )
