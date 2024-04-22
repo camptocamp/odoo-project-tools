@@ -3,11 +3,12 @@
 
 import os
 from pathlib import PosixPath
+from unittest import mock
 
 import pytest
 
 from odoo_tools.config import get_conf_key
-from odoo_tools.exceptions import PathNotFound
+from odoo_tools.exceptions import Exit, PathNotFound
 from odoo_tools.utils import pending_merge as pm_utils
 
 from .common import fake_project_root, mock_pending_merge_repo_paths
@@ -148,6 +149,92 @@ def test_add_pending_pr():
     compare_dict(repo.merges_config(), expected)
 
 
+@pytest.mark.usefixtures("project")
+@pytest.mark.project_setup(proj_tmpl_ver=1)
+def test_add_pending_odoo_pr_v1():
+    repo = Repo("odoo", path_check=False)
+    # 1: start with no pending merges, generate the pending merges file
+    assert not repo.has_pending_merges()
+    with mock.patch("odoo_tools.utils.ui.ask_confirmation", return_value=True):
+        repo.generate_pending_merges_file_template("odoo")
+    assert repo.has_pending_merges()
+    compare_dict(
+        repo.merges_config(),
+        {
+            "merges": [
+                "odoo 14.0",
+            ],
+            "remotes": {
+                "camptocamp": "git@github.com:camptocamp/odoo.git",
+                "odoo": "git@github.com:odoo/odoo.git",
+            },
+            "target": "camptocamp merge-branch-1234-master",
+        },
+    )
+    # 2: add a pending merge
+    with mock.patch("odoo_tools.utils.ui.ask_confirmation", return_value=True):
+        repo.add_pending_pull_request("odoo", 778)
+    compare_dict(
+        repo.merges_config(),
+        {
+            "merges": [
+                "odoo 14.0",
+                "odoo refs/pull/778/head",
+            ],
+            "remotes": {
+                "camptocamp": "git@github.com:camptocamp/odoo.git",
+                "odoo": "git@github.com:odoo/odoo.git",
+            },
+            "target": "camptocamp merge-branch-1234-master",
+        },
+    )
+
+
+@pytest.mark.usefixtures("project")
+@pytest.mark.project_setup(proj_tmpl_ver=2)
+def test_add_pending_odoo_pr_v2():
+    repo = Repo("odoo", path_check=False)
+    # 1: start with no pending merges, generate the pending merges file
+    assert not repo.has_pending_merges()
+    with mock.patch(
+        "odoo_tools.utils.pending_merge.get_docker_image_commit_hashes",
+        return_value=("sha-odoo", "sha-enterprise"),
+    ):
+        repo.generate_pending_merges_file_template("odoo")
+    assert repo.has_pending_merges()
+    compare_dict(
+        repo.merges_config(),
+        {
+            "merges": [
+                "odoo sha-odoo",
+            ],
+            "remotes": {
+                "camptocamp": "git@github.com:camptocamp/odoo.git",
+                "odoo": "git@github.com:odoo/odoo.git",
+            },
+            "target": "camptocamp merge-branch-1234-master",
+        },
+    )
+    # attempt to add a pending pr
+    with pytest.raises(Exit) as e:
+        repo.add_pending_pull_request("odoo", 778)
+        assert "Pull Request to Odoo repositories is not supported" in str(e)
+    # it shouldn't have changed the config
+    compare_dict(
+        repo.merges_config(),
+        {
+            "merges": [
+                "odoo sha-odoo",
+            ],
+            "remotes": {
+                "camptocamp": "git@github.com:camptocamp/odoo.git",
+                "odoo": "git@github.com:odoo/odoo.git",
+            },
+            "target": "camptocamp merge-branch-1234-master",
+        },
+    )
+
+
 # TODO: test all cases
 @pytest.mark.usefixtures("all_template_versions")
 def test_remove_pending_pr():
@@ -256,6 +343,63 @@ def test_add_pending_commit_v2():
         ],
     }
     compare_dict(repo.merges_config(), expected)
+
+
+@pytest.mark.usefixtures("project")
+@pytest.mark.project_setup(proj_tmpl_ver=1)
+def test_add_pending_odoo_commit_v1():
+    repo = Repo("odoo", path_check=False)
+    with mock.patch("odoo_tools.utils.ui.ask_confirmation", return_value=True):
+        repo.generate_pending_merges_file_template("odoo")
+    commit_sha = "abcdefg123456789abcdefg123456789abcdefg1"
+    repo.add_pending_commit("odoo", commit_sha)
+    compare_dict(
+        repo.merges_config(),
+        {
+            "merges": [
+                "odoo 14.0",
+            ],
+            "remotes": {
+                "camptocamp": "git@github.com:camptocamp/odoo.git",
+                "odoo": "git@github.com:odoo/odoo.git",
+            },
+            "target": "camptocamp merge-branch-1234-master",
+            "shell_command_after": [
+                f"git fetch odoo {commit_sha}",
+                f"git am \"$(git format-patch -1 {commit_sha} -o ../patches)\"",
+            ],
+        },
+    )
+
+
+@pytest.mark.usefixtures("project")
+@pytest.mark.project_setup(proj_tmpl_ver=2)
+def test_add_pending_odoo_commit_v2():
+    repo = Repo("odoo", path_check=False)
+    with mock.patch(
+        "odoo_tools.utils.pending_merge.get_docker_image_commit_hashes",
+        return_value=("sha-odoo", "sha-enterprise"),
+    ):
+        repo.generate_pending_merges_file_template("odoo")
+    commit_sha = "abcdefg123456789abcdefg123456789abcdefg1"
+    repo.add_pending_commit("odoo", commit_sha)
+    compare_dict(
+        repo.merges_config(),
+        {
+            "merges": [
+                "odoo sha-odoo",
+            ],
+            "remotes": {
+                "camptocamp": "git@github.com:camptocamp/odoo.git",
+                "odoo": "git@github.com:odoo/odoo.git",
+            },
+            "target": "camptocamp merge-branch-1234-master",
+            "shell_command_after": [
+                f"git fetch odoo {commit_sha}",
+                f"git am \"$(git format-patch -1 {commit_sha} -o ../../patches/odoo)\"",
+            ],
+        },
+    )
 
 
 # TODO: test all cases
