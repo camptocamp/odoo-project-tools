@@ -16,7 +16,7 @@ classifiers = [
     "Natural Language :: English",
 ]
 dependencies = [
-    "invoke==2.0.0",
+    "invoke==2.2.0",
     "requests==2.31.0",
     "git-aggregator>=4.0",
     "git-autoshare",
@@ -27,6 +27,7 @@ dependencies = [
     "psycopg2-binary>=2.7.6",
     "gitpython",
     "packaging",
+    "setuptools",
     "pyyaml>6.0.0",
     "ruamel.yaml",
     "kaptan==0.6.0",
