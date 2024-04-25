@@ -37,9 +37,7 @@ dependencies = [
     "towncrier",
     "importlib_resources; python_version < '3.9'",
     "bump2version",
-    # Include fix for parsing editable requirements
-    # https://github.com/madpah/requirements-parser/pull/85
-    "requirements-parser @ https://github.com/simahawk/requirements-parser/archive/refs/heads/fix-editable.tar.gz",
+    "requirements-parser>=0.8.0",
     ]
 requires-python = ">=3.8"
 dynamic = ["version"]
