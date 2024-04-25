@@ -13,6 +13,10 @@ class ProjectRootFolderNotFound(Exception):
     pass
 
 
+class ProjectConfigException(Exception):
+    pass
+
+
 class Exit(_Exit):
     exit_code = 1
 
