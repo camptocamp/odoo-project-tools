@@ -179,18 +179,6 @@ class Repo:
         return "git@github.com:{}/{}.git".format(namespace, repo_name)
 
 
-def check_pending_merge_version():
-    # First of all, check if there's a migration file at the old path
-    if os.path.exists("odoo/pending-merges.yaml"):
-        # notify ppl that this file was moved, then terminate execution
-        exit_msg(
-            "##############################################################\n"
-            "Found file `odoo/pending-merges.yaml`.\n"
-            "Please run `invoke deprecate.split-pending-merges` task first.\n"
-            "##############################################################\n"
-        )
-
-
 def get_target_branch(ctx, target_branch=None):
     """Gets the branch to push on and checks if we're overriding something.
 
@@ -326,7 +314,6 @@ def merges(ctx, submodule_path, push=True, target_branch=None):
     to run `sync_remote` manually.
     """
 
-    check_pending_merge_version()
     repo = Repo(submodule_path)
 
     target_branch = get_target_branch(ctx, target_branch=target_branch)
@@ -353,7 +340,6 @@ def push(ctx, submodule_path, target_branch=None):
     Pushes the current state of your submodule to the target remote and branch
     either given by you or specified in pending-merges.yml
     """
-    check_pending_merge_version()
     repo = Repo(submodule_path)
     target_branch = get_target_branch(ctx, target_branch=target_branch)
     print("Pushing to camptocamp/{}".format(target_branch))
@@ -395,7 +381,6 @@ def show_prs(ctx, submodule_path=None, state=None, purge=None):
     """
     if purge:
         assert purge in ("closed", "merged")
-    check_pending_merge_version()
     logging.getLogger("requests").setLevel(logging.ERROR)
     if submodule_path is None:
         repositories = Repo.repositories_from_pending_folder()
@@ -564,7 +549,6 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
     Mainly used as a post-execution step for add/remove-pending-merge but it's
     possible to call it directly from the command line.
     """
-    check_pending_merge_version()
     assert submodule_path or repo
     repo = repo or Repo(submodule_path)
 
@@ -812,7 +796,6 @@ def add_pending_commit(repo, conf, upstream, commit_sha):
 @task
 def add_pending(ctx, entity_url):
     """Add a pending merge using given entity link"""
-    check_pending_merge_version()
     # pattern, given an https://github.com/<user>/<repo>/pull/<pr-index>
     # # PR headline
     # # PR link as is
@@ -877,7 +860,6 @@ def remove_pending_pull(repo, conf, upstream, pull_id):
 def remove_pending(ctx, entity_url):
     """Remove a pending merge using given entity link"""
 
-    check_pending_merge_version()
     parts = parse_github_url(entity_url)
 
     upstream = parts.get("upstream")
