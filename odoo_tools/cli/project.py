@@ -5,7 +5,7 @@ import os
 
 import click
 
-from ..config import PROJ_CFG_FILE, get_conf_key
+from ..config import PROJ_CFG_FILE, load_config
 from ..utils import ui
 from ..utils.misc import SmartDict, copy_file, get_template_path
 from ..utils.os_exec import run
@@ -23,9 +23,10 @@ def get_proj_tmpl_ver():
 def get_bumpversion_vars(opts):
     version = opts.version or get_current_version()
     odoo_major, odoo_minor, __ = version.split(".", 2)
+    config = load_config()
     res = {
-        "rel_path_local_addons": get_conf_key("local_src_rel_path").as_posix(),
-        "rel_path_version_file": get_conf_key("version_file_rel_path").as_posix(),
+        "rel_path_local_addons": config.local_src_rel_path.as_posix(),
+        "rel_path_version_file": config.version_file_rel_path.as_posix(),
         "bundle_addon_name": "{}_bundle".format(
             get_project_manifest_key("customer_shortname")
         ),
