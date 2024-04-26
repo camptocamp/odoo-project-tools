@@ -4,7 +4,7 @@
 import os
 from unittest import mock
 
-from odoo_tools.cli.project import init, local_odoo
+from odoo_tools.cli.project import checkout_local_odoo, init
 from odoo_tools.config import get_conf_key
 from odoo_tools.utils.path import build_path
 
@@ -100,7 +100,7 @@ def test_init_custom_version():
         assert result.exit_code == 0
 
 
-def test_local_odoo():
+def test_checkout_local_odoo():
     with fake_project_root(proj_tmpl_ver="2", proj_version="16.0.1.1.0") as runner:
         odoo_src_path = str(build_path(get_conf_key("odoo_src_rel_path")))
         odoo_enterprise_path = str(os.path.join(odoo_src_path, "..", "enterprise"))
@@ -158,7 +158,7 @@ def test_local_odoo():
         )
         with mock.patch("subprocess.run", mock_fn):
             runner.invoke(
-                local_odoo,
+                checkout_local_odoo,
                 ["--odoo-hash", "12345", "--enterprise-hash", "56789"],
                 catch_exceptions=False,
             )
@@ -252,7 +252,7 @@ def test_local_odoo_venv():
         )
         with mock.patch("subprocess.run", mock_fn):
             runner.invoke(
-                local_odoo,
+                checkout_local_odoo,
                 [
                     "--odoo-hash",
                     "12345",

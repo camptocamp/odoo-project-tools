@@ -5,7 +5,6 @@ import os
 
 import click
 
-
 from ..config import PROJ_CFG_FILE, get_conf_key, load_config
 from ..utils import git, ui
 from ..utils.misc import (
@@ -143,7 +142,9 @@ def init(**kw):
     default=".venv",
     help="Directory to use for the virtualenv",
 )
-def local_odoo(odoo_hash=None, enterprise_hash=None, venv=False, venv_path=".venv"):
+def checkout_local_odoo(
+    odoo_hash=None, enterprise_hash=None, venv=False, venv_path=".venv"
+):
     """checkout odoo core and odoo enterprise in the working directory
 
     This can be used to test odoo core/enterprise patches inside docker (the tool will suggest how to change your
