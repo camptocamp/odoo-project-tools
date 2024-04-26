@@ -16,7 +16,7 @@ classifiers = [
     "Natural Language :: English",
 ]
 dependencies = [
-    "invoke==2.0.0",
+    "invoke==2.2.0",
     "requests==2.31.0",
     "git-aggregator>=4.0",
     "git-autoshare",
