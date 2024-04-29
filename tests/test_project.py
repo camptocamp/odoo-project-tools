@@ -7,14 +7,10 @@ from unittest import mock
 import pytest
 
 from odoo_tools.cli.project import checkout_local_odoo, init
-from odoo_tools.config import get_conf_key
+from odoo_tools.config import load_config
 from odoo_tools.utils.path import build_path
 
-from .common import (
-    compare_line_by_line,
-    get_fixture,
-    mock_subprocess_run,
-)
+from .common import compare_line_by_line, get_fixture, mock_subprocess_run
 
 
 @pytest.mark.parametrize(
@@ -68,6 +64,7 @@ def test_init_proj_conf_already_existing(project):
         assert content == expected
     assert result.exit_code == 0
 
+
 @pytest.mark.project_setup(proj_tmpl_ver=2)
 def test_init_custom_version(project):
     result = project.invoke(
@@ -89,8 +86,8 @@ def test_init_custom_version(project):
 @pytest.mark.usefixtures("project")
 @pytest.mark.project_setup(proj_tmpl_ver=2, proj_version="16.0.1.1.0")
 def test_checkout_local_odoo(runner):
-    odoo_src_path = str(build_path(get_conf_key("odoo_src_rel_path")))
-    odoo_enterprise_path = str(os.path.join(odoo_src_path, "..", "enterprise"))
+    config = load_config()
+    odoo_src_path = build_path(config.odoo_src_rel_path)
     mock_fn = mock_subprocess_run(
         [
             {
@@ -101,7 +98,7 @@ def test_checkout_local_odoo(runner):
                     "--branch",
                     "16.0",
                     "git@github.com:odoo/odoo",
-                    odoo_src_path,
+                    str(odoo_src_path / "odoo"),
                 ],
                 # "sim_call": sim_touch,
                 # "sim_call_args": ["foo"],
@@ -110,7 +107,7 @@ def test_checkout_local_odoo(runner):
                 "args": [
                     "git",
                     "-C",
-                    odoo_src_path,
+                    str(odoo_src_path / "odoo"),
                     "checkout",
                     "12345",
                 ],
@@ -125,7 +122,7 @@ def test_checkout_local_odoo(runner):
                     "--branch",
                     "16.0",
                     "git@github.com:odoo/enterprise",
-                    odoo_enterprise_path,
+                    str(odoo_src_path / "enterprise"),
                 ],
                 # "sim_call": sim_touch,
                 # "sim_call_args": ["foo"],
@@ -134,7 +131,7 @@ def test_checkout_local_odoo(runner):
                 "args": [
                     "git",
                     "-C",
-                    odoo_enterprise_path,
+                    str(odoo_src_path / "enterprise"),
                     "checkout",
                     "56789",
                 ],
@@ -154,8 +151,8 @@ def test_checkout_local_odoo(runner):
 @pytest.mark.usefixtures("project")
 @pytest.mark.project_setup(proj_tmpl_ver=2, proj_version="16.0.1.1.0")
 def test_local_odoo_venv(runner):
-    odoo_src_path = str(build_path(get_conf_key("odoo_src_rel_path")))
-    odoo_enterprise_path = str(os.path.join(odoo_src_path, "..", "enterprise"))
+    config = load_config()
+    odoo_src_path = build_path(config.odoo_src_rel_path)
     config_file = build_path("odoo.cfg")
 
     def create_config():
@@ -172,7 +169,7 @@ def test_local_odoo_venv(runner):
                     "--branch",
                     "16.0",
                     "git@github.com:odoo/odoo",
-                    odoo_src_path,
+                    str(odoo_src_path / "odoo"),
                 ],
                 # "sim_call": sim_touch,
                 # "sim_call_args": ["foo"],
@@ -181,7 +178,7 @@ def test_local_odoo_venv(runner):
                 "args": [
                     "git",
                     "-C",
-                    odoo_src_path,
+                    str(odoo_src_path / "odoo"),
                     "checkout",
                     "12345",
                 ],
@@ -196,7 +193,7 @@ def test_local_odoo_venv(runner):
                     "--branch",
                     "16.0",
                     "git@github.com:odoo/enterprise",
-                    odoo_enterprise_path,
+                    str(odoo_src_path / "enterprise"),
                 ],
                 # "sim_call": sim_touch,
                 # "sim_call_args": ["foo"],
@@ -205,7 +202,7 @@ def test_local_odoo_venv(runner):
                 "args": [
                     "git",
                     "-C",
-                    odoo_enterprise_path,
+                    str(odoo_src_path / "enterprise"),
                     "checkout",
                     "56789",
                 ],

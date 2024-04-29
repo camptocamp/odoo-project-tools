@@ -5,7 +5,7 @@ import os
 
 import click
 
-from ..config import PROJ_CFG_FILE, get_conf_key, load_config
+from ..config import PROJ_CFG_FILE, load_config
 from ..utils import git, ui
 from ..utils.misc import (
     SmartDict,
@@ -155,31 +155,32 @@ def checkout_local_odoo(
     virtual environment in the directory with the required tools installed to run Odoo locally (you will still need
     docker to get the correct versions of the source code, unless you pass the hashes on the command line).
     """
-    version = get_current_version(serie_only=True)
-    odoo_src_path = get_conf_key("odoo_src_rel_path")
-    if get_conf_key("template_version") == 1:
+    config = load_config()
+    if config.template_version == 1:
         ui.exit_msg("This command is not support on this project version;")
-    odoo_enterprise_path = os.path.join(odoo_src_path, "..", "enterprise")
+    version = get_current_version(serie_only=True)
     branch = f"{version}.0"
+    odoo_src_dest = config.odoo_src_rel_path / "odoo"
+    enterprise_src_dest = config.odoo_src_rel_path / "enterprise"
     if odoo_hash is None or enterprise_hash is None:
         image_odoo_hash, image_enterprise_hash = get_docker_image_commit_hashes()
         odoo_hash = odoo_hash or image_odoo_hash
         enterprise_hash = enterprise_hash or image_enterprise_hash
     if odoo_hash:
-        git.get_odoo_core(odoo_hash, dest=odoo_src_path, branch=branch)
+        git.get_odoo_core(odoo_hash, dest=odoo_src_dest, branch=branch)
     else:
         ui.exit_msg("Unable to find the commit hash of odoo core")
 
     if enterprise_hash:
         git.get_odoo_enterprise(
-            enterprise_hash, dest=odoo_enterprise_path, branch=branch
+            enterprise_hash, dest=enterprise_src_dest, branch=branch
         )
     else:
         ui.exit_msg("Unable to find the commit hash of odoo enterprise")
 
     if venv:
         setup_venv(venv_path)
-        generate_odoo_config_file(venv_path, odoo_src_path, odoo_enterprise_path)
+        generate_odoo_config_file(venv_path, odoo_src_dest, enterprise_src_dest)
         ui.echo("\nOdoo is now installed and available in `{venv}/bin/odoo`")
     else:
         ui.echo(
