@@ -60,7 +60,7 @@ def get_docker_image_commit_hashes():
     variables = {}
     for line in process.stdout.splitlines():
         try:
-            name, value = line.strip().split('=', maxsplit=1)
+            name, value = line.strip().split("=", maxsplit=1)
         except ValueError:
             # not formatted as an environment variable, we can ignore
             continue

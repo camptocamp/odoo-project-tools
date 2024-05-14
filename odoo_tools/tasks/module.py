@@ -39,7 +39,7 @@ class Module:
         # use root_path to get root project directory
         if self.name == "base":
             return "odoo/src/odoo/addons"
-        raise Exception("module {} not found".format(self.name))
+        raise Exception(f"module {self.name} not found")
 
     @property
     def path(self):

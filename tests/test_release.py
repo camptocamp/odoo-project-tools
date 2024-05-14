@@ -174,12 +174,12 @@ def test_bump_push_repo_with_pending_merge():
             "Running: towncrier build --yes --version=14.0.0.2.0",
             "Updating marabunta migration file",
             "Push local branches? [y/N]: y",
-            'Pushing odoo/external-src/edi-framework',
-            'Impacted repos:',
-            'odoo/external-src/edi-framework',
+            "Pushing odoo/external-src/edi-framework",
+            "Impacted repos:",
+            "odoo/external-src/edi-framework",
         ]
         assert ran_cmd == [
-            'git config remote.camptocamp.url',
-            'git push -f -v camptocamp HEAD:refs/heads/merge-branch-1234-14.0.0.2.0',
+            "git config remote.camptocamp.url",
+            "git push -f -v camptocamp HEAD:refs/heads/merge-branch-1234-14.0.0.2.0",
         ]
         assert result.exit_code == 0

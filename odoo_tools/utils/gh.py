@@ -30,13 +30,13 @@ def parse_github_url(entity_spec):
             upstream, repo_name, entity_type, entity_id = entity_spec.split("/")[3:7]
         except ValueError:
             msg = (
-                "Could not parse: {}.\n"
+                f"Could not parse: {entity_spec}.\n"
                 "Accept formats are either:\n"
                 "* Full PR URL: https://github.com/user/repo/pull/1234/files#diff-deadbeef\n"
                 "* Short PR ref: user/repo#pull-request-id"
                 "* Cherry-pick URL: https://github.com/user/repo/[tree]/<commit SHA>"
-            ).format(entity_spec)
-            raise ValueError(msg)
+            )
+            raise ValueError(msg) from None
 
     # force uppercase in OCA upstream name:
     # otherwise `oca` and `OCA` are treated as different namespaces
@@ -57,7 +57,7 @@ def get_current_rebase_branch():
     for rebase_file in ("rebase-merge", "rebase-apply"):
         # in case of rebase, the ref of the branch is in one of these
         # directories, in a file named "head-name"
-        path = run("git rev-parse --git-path {}".format(rebase_file))
+        path = run(f"git rev-parse --git-path {rebase_file}")
         if os.path.exists(path):
             with open(os.path.join(path, "head-name")) as rf:
                 current_branch = rf.read().strip().replace("refs/heads/", "")
@@ -86,15 +86,11 @@ def get_target_branch(target_branch=None):
     project_id = get_project_manifest_key("project_id")
     if not target_branch:
         commit = run("git rev-parse HEAD")[:8]
-        target_branch = "merge-branch-{}-{}-{}".format(
-            project_id, current_branch, commit
-        )
+        target_branch = f"merge-branch-{project_id}-{current_branch}-{commit}"
     if current_branch == "master" or re.match(r"\d{1,2}.\d", target_branch):
         ui.ask_or_abort(
-            "You are on branch {}."
-            " Please confirm override of target branch {}".format(
-                current_branch, target_branch
-            )
+            f"You are on branch {current_branch}."
+            f" Please confirm override of target branch {target_branch}"
         )
     return target_branch
 

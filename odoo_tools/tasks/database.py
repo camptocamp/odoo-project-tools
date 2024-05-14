@@ -80,10 +80,7 @@ def execute_db_request(ctx, dbname, sql):
     result = False
     with ensure_db_container_up(ctx):
         db_port = get_db_container_port(ctx)
-        dsn = "host=localhost dbname=%s " "user=odoo password=odoo port=%s" % (
-            dbname,
-            db_port,
-        )
+        dsn = f"host=localhost dbname={dbname} user=odoo password=odoo port={db_port}"
         # Connect and list DBs
         with psycopg2.connect(dsn) as db_connection:
             with db_connection.cursor() as db_cursor:
@@ -96,10 +93,7 @@ def get_db_request_result(ctx, dbname, sql):
     result = False
     with ensure_db_container_up(ctx):
         db_port = get_db_container_port(ctx)
-        dsn = "host=localhost dbname=%s " "user=odoo password=odoo port=%s" % (
-            dbname,
-            db_port,
-        )
+        dsn = f"host=localhost dbname={dbname} user=odoo password=odoo port={db_port}"
         # Connect and list DBs
         with psycopg2.connect(dsn) as db_connection:
             with db_connection.cursor() as db_cursor:
@@ -194,9 +188,7 @@ def download_dump(ctx, platform="", customer="", env="int", dump_name="", dumpdi
             dump_name or _get_list_of_dumps(ctx, p_platform, p_customer, env)[-1]
         )  # get the last
     except IndexError:
-        ui.exit_msg(
-            "Dump not found for {} on {} {}".format(p_customer, p_platform, env)
-        )
+        ui.exit_msg(f"Dump not found for {p_customer} on {p_platform} {env}")
 
     # gpg_fname is like fighting_snail_1024[...].pg.gpg
     gpg_fname = os.path.basename(database_name)
@@ -205,12 +197,12 @@ def download_dump(ctx, platform="", customer="", env="int", dump_name="", dumpdi
     make_dir(dumpdir)
     with cd(dumpdir):
         if not os.path.isfile(fname):
-            print("Azure Downloading dump...{}".format(database_name))
-            print("From: {} {} of {}".format(p_platform, env, p_customer))
-            print("to: {}".format(os.getcwd()))
+            print(f"Azure Downloading dump...{database_name}")
+            print(f"From: {p_platform} {env} of {p_customer}")
+            print(f"to: {os.getcwd()}")
             _download_from_azure(ctx, p_platform, p_customer, env, database_name)
         else:
-            print("A file named {} already exists, skipping download.".format(fname))
+            print(f"A file named {fname} already exists, skipping download.")
     return fname
 
 
@@ -229,13 +221,11 @@ def generate_dump(ctx, platform="", customer="", env="int"):
     p_platform = platform if platform else ctx_platform
     p_customer = customer if customer else ctx_customer
     generate = ctx.run(
-        "celebrimbor_cli -p {} dump -c {} -e {} -r".format(p_platform, p_customer, env),
+        f"celebrimbor_cli -p {p_platform} dump -c {p_customer} -e {env} -r",
         hide=True,
     )
     dump_name = eval(generate.stdout)["name"]
-    print(
-        "{} is generated for {} on {} {}".format(dump_name, p_customer, p_platform, env)
-    )
+    print(f"{dump_name} is generated for {p_customer} on {p_platform} {env}")
     return dump_name
 
 
@@ -256,15 +246,9 @@ def upload_dump(ctx, db_path, platform="", customer="", env="int"):
     p_customer = customer if customer else ctx_customer
     dump_file_path = expand_path(db_path)
     ctx.run(
-        "celebrimbor_cli -p {} dump -c {} -e {} -i {}".format(
-            p_platform, p_customer, env, dump_file_path
-        )
+        f"celebrimbor_cli -p {p_platform} dump -c {p_customer} -e {env} -i {dump_file_path}"
     )
-    print(
-        "{} is uploaded for {} on {} {}".format(
-            dump_file_path, p_customer, p_platform, env
-        )
-    )
+    print(f"{dump_file_path} is uploaded for {p_customer} on {p_platform} {env}")
 
 
 @task(name="restore-from-prod")
@@ -281,15 +265,9 @@ def restore_from_prod(ctx, platform="", customer="", env="int"):
     p_platform = platform if platform else ctx_platform
     p_customer = customer if customer else ctx_customer
     ctx.run(
-        "celebrimbor_cli -p {} restore -c {} -e {} --from-prod".format(
-            p_platform, p_customer, env
-        )
+        f"celebrimbor_cli -p {p_platform} restore -c {p_customer} -e {env} --from-prod"
     )
-    print(
-        "Replica from prod is restored for {} on {} {}".format(
-            p_customer, p_platform, env
-        )
-    )
+    print(f"Replica from prod is restored for {p_customer} on {p_platform} {env}")
 
 
 @task(name="azure-restore-dump")
@@ -307,13 +285,9 @@ def azure_restore_dump(ctx, dump_name, platform="", customer="", env="int"):
     p_platform = platform if platform else ctx_platform
     p_customer = customer if customer else ctx_customer
     ctx.run(
-        "celebrimbor_cli -p {} restore -c {} -e {} -n {}".format(
-            p_platform, p_customer, env, dump_name
-        )
+        f"celebrimbor_cli -p {p_platform} restore -c {p_customer} -e {env} -n {dump_name}"
     )
-    print(
-        "{} is restored for {} on {} {}".format(dump_name, p_customer, p_platform, env)
-    )
+    print(f"{dump_name} is restored for {p_customer} on {p_platform} {env}")
 
 
 @task(name="restore-dump")
@@ -329,17 +303,11 @@ def restore_dump(ctx, dump_path, db_name="", hide_traceback=True):
         # ie: polished_morning_3582-20181114-031713
         db_name = os.path.splitext(os.path.basename(dump_path))[0]
     # rely on PG error if database already exists
-    ctx.run(
-        "docker-compose run --rm odoo createdb -O odoo {db_name}".format(
-            db_name=db_name
-        )
-    )
+    ctx.run(f"docker-compose run --rm odoo createdb -O odoo {db_name}")
     print("Restoring", dump_path, "on", db_name)
     ctx.run(
         "docker-compose run --rm odoo pg_restore -O "
-        "-d {db_name} < {dump_path}".format(
-            db_name=db_name, dump_path=expand_path(dump_path)
-        ),
+        f"-d {db_name} < {expand_path(dump_path)}",
         hide=hide_traceback,
     )
     print("Dump successfully restored on", db_name)
@@ -347,8 +315,8 @@ def restore_dump(ctx, dump_path, db_name="", hide_traceback=True):
         # print shortcut to run this new db
         print("You can Odoo on this DB:")
         print(
-            "docker-compose run --rm -e DB_NAME={} "
-            "-p 8069:8069 odoo odoo --workers=0".format(db_name)
+            f"docker-compose run --rm -e DB_NAME={db_name} "
+            "-p 8069:8069 odoo odoo --workers=0"
         )
 
 
@@ -397,11 +365,9 @@ def local_dump(ctx, db_name="odoodb", path="."):
         dump_name = "{}_{}-{}.pg".format(
             username, project_name, datetime.now().strftime("%Y%m%d-%H%M%S")
         )
-        dump_file_path = "{}/{}".format(path, dump_name)
+        dump_file_path = f"{path}/{dump_name}"
         ctx.run(
-            "pg_dump -h localhost -p {} --format=c -U odoo --file {} {}".format(
-                db_port, dump_file_path, db_name
-            ),
+            f"pg_dump -h localhost -p {db_port} --format=c -U odoo --file {dump_file_path} {db_name}",
             hide=True,
         )
         print("Dump successfully generated at %s" % dump_file_path)
@@ -449,9 +415,7 @@ def _download_from_azure(ctx, platform, customer, env, dump_name):
     :param dump_name: dump name, you can get from task=list-of-dumps or task=generate-dump
     """
     ctx.run(
-        "celebrimbor_cli -p {} download -c {} -e {} --name {}".format(
-            platform, customer, env, dump_name
-        )
+        f"celebrimbor_cli -p {platform} download -c {customer} -e {env} --name {dump_name}"
     )
 
 
@@ -465,7 +429,7 @@ def _get_list_of_dumps(ctx, platform, customer, env):
     """
     res = []
     result_of_azure_call = ctx.run(
-        "celebrimbor_cli -p {} list -c {} -e {} -r".format(platform, customer, env),
+        f"celebrimbor_cli -p {platform} list -c {customer} -e {env} -r",
         hide=True,
     )
     result_of_azure_call = eval(result_of_azure_call.stdout)

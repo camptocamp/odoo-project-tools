@@ -34,7 +34,7 @@ The package brings the following commands:
 
 `otools-release`: bump releases
 
-`otools-tasks`: access to the "old" invoke tasks, being rewritten. 
+`otools-tasks`: access to the "old" invoke tasks, being rewritten.
 
 
 Use `--help` to get the list of subcommands.
@@ -96,8 +96,8 @@ Go to the root of your project and follow the steps below:
     further manual steps are required, and what you need to check for. These
     steps will also be saved to a file (see step 8 below).
 
-    Be careful, if you need to redo these steps, the submodules will have 
-    been removed by the script, you will need to run `git submodule update -i` again. 
+    Be careful, if you need to redo these steps, the submodules will have
+    been removed by the script, you will need to run `git submodule update -i` again.
 
 7. Install pre-commit and run it on all files
 
@@ -113,5 +113,5 @@ Go to the root of your project and follow the steps below:
     git add .
     git commit -m "Convert to proj v2"
     ```
- 
+
 9. Follow the steps in the generated `V2_MIG_NEXT_STEPS.todo` file

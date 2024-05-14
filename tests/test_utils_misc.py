@@ -31,4 +31,4 @@ def test_get_docker_image_commit_hashes():
     )
     with patch("subprocess.run", mock_fn):
         res = misc_utils.get_docker_image_commit_hashes()
-        assert res == ('12345', '56789')
+        assert res == ("12345", "56789")

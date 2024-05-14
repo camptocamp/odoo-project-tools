@@ -172,7 +172,7 @@ def test_local_odoo_venv():
 
         def create_config():
             with open(config_file, "w") as fobj:
-                fobj.write('db_name=testdb\n')
+                fobj.write("db_name=testdb\n")
 
         mock_fn = mock_subprocess_run(
             [
@@ -225,24 +225,24 @@ def test_local_odoo_venv():
                     # "sim_call_args": ["foo"],
                 },
                 {
-                    "args": lambda a: str(a[0]).endswith('python')
+                    "args": lambda a: str(a[0]).endswith("python")
                     and a[2] == "ensurepip",
                 },
                 {
-                    "args": lambda a: str(a[0]).endswith('pip')
+                    "args": lambda a: str(a[0]).endswith("pip")
                     and str(a[3]).endswith("odoo/src/requirements.txt"),
                 },
                 {
-                    "args": lambda a: str(a[0]).endswith('pip')
+                    "args": lambda a: str(a[0]).endswith("pip")
                     and a[1:] == ["install", "-r", "local-requirements.txt"]
                 },
                 {
-                    "args": lambda a: str(a[0]).endswith('pip')
+                    "args": lambda a: str(a[0]).endswith("pip")
                     and str(a[3]).endswith("/requirements.txt")
                 },
                 {
-                    "args": lambda a: str(a[0]).endswith('pip')
-                    and a[1:] == ['install', '-e', '.']
+                    "args": lambda a: str(a[0]).endswith("pip")
+                    and a[1:] == ["install", "-e", "."]
                 },
                 {
                     "args": None,
@@ -258,7 +258,7 @@ def test_local_odoo_venv():
                     "12345",
                     "--enterprise-hash",
                     "56789",
-                    '--venv',
+                    "--venv",
                 ],
                 catch_exceptions=False,
             )

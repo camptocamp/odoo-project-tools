@@ -7,10 +7,10 @@ from odoo_tools.utils import gh as gh_utils
 def test_parse_github_url():
     url = "https://github.com/OCA/edi/pull/731"
     expected = {
-        'upstream': 'OCA',
-        'repo_name': 'edi',
-        'entity_type': 'pull',
-        'entity_id': '731',
+        "upstream": "OCA",
+        "repo_name": "edi",
+        "entity_type": "pull",
+        "entity_id": "731",
     }
     res = gh_utils.parse_github_url(url)
     for k, v in expected.items():

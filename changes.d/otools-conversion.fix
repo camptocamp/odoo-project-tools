@@ -1,1 +1,1 @@
-otools-conversion: fix an issue preventing more than 1 addon in a given external-src subdirectory from being added to the requirements of the project. 
+otools-conversion: fix an issue preventing more than 1 addon in a given external-src subdirectory from being added to the requirements of the project.

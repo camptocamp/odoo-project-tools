@@ -1,6 +1,4 @@
-otools-addon add: filter by odoo serie    
+otools-addon add: filter by odoo serie
 Without the patch, adding or upgrading an odoo addon would always get
 the latest version, which could result in adding an addon meant for odoo
 17 on a project using odoo 15.
-
-

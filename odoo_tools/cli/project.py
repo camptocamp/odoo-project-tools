@@ -183,7 +183,7 @@ def checkout_local_odoo(
         ui.echo("\nOdoo is now installed and available in `{venv}/bin/odoo`")
     else:
         ui.echo(
-            '\nYou can add the following lines to docker-compose.override.yml, in the odoo service section:'
+            "\nYou can add the following lines to docker-compose.override.yml, in the odoo service section:"
         )
         ui.echo(
             """
@@ -201,5 +201,5 @@ docker-compose run --rm odoo pip install --user -e /odoo/src/odoo
         )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()

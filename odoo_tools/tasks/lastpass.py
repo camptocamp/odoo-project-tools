@@ -23,7 +23,7 @@ LastpassEntry = namedtuple("LastpassEntry", "location name username comment")
 
 
 def make_lp_entry(env, shortname, name, username="", location="", comment=""):
-    name = "[odoo-{}] {}".format(env, shortname)
+    name = f"[odoo-{env}] {shortname}"
     return LastpassEntry(
         location=location, name=name, username=username, comment=comment
     )
@@ -38,8 +38,8 @@ def put_lp_pwd(project, lp_entry, password):
         )
         ui.exit_msg(msg)
         return
-    project_folder = "{}{}/".format(SHARED_C2C_FOLDER_PREFIX, project)
-    entry_name = "{}{}\n".format(project_folder, lp_entry.name)
+    project_folder = f"{SHARED_C2C_FOLDER_PREFIX}{project}/"
+    entry_name = f"{project_folder}{lp_entry.name}\n"
     # Synchronize with LPass server, in order to catch permission issues
     command = ["lpass", "add", "--non-interactive", "--sync=now", entry_name]
     p = Popen(command, stdout=PIPE, stdin=PIPE, stderr=PIPE)
@@ -49,28 +49,26 @@ def put_lp_pwd(project, lp_entry, password):
 
 
 def format_lastpass_entry(project, lp_entry, password, for_cli=False):
-    project_folder = "{}{}/".format(SHARED_C2C_FOLDER_PREFIX, project)
+    project_folder = f"{SHARED_C2C_FOLDER_PREFIX}{project}/"
     # this is the format expected by the lastpass CLI,
     # do not change
-    entry = ("URL: {}\nUsername: {}\nPassword: {}\nNotes:\n{}\n").format(
-        lp_entry.location, lp_entry.username, password, lp_entry.comment
-    )
+    entry = f"URL: {lp_entry.location}\nUsername: {lp_entry.username}\nPassword: {password}\nNotes:\n{lp_entry.comment}\n"
     if for_cli:
-        entry = "Name: {}{}\n".format(project_folder, lp_entry.name) + entry
+        entry = f"Name: {project_folder}{lp_entry.name}\n" + entry
     else:
-        entry = "Folder: {}\nName: {}\n".format(project_folder, lp_entry.name) + entry
+        entry = f"Folder: {project_folder}\nName: {lp_entry.name}\n" + entry
     return entry
 
 
 def gen_password(pass_len=40):
     pwd = "".join(random.choices(string.ascii_letters, None, k=pass_len))
-    print("\nAdmin password:\n{}\n".format(pwd))
+    print(f"\nAdmin password:\n{pwd}\n")
     return pwd
 
 
 def encrypt_password(pwd):
     pwd_encrypted = CryptContext(["pbkdf2_sha512"]).encrypt(pwd)
-    print("Encrypted admin password :\n{}\n".format(pwd_encrypted))
+    print(f"Encrypted admin password :\n{pwd_encrypted}\n")
     return pwd_encrypted
 
 
@@ -94,7 +92,7 @@ def send_pwd_to_lp(pwd, username="admin"):
         ("prod", ODOO_PROJECT_URL.format(name)),
         ("integration", ODOO_PROJECT_URL.format("integration." + name)),
     ]
-    comment = "Created automatically on {:%d.%m.%Y}".format(date.today())
+    comment = f"Created automatically on {date.today():%d.%m.%Y}"
     for env, location in locations:
         entry = make_lp_entry(env, shortname, name, username, location, comment)
         formatted = format_lastpass_entry(project_name, entry, pwd, for_cli=True)
@@ -106,7 +104,7 @@ def send_pwd_to_lp(pwd, username="admin"):
                 "\n  ",
                 "** ERROR during the storing in LastPass, "
                 "please create the entry "
-                "manually. **\n{}\n{}".format(out, err),
+                f"manually. **\n{out}\n{err}",
             )
             return
         print(

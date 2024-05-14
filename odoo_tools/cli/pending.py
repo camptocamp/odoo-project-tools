@@ -24,7 +24,7 @@ def cli():
     "--purge",
     "purge",
     help="remove the pull request in a state matching the value if the option from the git-aggregator file",
-    type=click.Choice(['closed', 'merged'], case_sensitive=False),
+    type=click.Choice(["closed", "merged"], case_sensitive=False),
 )
 def show_pending(repo_path, state=None, purge=None):
     """List pull requests on <repo_path>"""

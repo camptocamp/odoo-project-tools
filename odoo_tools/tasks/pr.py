@@ -33,7 +33,7 @@ def test(
     created database template
     """
     _check_arguments(get_local_db, get_remote_db, template_db, create_template)
-    docker_yml_name = "docker-compose.override-{}.yml".format(pr_link)
+    docker_yml_name = f"docker-compose.override-{pr_link}.yml"
     if not keep_alive:
         restart(ctx)
     handle_git_repository(ctx, pr_link, base_branch)
@@ -47,11 +47,10 @@ def test(
         download_dump(ctx, get_remote_db)
     elif get_local_db:
         fname = get_local_db
-    else:
-        if ui.ask_confirmation(
-            "No --get-local-db/--get-remote-db parameter specified - build database from scratch?"
-        ):
-            _create_db(ctx, "odoodb-{}".format(pr_link))
+    elif ui.ask_confirmation(
+        "No --get-local-db/--get-remote-db parameter specified - build database from scratch?"
+    ):
+        _create_db(ctx, f"odoodb-{pr_link}")
     if fname:
         database_dump = _load_database(ctx, pr_link, fname)
 
@@ -63,7 +62,7 @@ def test(
 
     print("Starting container")
     print("Database migration started you can reach database on port 8069")
-    ctx.run("docker-compose -f docker-compose.yml -f {} up".format(docker_yml_name))
+    ctx.run(f"docker-compose -f docker-compose.yml -f {docker_yml_name} up")
 
 
 @task
@@ -74,13 +73,13 @@ def clean(ctx, pr_number):
     print("Removing branch")
     try:
         ctx.run("git checkout master")
-        ctx.run("git branch -D {}".format(pr_number), hide=False)
+        ctx.run(f"git branch -D {pr_number}", hide=False)
     except Exception as expt:
-        print("Error when trying to remove branch : {}".format(expt))
+        print(f"Error when trying to remove branch : {expt}")
 
     print("Removing database")
-    _drop_db(ctx, "odoodb-{}".format(pr_number))
-    _drop_db(ctx, "odoodb{}-template".format(pr_number))
+    _drop_db(ctx, f"odoodb-{pr_number}")
+    _drop_db(ctx, f"odoodb{pr_number}-template")
 
 
 def _check_arguments(
@@ -109,25 +108,19 @@ def _check_arguments(
 
 
 def _restore_database_from_template(ctx, pr_link, template):
-    _drop_db(ctx, "odoodb-{}".format(pr_link))
-    ctx.run(
-        "docker-compose run --rm odoo createdb -T {} odoodb-{}".format(
-            template, pr_link
-        )
-    )
+    _drop_db(ctx, f"odoodb-{pr_link}")
+    ctx.run(f"docker-compose run --rm odoo createdb -T {template} odoodb-{pr_link}")
 
 
 def _handle_database_template(ctx, pr_link, database_dump):
     # at this point we should have the database loaded under proper name
-    _drop_db(ctx, "odoodb{}-template".format(pr_link))
-    _create_db(ctx, "odoodb{}-template".format(pr_link))
+    _drop_db(ctx, f"odoodb{pr_link}-template")
+    _create_db(ctx, f"odoodb{pr_link}-template")
 
     try:
         print("Creating template")
         ctx.run(
-            "docker-compose run --rm odoo pg_restore -p 5432 -d odoodb{}-template < {}".format(
-                pr_link, database_dump
-            ),
+            f"docker-compose run --rm odoo pg_restore -p 5432 -d odoodb{pr_link}-template < {database_dump}",
             hide=True,
         )
     except Exception:
@@ -136,16 +129,14 @@ def _handle_database_template(ctx, pr_link, database_dump):
 
 
 def _load_database(ctx, pr_link, fname):
-    _drop_db(ctx, "odoodb-{}".format(pr_link))
-    _create_db(ctx, "odoodb-{}".format(pr_link))
+    _drop_db(ctx, f"odoodb-{pr_link}")
+    _create_db(ctx, f"odoodb-{pr_link}")
 
     if os.path.isfile(fname):
         try:
             print("Restoring database")
             ctx.run(
-                "docker-compose run --rm odoo pg_restore -p 5432 -d odoodb-{} < {} -O".format(
-                    pr_link, fname
-                ),
+                f"docker-compose run --rm odoo pg_restore -p 5432 -d odoodb-{pr_link} < {fname} -O",
                 hide=True,
             )
         except Exception:
@@ -159,42 +150,38 @@ def _load_database(ctx, pr_link, fname):
 
 def _drop_db(ctx, database_name):
     try:
-        print("Cleanup database {}".format(database_name))
-        ctx.run("docker-compose run --rm odoo dropdb {}".format(database_name))
+        print(f"Cleanup database {database_name}")
+        ctx.run(f"docker-compose run --rm odoo dropdb {database_name}")
     except Exception:
         pass
 
 
 def _create_db(ctx, database_name):
     try:
-        print("Create database {}".format(database_name))
-        ctx.run(
-            "docker-compose run --rm odoo createdb -O odoo {}".format(database_name)
-        )
+        print(f"Create database {database_name}")
+        ctx.run(f"docker-compose run --rm odoo createdb -O odoo {database_name}")
     except Exception:
         pass
 
 
 def handle_git_repository(ctx, pr_number, branch):
     gh.check_git_diff(ctx)
-    master = "remotes/origin/{}".format(branch)
+    master = f"remotes/origin/{branch}"
 
     try:
         print("Restoring database")
-        ctx.run("git checkout -b {}".format(pr_number))
+        ctx.run(f"git checkout -b {pr_number}")
     except Exception:
-        ctx.run("git checkout {}".format(pr_number))
-    ctx.run("git fetch origin +refs/pull/{}/merge".format(pr_number))
+        ctx.run(f"git checkout {pr_number}")
+    ctx.run(f"git fetch origin +refs/pull/{pr_number}/merge")
     ctx.run("git reset --hard FETCH_HEAD")
 
     # TODO: change depending on new structure
     # use root_path to get root project directory
     # rebuild image if there was changes
-    docker_diff = ctx.run(
-        "git diff {} {} odoo/Dockerfile".format(pr_number, master), hide=True
-    )
+    docker_diff = ctx.run(f"git diff {pr_number} {master} odoo/Dockerfile", hide=True)
     req_diff = ctx.run(
-        "git diff {} {} odoo/requirements.txt".format(pr_number, master),
+        f"git diff {pr_number} {master} odoo/requirements.txt",
         hide=True,
     )
 
@@ -208,19 +195,17 @@ def handle_git_repository(ctx, pr_number, branch):
 def generate_docker_yml(PR, file_name):
     # generate additional docker-compose file
     with open(file_name, "w+") as f:
-        data = """
+        data = f"""
 version: '2'
 services:
   odoo:
     environment:
-        DB_NAME: odoodb-{}
+        DB_NAME: odoodb-{PR}
         MARABUNTA_MODE: full
   nginx:
     ports:
       - 8069:80
-        """.format(
-            PR
-        )
+        """
         f.write(data)
 
 

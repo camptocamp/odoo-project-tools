@@ -26,7 +26,7 @@ def make_bumpversion_cmd(rel_type, new_version=None, dry_run=False):
 
 
 def make_towncrier_cmd(version):
-    return "towncrier build --yes --version={}".format(version)
+    return f"towncrier build --yes --version={version}"
 
 
 def update_marabunta_file(version):
@@ -45,7 +45,7 @@ def cli():
     "--type",
     "rel_type",
     help="version increment to use",
-    type=click.Choice(['major', 'minor', 'patch'], case_sensitive=False),
+    type=click.Choice(["major", "minor", "patch"], case_sensitive=False),
 )
 @click.option("--new-version", "new_version", help="explicit new version to create")
 @click.option(
@@ -81,5 +81,5 @@ def bump(rel_type, new_version=None, dry_run=False, commit=False):
     # doco --rm run odoo pip freeze > requirements.txt
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()

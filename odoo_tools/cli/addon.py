@@ -3,7 +3,9 @@
 
 import click
 
-from ..utils import pending_merge as pm_utils, req as req_utils, ui
+from ..utils import pending_merge as pm_utils
+from ..utils import req as req_utils
+from ..utils import ui
 from ..utils.misc import SmartDict
 from ..utils.os_exec import run
 from ..utils.pkg import Package
