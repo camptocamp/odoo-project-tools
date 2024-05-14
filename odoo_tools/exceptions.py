@@ -26,5 +26,5 @@ class Exit(_Exit):
         print(self.message)
 
 
-# TODO: manage exceptions globally and homogenously.
+# TODO: manage exceptions globally and homogeneously.
 # See https://stackoverflow.com/questions/45875930/is-there-a-way-to-handle-exceptions-automatically-with-python-click
