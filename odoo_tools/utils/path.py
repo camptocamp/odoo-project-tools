@@ -27,11 +27,10 @@ def root_path(marker_file=get_root_marker(), raise_if_missing=True):
         parent_dir = os.path.dirname(current_dir)
         if marker_file in file_list:
             return PosixPath(current_dir)
+        elif current_dir == parent_dir:
+            break
         else:
-            if current_dir == parent_dir:
-                break
-            else:
-                current_dir = parent_dir
+            current_dir = parent_dir
         max_depth -= 1
     if raise_if_missing:
         raise ProjectRootFolderNotFound(
@@ -65,9 +64,7 @@ def make_dir(path_dir):
         os.makedirs(path_dir)
     except OSError:
         if not os.path.isdir(path_dir):
-            msg = ("Directory does not exist and could not be created: {}").format(
-                path_dir
-            )
+            msg = f"Directory does not exist and could not be created: {path_dir}"
             ui.exit_msg(msg)
         else:
             pass  # directory already exists, nothing to do in this case

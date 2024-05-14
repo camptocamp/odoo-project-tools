@@ -19,7 +19,7 @@ def get_odoo_enterprise(hash, dest="src/enterprise", org="odoo", branch=None):
     dest = str(build_path(dest))
     _clone_or_fetch_repo(org, "enterprise", branch, dest)
     ui.echo(f"Checking out {hash}")
-    subprocess.run(["git", "-C", dest, "checkout", hash])
+    subprocess.run(["git", "-C", dest, "checkout", hash], check=False)
 
 
 def _clone_or_fetch_repo(org, repo, branch, dest):

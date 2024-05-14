@@ -5,4 +5,4 @@ migration:
         upgrade:
           - foo
           - baz
-    - version: 14.0.0.1.0 
+    - version: 14.0.0.1.0

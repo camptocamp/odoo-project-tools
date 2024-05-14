@@ -52,13 +52,11 @@ class Repo:
         if not (self.abs_path / ".git").exists():
             raise PathNotFound(
                 "GIT CONFIG NOT FOUND. "
-                "{} does not look like a mature repository. "
-                "Aborting.".format(self.abs_path)
+                f"{self.abs_path} does not look like a mature repository. "
+                "Aborting."
             )
         if not self.abs_merges_path.exists():
-            raise PathNotFound(
-                "MERGES PATH NOT FOUND `{}'.".format(self.abs_merges_path)
-            )
+            raise PathNotFound(f"MERGES PATH NOT FOUND `{self.abs_merges_path}'.")
 
     @staticmethod
     def _safe_repo_name(name_or_path):
@@ -97,7 +95,7 @@ class Repo:
         pending_merge_abs_path = build_path(get_conf_key("pending_merge_rel_path"))
         path = path or pending_merge_abs_path
         repo_names = []
-        for root, dirs, files in os.walk(path):
+        for __, __, files in os.walk(path):
             repo_names = [
                 os.path.splitext(fname)[0] for fname in files if fname.endswith(".yml")
             ]
@@ -131,9 +129,7 @@ class Repo:
             yaml_dump(data, f)
 
     def api_url(self, upstream=None):
-        return "https://api.github.com/repos/{}/{}".format(
-            upstream or self.company_git_remote, self.name
-        )
+        return f"https://api.github.com/repos/{upstream or self.company_git_remote}/{self.name}"
 
     def ssh_url(self, namespace=None):
         namespace = namespace or self.company_git_remote
@@ -141,7 +137,7 @@ class Repo:
 
     @classmethod
     def build_ssh_url(cls, namespace, repo_name):
-        return "git@github.com:{}/{}.git".format(namespace, repo_name)
+        return f"git@github.com:{namespace}/{repo_name}.git"
 
     def generate_pending_merges_file_template(self, upstream):
         """Create git-aggregator config for current repo"""
@@ -174,31 +170,25 @@ class Repo:
             remotes.insert(0, self.company_git_remote, remote_company_url)
         config = CommentedMap()
         config.insert(0, "remotes", remotes)
-        config.insert(
-            1, "target", "{} {}".format(self.company_git_remote, default_target)
-        )
+        config.insert(1, "target", f"{self.company_git_remote} {default_target}")
         if oca_ocb_remote:
             base_merge = "{} {}".format("oca", odoo_version)
         else:
-            base_merge = "{} {}".format(upstream, odoo_version)
+            base_merge = f"{upstream} {odoo_version}"
         config.insert(2, "merges", CommentedSeq([base_merge]))
         self.update_merges_config(config)
 
     def add_pending_pull_request(self, upstream, pull_id):
         conf = self.merges_config()
         odoo_version = get_project_manifest_key("odoo_version")
-        pending_mrg_line = "{} refs/pull/{}/head".format(upstream, pull_id)
+        pending_mrg_line = f"{upstream} refs/pull/{pull_id}/head"
         if pending_mrg_line in conf.get("merges", {}):
             ui.echo(
-                "Requested pending merge is already mentioned in {} ".format(
-                    self.abs_merges_path
-                )
+                f"Requested pending merge is already mentioned in {self.abs_merges_path} "
             )
             return True
 
-        response = requests.get(
-            "{}/pulls/{}".format(self.api_url(upstream=upstream), pull_id)
-        )
+        response = requests.get(f"{self.api_url(upstream=upstream)}/pulls/{pull_id}")
 
         # TODO: auth
         base_branch = response.json().get("base", {}).get("ref")
@@ -245,16 +235,12 @@ class Repo:
                 "It's recommended to use fully qualified 40-digit hashes though.\n"
                 "Continue?"
             )
-        fetch_commit_line = "git fetch {} {}".format(upstream, commit_sha)
-        pending_mrg_line = 'git am "$(git format-patch -1 {} -o ../patches)"'.format(
-            commit_sha
-        )
+        fetch_commit_line = f"git fetch {upstream} {commit_sha}"
+        pending_mrg_line = f'git am "$(git format-patch -1 {commit_sha} -o ../patches)"'
 
         if pending_mrg_line in conf.get("shell_command_after", {}):
             ui.echo(
-                "Requested pending merge is mentioned in {} already".format(
-                    self.abs_merges_path
-                )
+                f"Requested pending merge is mentioned in {self.abs_merges_path} already"
             )
             return True
         if "shell_command_after" not in conf:
@@ -279,18 +265,16 @@ class Repo:
     def remove_pending_commit(self, upstream, commit_sha):
         conf = self.merges_config()
         lines_to_drop = [
-            "git fetch {} {}".format(upstream, commit_sha),
-            'git am "$(git format-patch -1 {} -o ../patches)"'.format(commit_sha),
+            f"git fetch {upstream} {commit_sha}",
+            f'git am "$(git format-patch -1 {commit_sha} -o ../patches)"',
         ]
         if lines_to_drop[0] not in conf.get(
             "shell_command_after", {}
         ) and lines_to_drop[1] not in conf.get("shell_command_after", {}):
             ui.exit_msg(
-                "No such reference found in {},"
+                f"No such reference found in {self.abs_merges_path},"
                 " having troubles removing that:\n"
-                "Looking for:\n- {}\n- {}".format(
-                    self.abs_merges_path, lines_to_drop[0], lines_to_drop[1]
-                )
+                f"Looking for:\n- {lines_to_drop[0]}\n- {lines_to_drop[1]}"
             )
         for line in lines_to_drop:
             if line in conf["shell_command_after"]:
@@ -298,16 +282,16 @@ class Repo:
         if not conf["shell_command_after"]:
             del conf["shell_command_after"]
         self.update_merges_config(conf)
-        print("✨ cherry pick {}/{} has been removed".format(upstream, commit_sha))
+        print(f"✨ cherry pick {upstream}/{commit_sha} has been removed")
 
     def remove_pending_pull(self, upstream, pull_id):
         conf = self.merges_config()
-        line_to_drop = "{} refs/pull/{}/head".format(upstream, pull_id)
+        line_to_drop = f"{upstream} refs/pull/{pull_id}/head"
         if line_to_drop not in conf["merges"]:
             ui.exit_msg(
-                "No such reference found in {},"
+                f"No such reference found in {self.abs_merges_path},"
                 " having troubles removing that:\n"
-                "Looking for: {}".format(self.abs_merges_path, line_to_drop)
+                f"Looking for: {line_to_drop}"
             )
         conf["merges"].remove(line_to_drop)
         self.update_merges_config(conf)
@@ -473,7 +457,7 @@ def remove_pending(entity_url):
 
 def make_merge_branch_name(version):
     project_id = get_project_manifest_key("project_id")
-    branch_name = "merge-branch-{}-{}".format(project_id, version)
+    branch_name = f"merge-branch-{project_id}-{version}"
     return branch_name
 
 
@@ -503,15 +487,11 @@ def push_branches(version=None, force=False):
         ui.echo(f"Pushing {repo.path}")
         with cd(repo.abs_path):
             try:
-                run("git config remote.{}.url".format(company_git_remote))
+                run(f"git config remote.{company_git_remote}.url")
             except Exception:  # TODO
                 remote_url = config["remotes"][company_git_remote]
-                run("git remote add {} {}".format(company_git_remote, remote_url))
-            run(
-                "git push -f -v {} HEAD:refs/heads/{}".format(
-                    company_git_remote, branch_name
-                )
-            )
+                run(f"git remote add {company_git_remote} {remote_url}")
+            run(f"git push -f -v {company_git_remote} HEAD:refs/heads/{branch_name}")
     if impacted_repos:
         ui.echo("Impacted repos:")
         ui.echo("\n - ".join([x.as_posix() for x in impacted_repos]))

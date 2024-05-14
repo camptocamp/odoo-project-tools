@@ -79,6 +79,30 @@ find = {}
 line-length = 88
 skip-string-normalization = "True"
 
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+  "F",        # pyflakes
+  "E",        # pycodestyle (errors)
+  "W",        # pycodestyle (warnings)
+  "C90",      # mccabe
+  "I",        # isort
+  "UP",       # pyupgrade
+  "B",        # flake8-bugbear
+  "Q",        # flake8-quotes
+]
+ignore = [
+  "E501",     # line too long (if black is happy, we're happy)
+  "UP031",    # pyupgrade: use format specifiers instead of percent format (TODO: enable)
+  "E721",     # do not compare types, use 'isinstance()' (TODO: enable)
+  "B008",     # do not perform calls in argument defaults (TODO: enable)
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 16
+
 [tool.towncrier]
 directory = "changes.d"
 filename = "HISTORY.rst"

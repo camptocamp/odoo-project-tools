@@ -45,12 +45,16 @@ def setup_venv(venv_dir, odoo_src_path=None):
         odoo_src_path = build_path(get_conf_key("odoo_src_rel_path"))
 
     if not (venv_dir / "bin/odoo").is_file():
-        subprocess.run([pip, "install", "-r", odoo_src_path / "requirements.txt"])
-        subprocess.run([pip, "install", "-r", "local-requirements.txt"])
-    subprocess.run([pip, "install", "-r", build_path("requirements.txt")])
+        subprocess.run(
+            [pip, "install", "-r", odoo_src_path / "requirements.txt"], check=False
+        )
+        subprocess.run([pip, "install", "-r", "local-requirements.txt"], check=False)
+    subprocess.run([pip, "install", "-r", build_path("requirements.txt")], check=False)
     if build_path("dev_requirements.txt").is_file():
-        subprocess.run([pip, "install", "-r", build_path("dev_requirements.txt")])
-    subprocess.run([pip, "install", "-e", "."])
+        subprocess.run(
+            [pip, "install", "-r", build_path("dev_requirements.txt")], check=False
+        )
+    subprocess.run([pip, "install", "-e", "."], check=False)
 
 
 def ensure_local_requirements(local_requirement_path):
@@ -87,7 +91,8 @@ def generate_odoo_config_file(
                 f"--addons-path={addons_dir}, {odoo_enterprise_path},{odoo_src_path}/addons,{odoo_src_path}/odoo/addons",
                 "--workers=0",
                 "--stop-after-init",
-            ]
+            ],
+            check=False,
         )
     config_has_running_env = False
     with open(config_file) as odoo_cfg:
