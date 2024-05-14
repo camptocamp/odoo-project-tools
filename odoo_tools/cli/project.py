@@ -134,7 +134,7 @@ def init(**kw):
     "--venv",
     type=bool,
     default=False,
-    help="setup a virtual environment useable to work without docker",
+    help="setup a virtual environment usable to work without docker",
 )
 @click.option(
     "--venv-path",

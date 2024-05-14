@@ -126,8 +126,8 @@ def generate_admin_pwd_and_put_to_lastpass():
     change_admin_pwd(pwd_encrypted)
     try:
         send_pwd_to_lp(pwd)
-    except Exception as exept:
-        print(exept)
+    except Exception as e:
+        print(e)
 
 
 @task(name="gen-admin-pwd")
@@ -153,5 +153,5 @@ def send_admin_pwd_to_lpass(ctx):
     change_admin_pwd(pwd_encrypted)
     try:
         send_pwd_to_lp(pwd)
-    except Exception as exept:
-        print(exept)
+    except Exception as e:
+        print(e)

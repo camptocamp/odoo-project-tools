@@ -26,3 +26,8 @@ repos:
     rev: 24.4.0
     hooks:
       - id: black
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.2.4
+    hooks:
+    - id: codespell
