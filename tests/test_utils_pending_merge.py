@@ -309,7 +309,7 @@ def test_add_pending_commit_v1():
         ],
         "shell_command_after": [
             "git fetch OCA a86f5fe73e1f34f29cb2ad0dca253e47ce625406",
-            "git am \"$(git format-patch -1 a86f5fe73e1f34f29cb2ad0dca253e47ce625406 -o ../patches)\"",
+            'git am "$(git format-patch -1 a86f5fe73e1f34f29cb2ad0dca253e47ce625406 -o ../patches)"',
         ],
     }
     compare_dict(repo.merges_config(), expected)
@@ -366,7 +366,7 @@ def test_add_pending_odoo_commit_v1():
             "target": "camptocamp merge-branch-1234-master",
             "shell_command_after": [
                 f"git fetch odoo {commit_sha}",
-                f"git am \"$(git format-patch -1 {commit_sha} -o ../patches)\"",
+                f'git am "$(git format-patch -1 {commit_sha} -o ../patches)"',
             ],
         },
     )
@@ -396,7 +396,7 @@ def test_add_pending_odoo_commit_v2():
             "target": "camptocamp merge-branch-1234-master",
             "shell_command_after": [
                 f"git fetch odoo {commit_sha}",
-                f"git am \"$(git format-patch -1 {commit_sha} -o ../../patches/odoo)\"",
+                f'git am "$(git format-patch -1 {commit_sha} -o ../../patches/odoo)"',
             ],
         },
     )
@@ -414,7 +414,7 @@ def test_remove_pending_commit_v1():
     shell_command_after = repo.merges_config().get("shell_command_after", [])
     assert shell_command_after == [
         "git fetch OCA a86f5fe73e1f34f29cb2ad0dca253e47ce625406",
-        "git am \"$(git format-patch -1 a86f5fe73e1f34f29cb2ad0dca253e47ce625406 -o ../patches)\"",
+        'git am "$(git format-patch -1 a86f5fe73e1f34f29cb2ad0dca253e47ce625406 -o ../patches)"',
     ]
     repo.remove_pending_commit("OCA", sha)
     shell_command_after = repo.merges_config().get("shell_command_after", [])
