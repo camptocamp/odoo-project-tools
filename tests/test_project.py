@@ -210,8 +210,7 @@ def test_local_odoo_venv(runner):
                 # "sim_call_args": ["foo"],
             },
             {
-                "args": lambda a: str(a[0]).endswith("python")
-                and a[2] == "ensurepip",
+                "args": lambda a: str(a[0]).endswith("python") and a[2] == "ensurepip",
             },
             {
                 "args": lambda a: str(a[0]).endswith("pip")

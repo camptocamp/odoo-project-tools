@@ -277,7 +277,7 @@ class Repo:
         """Return the lines to add to the merges file for a given commit."""
         if self.template_version == 1:
             return [
-                f'git fetch {upstream} {commit_sha}',
+                f"git fetch {upstream} {commit_sha}",
                 f'git am "$(git format-patch -1 {commit_sha} -o ../patches)"',
             ]
         # self.template_version == 2
@@ -286,15 +286,15 @@ class Repo:
             # This patch will be applied when the image is built.
             patch_dir = f"../../patches/{self.name}"
             return [
-                f'git fetch {upstream} {commit_sha}',
+                f"git fetch {upstream} {commit_sha}",
                 f'git am "$(git format-patch -1 {commit_sha} -o {patch_dir})"',
             ]
         else:
             # For external repositories, we just cherry-pick the commit,
             # as we don't need to store the patch file.
             return [
-                f'git fetch {upstream} {commit_sha}',
-                f'git cherry-pick {commit_sha}',
+                f"git fetch {upstream} {commit_sha}",
+                f"git cherry-pick {commit_sha}",
             ]
 
     def add_pending_commit(self, upstream, commit_sha, skip_questions=True):
