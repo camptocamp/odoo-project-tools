@@ -45,7 +45,14 @@ def cli():
     default=False,
     help="upgrade will update the addon to the latest available version on PyPI",
 )
-def add(name, version=None, pr=None, odoo=True, upgrade=False):
+@click.option(
+    "--wool/--no-wool",
+    "use_wool",
+    help="Force using wool packaging (for a PR) even on projects using Odoo 16 or before, or force not using wool packaging, for a project using Odoo 17 or later. .",
+    is_flag=True,
+    default=None,
+)
+def add(name, version=None, pr=None, odoo=True, upgrade=False, use_wool=None):
     """Update the project's requirements for a given package (odoo or not).
 
     * If the module is not already listed in the requirements.txt, check the
@@ -64,7 +71,7 @@ def add(name, version=None, pr=None, odoo=True, upgrade=False):
 
     if not pkg.pinned_version:
         # Brand new module: just add it
-        pkg.add_requirement(version=version, pr=pr)
+        pkg.add_requirement(version=version, pr=pr, use_wool=use_wool)
         click.echo("Requirement updated")
         raise click.exceptions.Exit(0)
 
@@ -114,7 +121,14 @@ def add(name, version=None, pr=None, odoo=True, upgrade=False):
     is_flag=True,
     default=True,
 )
-def add_pending(pr_url, addons=None, editable=True, aggregate=True):
+@click.option(
+    "--wool/--no-wool",
+    "use_wool",
+    help="Force using wool packaging (for a PR) even on projects using Odoo 16 or before, or force not using wool packaging, for a project using Odoo 17 or later. .",
+    is_flag=True,
+    default=None,
+)
+def add_pending(pr_url, addons=None, editable=True, aggregate=True, use_wool=None):
     """Add a pending PR or commit.
 
     This command will create or update an aggregation file corresponding to the

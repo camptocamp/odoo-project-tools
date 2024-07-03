@@ -45,16 +45,27 @@ def make_requirement_line(pkg_name, version=None):
     return pkg_name + (f" == {version}" if version else "")
 
 
-def make_requirement_line_for_pr(pkg_name, pr):
+def make_requirement_line_for_pr(pkg_name, pr, use_wool=False):
     mod_name = pkg_name_to_odoo_name(pkg_name)
     parts = parse_github_url(pr)
     uri = "git+https://github.com/{upstream}/{repo_name}@refs/{entity_type}/{entity_id}/head".format(
         **parts
     )
-    return f"{pkg_name} @ {uri}#subdirectory=setup/{mod_name}"
+    subdirectory = modname_to_installation_subdirectory(mod_name, use_wool)
+    return f"{pkg_name} @ {uri}#subdirectory={subdirectory}"
 
 
-def make_requirement_line_for_proj_fork(pkg_name, repo_name, branch, upstream=None):
+def modname_to_installation_subdirectory(mod_name: str, use_wool: bool):
+    if use_wool:
+        subdirectory = f"{mod_name}"
+    else:
+        subdirectory = f"setup/{mod_name}"
+    return subdirectory
+
+
+def make_requirement_line_for_proj_fork(
+    pkg_name, repo_name, branch, upstream=None, use_wool=False
+):
     upstream = upstream or get_conf_key("company_git_remote")
     mod_name = pkg_name_to_odoo_name(pkg_name)
     parts = {
@@ -63,10 +74,13 @@ def make_requirement_line_for_proj_fork(pkg_name, repo_name, branch, upstream=No
         "repo_name": repo_name,
     }
     uri = "git+https://github.com/{upstream}/{repo_name}@{branch}".format(**parts)
-    return f"{pkg_name} @ {uri}#subdirectory=setup/{mod_name}"
+    subdirectory = modname_to_installation_subdirectory(mod_name, use_wool)
+    return f"{pkg_name} @ {uri}#subdirectory={subdirectory}"
 
 
-def make_requirement_line_for_editable(pkg_name, pr=None, repo_name=None, dev_src=None):
+def make_requirement_line_for_editable(
+    pkg_name, pr=None, repo_name=None, dev_src=None, use_wool=False
+):
     assert pr or repo_name
     if pr:
         parts = parse_github_url(pr)
@@ -76,13 +90,18 @@ def make_requirement_line_for_editable(pkg_name, pr=None, repo_name=None, dev_sr
     return f"-e {dev_src}/{repo_name}/setup/{mod_name}"
 
 
-def add_requirement(pkg_name, version=None, req_filepath=None, pr=None, editable=False):
+def add_requirement(
+    pkg_name, version=None, req_filepath=None, pr=None, editable=False, use_wool=None
+):
     req_filepath = req_filepath or get_project_req()
+    if use_wool is None:
+        # assume a project on Odoo 17 is using wool
+        use_wool = version is None or version >= "17"
     if pr:
         handler = make_requirement_line_for_pr
         if editable:
             handler = make_requirement_line_for_editable
-        line = handler(pkg_name, pr)
+        line = handler(pkg_name, pr, use_wool=use_wool)
     else:
         line = make_requirement_line(pkg_name, version=version)
     sep = "\n" if os.path.exists(req_filepath) else ""
@@ -91,16 +110,22 @@ def add_requirement(pkg_name, version=None, req_filepath=None, pr=None, editable
 
 
 def replace_requirement(
-    pkg_name, version=None, req_filepath=None, pr=None, editable=False
+    pkg_name, version=None, req_filepath=None, pr=None, editable=False, use_wool=None
 ):
     req_filepath = req_filepath or get_project_req()
+    if use_wool is None:
+        # assume a project on Odoo 17 is using wool
+        use_wool = version >= "17"
     if pr:
         handler = make_requirement_line_for_pr
         if editable:
             handler = make_requirement_line_for_editable
-        replacement_line = handler(pkg_name, pr)
+        replacement_line = handler(pkg_name, pr, use_wool=use_wool)
     else:
-        replacement_line = make_requirement_line(pkg_name, version=version)
+        replacement_line = make_requirement_line(
+            pkg_name,
+            version=version,
+        )
     for line in fileinput.input(req_filepath, inplace=True):
         # `print` replaces line inside fileinput ctx manager
         # TODO: add tests for all the forms of requirements

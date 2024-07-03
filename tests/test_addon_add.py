@@ -71,3 +71,17 @@ def test_replace_pr(project):
     with open("./requirements.txt") as fd:
         assert f"odoo-addon-edi_oca == {version}" in fd.read()
     assert result.exit_code == 0
+
+
+@pytest.mark.project_setup(
+    proj_version="17.0.0.1.0", manifest=dict(odoo_version="17.0")
+)
+def test_add_new_with_pr_wool(project):
+    addon_name = "edi_oca"
+    mock_pypi_version_cache(f"odoo-addon-{addon_name}", "17.0.1.0.0")
+    pr = "https://github.com/OCA/edi-framework/pull/3"
+    expected = "odoo-addon-edi_oca @ git+https://github.com/OCA/edi-framework@refs/pull/3/head#subdirectory=edi_oca"
+    result = project.invoke(addon.add, [addon_name, f"-p {pr}"])
+    with open("./requirements.txt") as fd:
+        assert expected in fd.read()
+    assert result.exit_code == 0
