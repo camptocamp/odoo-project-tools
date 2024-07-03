@@ -2,6 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import pytest
+import responses
 
 from odoo_tools.cli import addon
 from odoo_tools.utils.pending_merge import Repo
@@ -16,14 +17,22 @@ from odoo_tools.utils.req import get_project_dev_req
     manifest=dict(odoo_version="16.0"), proj_version="16.0.0.1.0"
 )
 def test_add_new_pending_no_addons(project):
-    pr = "https://github.com/OCA/edi-framework/pull/1"
+    pr = "https://github.com/OCA/edi-framework/pull/94"
     repo_name = "edi-framework"
     repo = Repo(repo_name, path_check=False)
     assert not repo.has_pending_merges()
-    result = project.invoke(
-        addon.add_pending,
-        [pr, "--no-aggregate"],
-    )
+    with responses.RequestsMock() as rsps:
+        rsps.add(
+            responses.GET,
+            "https://api.github.com/repos/OCA/edi-framework/pulls/94",
+            json={"base": {"ref": "16.0"}},
+            status=200,
+            content_type="application/json",
+        )
+        result = project.invoke(
+            addon.add_pending,
+            [pr, "--no-aggregate"],
+        )
     expected = [
         "No addon specifified. Please update dev requirements manually.",
     ]
@@ -44,7 +53,17 @@ def test_add_new_pending_with_addon_editable(project):
     assert not req_path.exists()
     pkg = Package(addon_name, req_filepath=req_path)
     assert not repo.has_pending_merges()
-    result = project.invoke(addon.add_pending, [pr, "-a", addon_name, "--no-aggregate"])
+    with responses.RequestsMock() as rsps:
+        rsps.add(
+            responses.GET,
+            "https://api.github.com/repos/OCA/edi-framework/pulls/1",
+            json={"base": {"ref": "16.0"}},
+            status=200,
+            content_type="application/json",
+        )
+        result = project.invoke(
+            addon.add_pending, [pr, "-a", addon_name, "--no-aggregate"]
+        )
     expected = [
         f"Adding: {addon_name} from https://github.com/OCA/edi-framework/pull/1",
         f"Updated dev requirements for: {addon_name}",
@@ -69,9 +88,17 @@ def test_add_new_pending_with_addon_not_editable(project):
     assert not req_path.exists()
     pkg = Package(addon_name, req_filepath=req_path)
     assert not repo.has_pending_merges()
-    result = project.invoke(
-        addon.add_pending, [pr, "-a", addon_name, "--no-editable", "--no-aggregate"]
-    )
+    with responses.RequestsMock() as rsps:
+        rsps.add(
+            responses.GET,
+            "https://api.github.com/repos/OCA/edi-framework/pulls/1",
+            json={"base": {"ref": "16.0"}},
+            status=200,
+            content_type="application/json",
+        )
+        result = project.invoke(
+            addon.add_pending, [pr, "-a", addon_name, "--no-editable", "--no-aggregate"]
+        )
     expected = [
         f"Adding: {addon_name} from https://github.com/OCA/edi-framework/pull/1",
         f"Updated dev requirements for: {addon_name}",
