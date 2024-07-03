@@ -35,31 +35,39 @@ class Package:
             return True
         return req.allowed_version(self.req, version)
 
-    def add_requirement(self, version=None, pr=None, editable=False):
+    def add_requirement(self, version=None, pr=None, editable=False, use_wool=None):
         req.add_requirement(
             self.pypi_name,
             version=version or self.latest_version,
             pr=pr,
             editable=editable,
             req_filepath=self.req_filepath,
+            use_wool=use_wool,
         )
         self._req = None
 
-    def replace_requirement(self, version=None, pr=None, editable=False):
+    def replace_requirement(self, version=None, pr=None, editable=False, use_wool=None):
         req.replace_requirement(
             self.pypi_name,
             version=version or self.latest_version,
             pr=pr,
             editable=editable,
             req_filepath=self.req_filepath,
+            use_wool=use_wool,
         )
         self._req = None
 
-    def add_or_replace_requirement(self, version=None, pr=None, editable=False):
+    def add_or_replace_requirement(
+        self, version=None, pr=None, editable=False, use_wool=None
+    ):
         if self.has_requirement():
-            self.replace_requirement(version=version, pr=pr, editable=editable)
+            self.replace_requirement(
+                version=version, pr=pr, editable=editable, use_wool=use_wool
+            )
         else:
-            self.add_requirement(version=version, pr=pr, editable=editable)
+            self.add_requirement(
+                version=version, pr=pr, editable=editable, use_wool=use_wool
+            )
 
     def has_pending_merge(self):
         return (

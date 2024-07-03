@@ -93,7 +93,9 @@ def test_add_requirement_pr():
         pr = "https://github.com/OCA/edi-framework/pull/3"
         mod_name = "foo"
         pkg_name = f"odoo-addon-{mod_name}"
-        req_utils.add_requirement(pkg_name, pr=pr, req_filepath=req_path)
+        req_utils.add_requirement(
+            pkg_name, pr=pr, req_filepath=req_path, use_wool=False
+        )
         expected = "odoo-addon-foo @ git+https://github.com/OCA/edi-framework@refs/pull/3/head#subdirectory=setup/foo"
         with open(req_path) as fd:
             assert fd.read() == expected
@@ -105,7 +107,9 @@ def test_add_requirement_pr_editable():
         pr = "https://github.com/OCA/edi-framework/pull/3"
         mod_name = "foo"
         pkg_name = f"odoo-addon-{mod_name}"
-        req_utils.add_requirement(pkg_name, pr=pr, req_filepath=req_path, editable=True)
+        req_utils.add_requirement(
+            pkg_name, pr=pr, req_filepath=req_path, editable=True, use_wool=False
+        )
         path = get_conf_key("ext_src_rel_path")
         expected = f"-e {path}/edi-framework/setup/{mod_name}"
         with open(req_path) as fd:
@@ -120,7 +124,9 @@ def test_replace_requirement():
         mod_name = "foo"
         pkg_name = f"odoo-addon-{mod_name}"
         req_utils.add_requirement(pkg_name, pr=pr, req_filepath=req_path)
-        req_utils.replace_requirement(pkg_name, version="1.0.0", req_filepath=req_path)
+        req_utils.replace_requirement(
+            pkg_name, version="1.0.0", req_filepath=req_path, use_wool=False
+        )
         expected = "odoo-addon-foo == 1.0.0\n"
         with open(req_path) as fd:
             assert fd.read() == expected
