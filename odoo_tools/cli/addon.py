@@ -159,7 +159,7 @@ def add_pending(pr_url, addons=None, editable=True, aggregate=True, use_wool=Non
             req_filepath=dev_req_file_path,
         )
         # TODO: does it work w/ commits?
-        pkg.add_or_replace_requirement(pr=pr_url, editable=editable)
+        pkg.add_or_replace_requirement(pr=pr_url, editable=editable, use_wool=use_wool)
 
     ui.echo(f"Updated dev requirements for: {', '.join(addons)}", fg="green")
 
