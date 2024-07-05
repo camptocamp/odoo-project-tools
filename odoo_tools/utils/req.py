@@ -87,7 +87,8 @@ def make_requirement_line_for_editable(
         repo_name = parts["repo_name"]
     dev_src = dev_src or get_conf_key("ext_src_rel_path")
     mod_name = pkg_name_to_odoo_name(pkg_name)
-    return f"-e {dev_src}/{repo_name}/setup/{mod_name}"
+    subdirectory = modname_to_installation_subdirectory(mod_name, use_wool)
+    return f"-e {dev_src}/{repo_name}/{subdirectory}"
 
 
 def add_requirement(
