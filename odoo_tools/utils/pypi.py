@@ -36,7 +36,10 @@ def get_last_pypi_version(pkg_name, odoo=True):
             for version in data["releases"]
             if version.startswith(odoo_serie)
         ]
-        latest_version = str(max(versions))
+        if versions:
+            latest_version = str(max(versions))
+        else:
+            latest_version = f"{odoo_serie or '0'}.0.0.0.0-pre"
     else:
         latest_version = data["info"]["version"]
     TMP_CACHE[pkg_name] = latest_version
