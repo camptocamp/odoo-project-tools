@@ -131,7 +131,7 @@ def init(**kw):
     help="the commit hash to use for Odoo Enterprise. If not provided the docker image will be introspected.",
 )
 @click.option(
-    "--venv",
+    "--venv/--no-venv",
     type=bool,
     default=False,
     help="setup a virtual environment usable to work without docker",
@@ -151,9 +151,12 @@ def checkout_local_odoo(
     docker-compose file to mount the checkouts inside the image), or to develop without Docker using the same version
     as the one used in the image.
 
-    To develop without Docker you can call `otools-project local-odoo --venv .venv`: this will setup or update a
-    virtual environment in the directory with the required tools installed to run Odoo locally (you will still need
-    docker to get the correct versions of the source code, unless you pass the hashes on the command line).
+    To develop without Docker you can call:
+    `otools-project checkout-local-odoo --venv --venv-path=.venv`
+
+    This will setup or update a virtual environment in the directory with the required tools installed to run Odoo
+    locally (you will still need docker to get the correct versions of the source code, unless you pass the hashes
+    on the command line).
     """
     config = load_config()
     if config.template_version == 1:
