@@ -214,7 +214,7 @@ def test_local_odoo_venv(runner):
             },
             {
                 "args": lambda a: str(a[0]).endswith("pip")
-                and str(a[3]).endswith("odoo/src/requirements.txt"),
+                and str(a[3]).endswith(f"{odoo_src_path}/requirements.txt"),
             },
             {
                 "args": lambda a: str(a[0]).endswith("pip")
