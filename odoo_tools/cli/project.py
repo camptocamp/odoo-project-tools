@@ -89,6 +89,8 @@ def bootstrap_files(opts):
                 # TODO: use better variable tmpl?
                 for k, v in var_getter(opts).items():
                     content = content.replace(f"${k}", v)
+                    # avoid errors from end-of-file-fixer in pre-commit
+                    content = content.rstrip("\n") + "\n"
                 with open(dest, "w") as dest_fd:
                     dest_fd.write(content)
         else:
