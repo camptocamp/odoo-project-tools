@@ -80,3 +80,70 @@ submodule.odoo/external-src/account-financial-reporting.path odoo/external-src/a
             catch_exceptions=False,
         )
     assert result.exit_code == 0
+
+
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"), proj_version="16.0.1.2.3"
+)
+def test_update(project):
+    gitmodules = build_path(".gitmodules")
+    mock_fn = mock_subprocess_run(
+        [
+            {
+                "args": [
+                    "git",
+                    "config",
+                    "--file",
+                    str(gitmodules),
+                    "--get-regexp",
+                    "path",
+                ],
+                "stdout": """submodule.odoo/external-src/account-closing.path odoo/external-src/account-closing
+submodule.odoo/external-src/account-financial-reporting.path odoo/external-src/account-financial-reporting
+""",
+            },
+            {
+                "args": [
+                    "git",
+                    "config",
+                    "--file",
+                    str(gitmodules),
+                    "--get-regexp",
+                    "url",
+                ],
+                "stdout": """submodule.odoo/external-src/account-closing.url git@github.com:OCA/account-closing.git
+submodule.odoo/external-src/account-financial-reporting.url git@github.com:OCA/account-financial-reporting.git
+""",
+            },
+            {
+                "args": [
+                    "git",
+                    "submodule",
+                    "sync",
+                ],
+            },
+            {
+                "args": [
+                    "git",
+                    "submodule",
+                    "update",
+                    "--init" "odoo/external-src/account-closing",
+                ],
+            },
+            {
+                "args": [
+                    "git",
+                    "submodule",
+                    "update",
+                    "--init" "odoo/external-src/account-financial-reporting",
+                ],
+            },
+        ]
+    )
+    with mock.patch("subprocess.run", mock_fn):
+        result = project.invoke(
+            submodule.update,
+            [],
+            catch_exceptions=False,
+        )
+    assert result.exit_code == 0
