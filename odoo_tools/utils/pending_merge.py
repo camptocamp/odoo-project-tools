@@ -508,7 +508,7 @@ def add_pending(entity_url, aggregate=True):
     return repo
 
 
-def remove_pending(entity_url):
+def remove_pending(entity_url, aggregate=True):
     parts = gh.parse_github_url(entity_url)
     upstream = parts.get("upstream")
     repo_name = parts.get("repo_name")
@@ -531,6 +531,9 @@ def remove_pending(entity_url):
 
     if not pending_merges_present and not patches:
         os.remove(repo.abs_merges_path)
+    if aggregate:
+        aggregator = repo.get_aggregator()
+        aggregator.aggregate()
     return repo
 
 
