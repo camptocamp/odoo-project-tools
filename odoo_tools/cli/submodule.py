@@ -36,7 +36,7 @@ def init():
     help="With --no-dockerfile, the raw paths are listed instead of the Dockerfile format",
 )
 def ls(dockerfile=True):
-    """List git submodules paths.
+    """[NOT IMPLEMENTED]List git submodules paths.
 
     It can be used to directly copy-paste the addons paths in the Dockerfile.
     The order depends of the order in the .gitmodules file.
@@ -45,33 +45,34 @@ def ls(dockerfile=True):
     pass
 
 
-@cli.command()
-@click.argument("submodule_path")
-@click.option("--push/--no-push", default=True)
-@click.option("-b", "--target-branch")
-def merges(submodule_path, push=True, target_branch=None):
-    """Regenerate a pending branch for a submodule.
-
-    Use case: a PR has been updated and you want to refresh it.
-
-    It reads pending-merges.d/sub-name.yml, runs gitaggregator on the submodule
-    and pushes the new branch on dynamic target constructed as follows:
-    camptocamp/merge-branch-<project_id>-<branch>-<commit>
-
-    By default, the branch is pushed on the camptocamp remote, but you
-    can disable the push with ``--no-push``.
-
-    Beware, if you changed the remote of the submodule manually, you still need
-    to run `sync_remote` manually.
-    """
-    pass
+# @cli.command()
+# @click.argument("submodule_path")
+# @click.option("--push/--no-push", default=True)
+# @click.option("-b", "--target-branch")
+# def merges(submodule_path, push=True, target_branch=None):
+#     """Regenerate a pending branch for a submodule.
+#
+#     Use case: a PR has been updated and you want to refresh it.
+#
+#     It reads pending-merges.d/sub-name.yml, runs gitaggregator on the submodule
+#     and pushes the new branch on dynamic target constructed as follows:
+#     camptocamp/merge-branch-<project_id>-<branch>-<commit>
+#
+#     By default, the branch is pushed on the camptocamp remote, but you
+#     can disable the push with ``--no-push``.
+#
+#     Beware, if you changed the remote of the submodule manually, you still need
+#     to run `sync_remote` manually.
+#     """
+#     ui.echo("Use otools-pending aggregate")
+#
 
 
 @cli.command()
 @click.argument("submodule_path")
 @click.option("-b", "--target-branch")
 def push(submodule_path, target_branch=None):
-    """Push a Submodule
+    """[NOT IMPLEMENTED] Push a Submodule
 
     Pushes the current state of your submodule to the target remote and branch
     either given by you or specified in pending-merges.yml
@@ -99,38 +100,17 @@ def update(submodule_path=None):
         git.submodule_update(submodule_info)
 
 
-@cli.command()
-@click.argument("submodule_path", default="")
-@click.argument("repository", default="")
-@click.option("--force-remote/--no-force-remote", default=False)
-def sync_remote(submodule_path=None, repo=None, force_remote=False):
-    """Use to alter remotes between camptocamp and upstream in .gitmodules.
-
-    :param force_remote: explicit remote to add, if omitted, acts this way:
-
-    * sets upstream to `camptocamp` if `merges` section of it's pending-merges
-      file is populated
-
-    * tries to guess upstream otherwise - for `odoo/src` path it is usually
-      `OCA/OCB` repository, for anything else it would search for a fork in a
-      `camptocamp` namespace and then set the upstream to fork's parent
-
-    Mainly used as a post-execution step for add/remove-pending-merge but it's
-    possible to call it directly from the command line.
-    """
-    pass
-
-
-@cli.command()
-@click.argument("entity_url")
-def add_pending(entity_url):
-    """Add a pending merge using given entity link"""
-    pass
-
+# @cli.command()
+# @click.argument("submodule_path", default="")
+# @click.argument("repository", default="")
+# @click.option("--force-remote/--no-force-remote", default=False)
+# def sync_remote(submodule_path=None, repo=None, force_remote=False):
+#     ui.echo("Use otools-pending aggregate")
+#
 
 # To add
-# * show prs
-# * show closed prs
+# * show prs -> otools-pending show
+# * show closed prs -> otools-pending show
 # * list_external_dependencies_installed
 # * upgrade
 
