@@ -2,6 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import os
+from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -210,7 +211,8 @@ def test_local_odoo_venv(runner):
                 # "sim_call_args": ["foo"],
             },
             {
-                "args": lambda a: str(a[0]).endswith("python") and a[2] == "ensurepip",
+                "args": lambda a: Path(a[0]).name.startswith("python")
+                and a[2] == "ensurepip",
             },
             {
                 "args": lambda a: str(a[0]).endswith("pip")
