@@ -16,7 +16,7 @@ except ImportError:
 
 
 from . import ui
-from .path import build_path
+from .path import build_path, cd
 from .proj import get_current_version
 
 
@@ -162,3 +162,18 @@ def submodule_update(submodule_info):
                 args += ["--reference", autoshare_repo.repo_dir]
         args.append(path)
         subprocess.run(base_update_cmd + args, check=True)
+
+
+def set_remote_url(repo_path, url):
+    subprocess.run(
+        ["git", "config", "--file=.gitmodules", f"submodule.{repo_path}.url", url],
+        check=True,
+    )
+    # relative_name = repo_path.relative_to("../")
+    with cd(build_path(repo_path)):
+        subprocess.run(["git", "remote", "set-url", "origin", url], check=True)
+
+
+def checkout(branch_name):
+    subprocess.run(["git", "fetch", "origin", branch_name])
+    subprocess.run(["git", "checkout", f"origin/{branch_name}"])

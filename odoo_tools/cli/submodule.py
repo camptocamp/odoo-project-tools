@@ -1,6 +1,7 @@
 import click
 
-from ..utils import git, path, ui
+from ..utils import gh, git, path, proj, ui
+from ..utils import pending_merge as pm_utils
 
 
 @click.group()
@@ -100,13 +101,49 @@ def update(submodule_path=None):
         git.submodule_update(submodule_info)
 
 
-# @cli.command()
-# @click.argument("submodule_path", default="")
-# @click.argument("repository", default="")
-# @click.option("--force-remote/--no-force-remote", default=False)
-# def sync_remote(submodule_path=None, repo=None, force_remote=False):
-#     ui.echo("Use otools-pending aggregate")
-#
+@cli.command()
+@click.argument("submodule_path", default="")
+@click.option("--force-remote/--no-force-remote", default=False)
+def sync_remote(submodule_path=None, repo=None, force_remote=False):
+    """Use to alter remotes between camptocamp and upstream in .gitmodules.
+
+    :param force_remote: explicit remote to add, if omitted, acts this way:
+
+    * sets upstream to `camptocamp` if `merges` section of it's pending-merges
+      file is populated
+
+    * tries to guess upstream otherwise - for `odoo/src` path it is usually
+      `OCA/OCB` repository, for anything else it would search for a fork in a
+      `camptocamp` namespace and then set the upstream to fork's parent
+
+    Mainly used as a post-execution step for add/remove-pending-merge but it's
+    possible to call it directly from the command line.
+    """
+
+    assert submodule_path or repo
+    repo = repo or pm_utils.Repo(submodule_path)
+
+    new_remote_url = pm_utils.get_new_remote_url(repo=repo, force_remote=force_remote)
+
+    with path.cd(path.root_path()):
+        git.set_remote_url(repo.path, new_remote_url)
+
+    print(f"Submodule {repo.path} is now being sourced from {new_remote_url}")
+
+    if repo.has_pending_merges():
+        # we're being polite here, excode 1 doesn't apply to this answer
+        ui.ask_or_abort(f"Rebuild consolidation branch for {repo.name}?")
+        push = ui.ask_confirmation(f"Push it to `{gh.GIT_C2C_REMOTE_NAME}'?")
+        repo.rebuild_consolidation_branch(push=push)
+
+    else:
+        odoo_version = proj.get_project_manifest_key("odoo_version")
+        if ui.ask_confirmation(
+            f"Submodule {repo.name} has no pending merges. Update it to {odoo_version}?"
+        ):
+            with path.cd(repo.abs_path):
+                git.checkout(target_branch=odoo_version)
+
 
 # To add
 # * show prs -> otools-pending show

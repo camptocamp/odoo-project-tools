@@ -456,6 +456,12 @@ class Repo:
                 self.remove_pending(closed_pr_info["owner"], closed_pr_info["shortcut"])
         return unmerged_prs_urls
 
+    def rebuild_consolidation_branch(self, push=False):
+        aggregator = self.get_aggregator()
+        aggregator.aggregate()
+        if push:
+            aggregator.push()
+
 
 class RepoAggregator(git_aggregator.repo.Repo):
     def __init__(self, repo, **extra_config):
@@ -570,3 +576,50 @@ def push_branches(version=None, force=False):
         ui.echo("\n - ".join([x.as_posix() for x in impacted_repos]))
     else:
         ui.echo("No repo to push")
+
+
+def get_new_remote_url(repo=None, force_remote=False):
+    if repo.has_pending_merges():
+        with open(repo.abs_merges_path) as pending_merges:
+            # read everything we can reach
+            # for reading purposes only
+            data = yaml_load(pending_merges)
+            submodule_pending_config = data[str(PosixPath("..") / repo.path)]
+            merges_in_action = submodule_pending_config["merges"]
+            registered_remotes = submodule_pending_config["remotes"]
+
+            if force_remote:
+                new_remote_url = registered_remotes[force_remote]
+            elif merges_in_action:
+                new_remote_url = registered_remotes[gh.GIT_C2C_REMOTE_NAME]
+            else:
+                new_remote_url = next(
+                    remote
+                    for remote in registered_remotes.values()
+                    if remote != gh.GIT_C2C_REMOTE_NAME
+                )
+    else:
+        # resolve what's the parent repository from which C2C consolidation
+        # one was forked
+        response = requests.get(repo.api_url())
+        if response.ok:
+            info = response.json()
+            parent = info.get("parent", {})
+            if parent:
+                # resolve w/ parent repository
+                # C2C consolidation was forked from
+                new_remote_url = parent.get("ssh_url")
+            else:
+                # not a forked repo (eg: camptocamp/connector-jira)
+                new_remote_url = info.get("ssh_url")
+        else:
+            ui.echo(
+                "Couldn't reach Github API to resolve submodule upstream."
+                " Please provide it manually."
+            )
+            default_repo = repo.name.replace("_", "-")
+            new_namespace = input("Namespace [OCA]: ") or "OCA"
+            new_repo = input(f"Repo name [{default_repo}]: ") or default_repo
+            new_remote_url = Repo.build_ssh_url(new_namespace, new_repo)
+
+    return new_remote_url
