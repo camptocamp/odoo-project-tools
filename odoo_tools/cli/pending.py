@@ -57,5 +57,23 @@ def aggregate(repo_path, target_branch=None, push=None):
         aggregator.push()
 
 
+@cli.command(name="add")
+@click.argument("entity_url")
+@click.option(
+    "--aggregate/--no-aggregate",
+    "aggregate",
+    help="run git aggregate. This is the default behavior.",
+    is_flag=True,
+    default=True,
+)
+def add_pending(entity_url, aggregate=True):
+    """Add a pending merge using given entity link"""
+    # pattern, given an https://github.com/<user>/<repo>/pull/<pr-index>
+    # # PR headline
+    # # PR link as is
+    # - refs/pull/<pr-index>/head
+    pm_utils.add_pending(entity_url, aggregate=aggregate)
+
+
 if __name__ == "__main__":
     cli()
