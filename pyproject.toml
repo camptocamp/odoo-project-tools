@@ -36,11 +36,10 @@ dependencies = [
     "cookiecutter",
     "click>=8.1",
     "towncrier",
-    "importlib_resources; python_version < '3.9'",
     "bump2version",
     "requirements-parser>=0.8.0",
     ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dynamic = ["version"]
 
 [project.urls]

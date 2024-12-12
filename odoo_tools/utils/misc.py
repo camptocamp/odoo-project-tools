@@ -4,13 +4,9 @@
 import configparser
 import shutil
 import subprocess
+from importlib.resources import files
 
 PKG_NAME = "odoo_tools"
-try:
-    from importlib.resources import files
-except ImportError:
-    # py < 3.9
-    from importlib_resources import files
 
 
 def get_file_path(filepath):
