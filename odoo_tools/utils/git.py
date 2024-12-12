@@ -92,67 +92,28 @@ def submodule_add(
     subprocess.run(cmd + args, check=True)
 
 
-def _get_submodules(submodule_path=None):
-    """return a list of (submodule path, submodule url).
-    If a submodule path is passed as argument, only submodules with that path are returned
-    """
-
-    output = subprocess.run(
-        ["git", "config", "--file", _get_gitmodules(), "--get-regexp", "path"],
-        check=True,
-        stdout=subprocess.PIPE,
-        text=True,
-    ).stdout
-    paths = [line.split()[1] for line in output.splitlines()]
-
-    output = subprocess.run(
-        ["git", "config", "--file", _get_gitmodules(), "--get-regexp", "url"],
-        check=True,
-        stdout=subprocess.PIPE,
-        text=True,
-    ).stdout
-    urls = [line.split()[1] for line in output.splitlines()]
-    module_list = zip(
-        paths,
-        urls,
-        # strict=True
-    )
-
-    if submodule_path is not None:
-        submodule_path = os.path.normpath(submodule_path)
-        module_list = [
-            (path, url)
-            for path, url in module_list
-            if os.path.normpath(path) == submodule_path
-        ]
-    return module_list
-
-
-def submodule_sync(submodule_path=None):
+def submodule_sync(path: Union[str, PathLike]):
+    """Submodule sync"""
     sync_cmd = ["git", "submodule", "sync"]
-
-    if submodule_path:
-        sync_cmd += ["--", submodule_path]
-
+    if path:
+        sync_cmd += ["--", str(path)]
     subprocess.run(sync_cmd, check=True)
 
 
-def submodule_update(submodule_info):
-    """
-    :param submodule_info: list of (submodule path, submodule url), as returned by `_get_submodules()`
-    """
-    base_update_cmd = ["git", "submodule", "update", "--init"]
-
-    for path, url in submodule_info:
-        args = []
-        if AUTOSHARE_ENABLED:
-            index, autoshare_repo = find_autoshare_repository([url])
-            if autoshare_repo:
-                if not os.path.exists(autoshare_repo.repo_dir):
-                    autoshare_repo.prefetch(True)
-                args += ["--reference", autoshare_repo.repo_dir]
-        args.append(path)
-        subprocess.run(base_update_cmd + args, check=True)
+def submodule_update(path: Union[str, PathLike]):
+    """Submodule update"""
+    cmd = ["git", "submodule", "update", "--init"]
+    args = []
+    # Use git-autoshare if available
+    submodule = next(iter_gitmodules(filter_path=path), None)
+    if submodule:
+        __, autoshare_repo = find_autoshare_repository([submodule.url])
+        if autoshare_repo:
+            if not os.path.exists(autoshare_repo.repo_dir):
+                autoshare_repo.prefetch(True)
+            args += ["--reference", autoshare_repo.repo_dir]
+    args.append(str(path))
+    subprocess.run(cmd + args, check=True)
 
 
 def set_remote_url(repo_path, url):

@@ -119,10 +119,10 @@ def update(submodule_path=None):
     :param submodule_path: submodule path for a precise sync & update
 
     """
-    submodule_info = git._get_submodules(submodule_path)
     with path.cd(path.root_path()):
-        git.submodule_sync(submodule_path)
-        git.submodule_update(submodule_info)
+        for submodule in git.iter_gitmodules(filter_path=submodule_path):
+            git.submodule_sync(submodule.path)
+            git.submodule_update(submodule.path)
 
 
 @cli.command()

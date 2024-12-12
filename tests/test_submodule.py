@@ -54,43 +54,40 @@ def test_init(project):
 
 
 @pytest.mark.project_setup(
-    manifest=dict(odoo_version="16.0"), proj_version="16.0.1.2.3"
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
+    extra_files={
+        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
+    },
 )
 def test_update(project):
-    gitmodules = build_path(".gitmodules")
     mock_fn = mock_subprocess_run(
         [
             {
                 "args": [
                     "git",
-                    "config",
-                    "--file",
-                    str(gitmodules),
-                    "--get-regexp",
-                    "path",
+                    "submodule",
+                    "sync",
+                    "--",
+                    "odoo/external-src/account-closing",
                 ],
-                "stdout": """submodule.odoo/external-src/account-closing.path odoo/external-src/account-closing
-submodule.odoo/external-src/account-financial-reporting.path odoo/external-src/account-financial-reporting
-""",
             },
             {
                 "args": [
                     "git",
-                    "config",
-                    "--file",
-                    str(gitmodules),
-                    "--get-regexp",
-                    "url",
+                    "submodule",
+                    "update",
+                    "--init",
+                    "odoo/external-src/account-closing",
                 ],
-                "stdout": """submodule.odoo/external-src/account-closing.url git@github.com:OCA/account-closing.git
-submodule.odoo/external-src/account-financial-reporting.url git@github.com:OCA/account-financial-reporting.git
-""",
             },
             {
                 "args": [
                     "git",
                     "submodule",
                     "sync",
+                    "--",
+                    "odoo/external-src/account-financial-reporting",
                 ],
             },
             {
@@ -98,20 +95,18 @@ submodule.odoo/external-src/account-financial-reporting.url git@github.com:OCA/a
                     "git",
                     "submodule",
                     "update",
-                    "--init" "odoo/external-src/account-closing",
-                ],
-            },
-            {
-                "args": [
-                    "git",
-                    "submodule",
-                    "update",
-                    "--init" "odoo/external-src/account-financial-reporting",
+                    "--init",
+                    "odoo/external-src/account-financial-reporting",
                 ],
             },
         ]
     )
-    with mock.patch("subprocess.run", mock_fn):
+    with (
+        mock.patch("subprocess.run", mock_fn),
+        mock.patch(
+            "odoo_tools.utils.git.find_autoshare_repository", return_value=(None, None)
+        ),
+    ):
         result = project.invoke(
             submodule.update,
             [],
