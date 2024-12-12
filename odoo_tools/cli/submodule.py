@@ -69,7 +69,7 @@ git_aggregator.main.setup_logger()
 
 
 class Repo:
-    """Handle repository/submodule homogenously."""
+    """Handle repository/submodule homogeneously."""
 
     def __init__(self, name_or_path, path_check=True):
         self.path = self.build_submodule_path(name_or_path)
@@ -135,7 +135,7 @@ class Repo:
     def repositories_from_pending_folder(cls, path=None):
         path = path or PENDING_MERGES_DIR
         repo_names = []
-        for root, dirs, files in os.walk(path):
+        for __, __, files in os.walk(path):
             repo_names = [
                 os.path.splitext(fname)[0] for fname in files if fname.endswith(".yml")
             ]
