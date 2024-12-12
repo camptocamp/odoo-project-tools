@@ -1,3 +1,5 @@
+from itertools import chain
+
 import click
 
 from ..utils import gh, git, path, proj, ui
@@ -10,7 +12,8 @@ def cli():
 
 
 @cli.command()
-def init():
+@click.pass_context
+def init(ctx):
     """Add git submodules read in the .gitmodules files.
 
     Allows to edit the .gitmodules file, add all the repositories and
@@ -24,10 +27,10 @@ def init():
             git.submodule_add(line)
 
     ui.echo("Submodules added")
-    # ui.echo()
-    # ui.echo("You can now update odoo/Dockerfile with this addons-path:")
-    # ui.echo()
-    # ls()
+    ui.echo("")
+    ui.echo("You can now update odoo/Dockerfile with this addons-path:")
+    ui.echo("")
+    ctx.invoke(ls)
 
 
 @cli.command()
@@ -37,13 +40,30 @@ def init():
     help="With --no-dockerfile, the raw paths are listed instead of the Dockerfile format",
 )
 def ls(dockerfile=True):
-    """[NOT IMPLEMENTED]List git submodules paths.
+    """List git submodules paths.
 
     It can be used to directly copy-paste the addons paths in the Dockerfile.
     The order depends of the order in the .gitmodules file.
-
     """
-    pass
+    submodules = (submodule.path for submodule in git.iter_gitmodules())
+    if dockerfile:
+        blacklist = {"odoo/src"}
+        lines = (f"odoo/{line}" for line in submodules if line not in blacklist)
+        lines = chain(
+            lines,
+            [
+                "odoo/src/odoo/odoo/addons",
+                "odoo/src/odoo/addons",
+                "odoo/enterprise",
+                "odoo/odoo/addons",
+            ],
+        )
+        lines = ("/%s" % line for line in lines)
+        template = 'ENV ADDONS_PATH="%s" \\\n'
+        print(template % (", \\\n".join(lines)))
+    else:
+        for line in submodules:
+            ui.echo(line)
 
 
 # @cli.command()

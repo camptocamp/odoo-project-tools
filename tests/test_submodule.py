@@ -147,3 +147,49 @@ submodule.odoo/external-src/account-financial-reporting.url git@github.com:OCA/a
             catch_exceptions=False,
         )
     assert result.exit_code == 0
+    mock_fn.assert_completed_calls()
+
+
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
+    extra_files={
+        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
+    },
+)
+def test_ls(project):
+    result = project.invoke(
+        submodule.ls,
+        ["--no-dockerfile"],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    assert result.output.splitlines() == [
+        "odoo/external-src/account-closing",
+        "odoo/external-src/account-financial-reporting",
+    ]
+
+
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
+    extra_files={
+        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
+    },
+)
+def test_ls_dockerfile(project):
+    result = project.invoke(
+        submodule.ls,
+        ["--dockerfile"],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    assert result.output.splitlines() == [
+        'ENV ADDONS_PATH="/odoo/odoo/external-src/account-closing, \\',
+        "/odoo/odoo/external-src/account-financial-reporting, \\",
+        "/odoo/src/odoo/odoo/addons, \\",
+        "/odoo/src/odoo/addons, \\",
+        "/odoo/enterprise, \\",
+        '/odoo/odoo/addons" \\',
+        "",
+    ]
