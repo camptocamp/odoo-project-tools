@@ -3,21 +3,22 @@
 
 import os
 import subprocess
+from collections.abc import Iterator
+from os import PathLike
+from pathlib import Path
+from typing import NamedTuple, Optional, Union
 
-try:
-    import git_autoshare  # noqa: F401
-    from git_autoshare.core import find_autoshare_repository  # noqa: F401
-
-    AUTOSHARE_ENABLED = True
-except ImportError:
-    print("Missing git-autoshare from requirements")
-    print("Please run `pip install -r tasks/requirements.txt`")
-    AUTOSHARE_ENABLED = False
-
+from git.config import GitConfigParser
+from git_autoshare.core import find_autoshare_repository
 
 from . import ui
 from .path import build_path, cd
-from .proj import get_current_version
+
+
+class SubmoduleInfo(NamedTuple):
+    path: str
+    url: str
+    branch: Optional[str]
 
 
 def get_odoo_core(hash, dest="src/odoo", org="odoo", branch=None):
@@ -59,46 +60,36 @@ def _get_gitmodules():
     return str(build_path(".gitmodules"))
 
 
-def iter_submodules():
-    """yields the submodules from `.gitmodule`"""
-    output = subprocess.run(
-        [
-            "git",
-            "config",
-            "-f",
-            _get_gitmodules(),
-            "--get-regexp",
-            "^submodule\\..*\\.path$",
-        ],
-        check=True,
-        stdout=subprocess.PIPE,
-        text=True,
-    ).stdout
-    for line in output.splitlines():
-        yield line.strip()
+def iter_gitmodules(
+    filter_path: Optional[Union[str, PathLike]] = None,
+) -> Iterator[SubmoduleInfo]:
+    """Yields the submodules from `.gitmodules`
+
+    :param filter_path: if provided, only yield the submodules on the given path
+    """
+    config = GitConfigParser(_get_gitmodules(), read_only=True)
+    if filter_path:
+        filter_path = Path(filter_path)
+    for section in config.sections():
+        info = dict(config.items(section))
+        assert "path" in info, f"Missing `path` in {section}"
+        assert "url" in info, f"Missing `url` in {section}"
+        if filter_path and not Path(info["path"]).is_relative_to(filter_path):
+            continue
+        yield SubmoduleInfo(info["path"], info["url"], info.get("branch"))
 
 
-def submodule_add(submodule_line):
-    add_command = ["git", "submodule", "add"]
-    if AUTOSHARE_ENABLED:
-        add_command = ["git", "autoshare-submodule-add"]
-    odoo_serie = get_current_version(serie_only=True)
-    branch = f"{odoo_serie}.0"
-    path_key, path = submodule_line.split()
-    url_key = path_key.replace(".path", ".url")
-    url = subprocess.run(
-        ["git", "config", "-f", _get_gitmodules(), "--get", url_key],
-        check=True,
-        stdout=subprocess.PIPE,
-        text=True,
-    ).stdout.strip()
-    try:
-        res = subprocess.run(
-            add_command + ["-b", branch, url, path],
-        )
-        print(res.returncode)
-    except:
-        raise
+def submodule_add(
+    url: str,
+    path: Union[str, PathLike],
+    branch: Optional[str] = None,
+) -> None:
+    """Add a submodule"""
+    cmd = ["git", "autoshare-submodule-add"]
+    args = ["--force", url, str(path)]
+    if branch:
+        args = ["-b", branch, *args]
+    subprocess.run(cmd + args, check=True)
 
 
 def _get_submodules(submodule_path=None):

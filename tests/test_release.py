@@ -159,9 +159,12 @@ def test_bump_push_repo_with_pending_merge():
     def mocked_run(cmd):
         ran_cmd.append(cmd)
 
-    with fake_project_root(
-        proj_version="14.0.0.1.0", mock_marabunta_file=True
-    ) as runner, mock.patch("odoo_tools.utils.pending_merge.run", mocked_run):
+    with (
+        fake_project_root(
+            proj_version="14.0.0.1.0", mock_marabunta_file=True
+        ) as runner,
+        mock.patch("odoo_tools.utils.pending_merge.run", mocked_run),
+    ):
         mock_pending_merge_repo_paths("edi-framework")
         # run init to get all files ready (eg: bumpversion)
         runner.invoke(init, catch_exceptions=False)

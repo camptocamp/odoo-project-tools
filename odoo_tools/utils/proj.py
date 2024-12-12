@@ -4,7 +4,7 @@ import os
 import shutil
 import subprocess
 import venv
-from functools import lru_cache
+from functools import cache
 
 from ..config import get_conf_key
 from . import ui
@@ -13,7 +13,7 @@ from .path import build_path, get_root_marker, root_path
 from .yaml import yaml_load
 
 
-@lru_cache(maxsize=None)
+@cache
 def get_project_manifest(key=None):
     path = root_path() / get_root_marker()
     with open(path) as f:

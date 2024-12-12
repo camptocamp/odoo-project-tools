@@ -1,0 +1,12 @@
+;[submodule "odoo/external-src/account-consolidation"]
+;	path = odoo/external-src/account-consolidation
+;	url = git@github.com:OCA/account-consolidation.git
+;	branch = 16.0
+[submodule "odoo/external-src/account-closing"]
+	path = odoo/external-src/account-closing
+	url = git@github.com:OCA/account-closing.git
+	branch = 16.0
+[submodule "odoo/external-src/account-financial-reporting"]
+	path = odoo/external-src/account-financial-reporting
+	url = git@github.com:OCA/account-financial-reporting.git
+	branch = 16.0

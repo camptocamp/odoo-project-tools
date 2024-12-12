@@ -23,14 +23,18 @@ def init(ctx):
 
     """
     with path.cd(path.root_path()):
-        for line in git.iter_submodules():
-            git.submodule_add(line)
+        for submodule in git.iter_gitmodules():
+            git.submodule_add(
+                url=submodule.url,
+                path=submodule.path,
+                branch=submodule.branch,
+            )
 
     ui.echo("Submodules added")
     ui.echo("")
     ui.echo("You can now update odoo/Dockerfile with this addons-path:")
     ui.echo("")
-    ctx.invoke(ls)
+    ctx.invoke(ls, dockerfile=True)
 
 
 @cli.command()
@@ -39,7 +43,7 @@ def init(ctx):
     default=True,
     help="With --no-dockerfile, the raw paths are listed instead of the Dockerfile format",
 )
-def ls(dockerfile=True):
+def ls(dockerfile=False):
     """List git submodules paths.
 
     It can be used to directly copy-paste the addons paths in the Dockerfile.

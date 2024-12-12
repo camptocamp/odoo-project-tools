@@ -76,6 +76,7 @@ def make_fake_project_root(
     req_file="requirements.txt",
     proj_version="14.0.0.1.0",
     mock_marabunta_file=False,
+    extra_files=None,
 ):
     proj_cfg_data = FAKE_PROJ_CFG_BY_VER[str(proj_tmpl_ver)].copy()
     proj_cfg_data.update(proj_cfg or {})
@@ -102,6 +103,11 @@ def make_fake_project_root(
 
     if mock_marabunta_file:
         fake_marabunta_file()
+    # Write the extra files
+    if extra_files:
+        for path, content in extra_files.items():
+            with open(path, "w") as fd:
+                fd.write(content)
 
 
 def fake_marabunta_file(source_file_path=None):
@@ -224,5 +230,10 @@ def mock_subprocess_run(mock_spec=None):
                 )
             )
         return MockCompletedProcess(args, stdout=call_spec.get("stdout"))
+
+    def assert_completed_calls():
+        assert not mock_spec, f"{len(mock_spec)} calls missing: {mock_spec}"
+
+    mock_run.assert_completed_calls = assert_completed_calls
 
     return mock_run
