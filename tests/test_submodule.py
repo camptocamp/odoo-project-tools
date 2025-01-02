@@ -56,6 +56,22 @@ def test_init(project):
 @pytest.mark.project_setup(
     manifest=dict(odoo_version="16.0"),
     proj_version="16.0.1.2.3",
+)
+def test_init_missing_gitmodules(project):
+    mock_fn = mock_subprocess_run([])
+    with mock.patch("subprocess.run", mock_fn):
+        result = project.invoke(
+            submodule.init,
+            [],
+            catch_exceptions=False,
+        )
+    mock_fn.assert_completed_calls()
+    assert result.exit_code == 0
+
+
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
     extra_files={
         ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
     },
