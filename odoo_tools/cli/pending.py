@@ -12,7 +12,11 @@ def cli():
 
 
 @cli.command(name="show")
-@click.argument("repo_path")
+@click.argument(
+    "repo_paths",
+    required=False,
+    nargs=-1,
+)
 @click.option(
     "-s",
     "--state",
@@ -26,10 +30,14 @@ def cli():
     help="remove the pull request in a state matching the value if the option from the git-aggregator file",
     type=click.Choice(["closed", "merged"], case_sensitive=False),
 )
-def show_pending(repo_path, state=None, purge=None):
+def show_pending(repo_paths=(), state=None, purge=None):
     """List pull requests on <repo_path>"""
-    repo = pm_utils.Repo(repo_path)
-    repo.show_prs(state=state, purge=purge)
+    if not repo_paths:
+        repositories = pm_utils.Repo.repositories_from_pending_folder()
+    else:
+        repositories = [pm_utils.Repo(repo_path) for repo_path in repo_paths]
+    for repo in repositories:
+        repo.show_prs(state=state, purge=purge)
 
 
 # TODO: add tests
