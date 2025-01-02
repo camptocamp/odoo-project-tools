@@ -21,8 +21,9 @@ def cli():
     "-s",
     "--state",
     "state",
-    help="only list pull requests in the specified state (open, merged, closed)",
-)  # TODO list valid values
+    help="only list pull requests in the specified state",
+    type=click.Choice(["open", "merged", "closed"], case_sensitive=False),
+)
 @click.option(
     "-p",
     "--purge",

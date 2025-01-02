@@ -407,8 +407,13 @@ class Repo:
         ui.echo(f"Merge file: {self.merges_path}")
         all_prs = aggregator.collect_prs_info()
         if state is not None:
-            # filter only our state
-            all_prs = {k: v for k, v in all_prs.items() if k == state}
+            if state == "merged":
+                all_prs = {"closed": all_prs.get("closed", [])}
+                all_prs["closed"] = [
+                    pr for pr in all_prs["closed"] if pr.get("merged") == "merged"
+                ]
+            else:
+                all_prs = {k: v for k, v in all_prs.items() if k == state}
         for pr_state, prs in all_prs.items():
             ui.echo(f"State: {pr_state}")
             for i, pr_info in enumerate(prs, 1):
