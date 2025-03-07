@@ -54,13 +54,14 @@ def ls(dockerfile=False):
         blacklist = {"odoo/src"}
         lines = (f"odoo/{line}" for line in submodules if line not in blacklist)
         lines = chain(
-            lines,
             [
                 "odoo/src/odoo/odoo/addons",
                 "odoo/src/odoo/addons",
-                "odoo/enterprise",
+                "odoo/src/enterprise",
                 "odoo/odoo/addons",
             ],
+            lines,
+            ["odoo/odoo/paid-modules"],
         )
         lines = ("/%s" % line for line in lines)
         template = 'ENV ADDONS_PATH="%s" \\\n'
