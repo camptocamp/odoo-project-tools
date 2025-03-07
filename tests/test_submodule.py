@@ -167,11 +167,12 @@ def test_ls_dockerfile(project):
     )
     assert result.exit_code == 0
     assert result.output.splitlines() == [
-        'ENV ADDONS_PATH="/odoo/odoo/external-src/account-closing, \\',
-        "/odoo/odoo/external-src/account-financial-reporting, \\",
-        "/odoo/src/odoo/odoo/addons, \\",
+        'ENV ADDONS_PATH="/odoo/src/odoo/odoo/addons, \\',
         "/odoo/src/odoo/addons, \\",
-        "/odoo/enterprise, \\",
-        '/odoo/odoo/addons" \\',
+        "/odoo/src/enterprise, \\",
+        "/odoo/odoo/addons, \\",
+        "/odoo/odoo/external-src/account-closing, \\",
+        "/odoo/odoo/external-src/account-financial-reporting, \\",
+        '/odoo/odoo/paid-modules" \\',
         "",
     ]
