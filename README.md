@@ -48,19 +48,25 @@ runnable yet).
 
 Go to the root of your project and follow the steps below:
 
-1. Run sync from Vincent's fork of odoo-template
+1. Make a copy of your local docker-compose.override.yml file:
 
     ```
-    invoke project.sync --fork vrenaville/odoo-template --version mig_to_core
+    mv docker-compose.override.yml docker-compose.override.yml.bak
     ```
 
-2. Initialize the project at v1
+2. Run sync from Vincent's fork of odoo-template
+
+    ```
+    invoke project.sync --version mig_to_core
+    ```
+
+3. Initialize the project at v1
 
     ```
     PROJ_TMPL_VER=1 otools-project init
     ```
 
-3. Stage new files and commit
+4. Stage new files and commit
 
     ```
     git add .
@@ -71,7 +77,7 @@ Go to the root of your project and follow the steps below:
     ;) (don't forget to update the project submodules again, as they will
     certainly have been reset)
 
-4. Install conversion tools
+5. Install conversion tools
 
     ```
     pip install "odoo-tools[convert] @ git+https://github.com/camptocamp/odoo-project-tools.git"
@@ -83,23 +89,21 @@ Go to the root of your project and follow the steps below:
     pipx inject odoo-tools "odoo-tools[convert] @ git+https://github.com/camptocamp/odoo-project-tools.git"
     ```
 
-5. Start a local instance with a copy of the production database
-
 6. Run the conversion script
 
     ```
-    CONV_ADMIN_PWD=admin otools-conversion -p 8069
+    otools-conversion
     ```
 
-    The script will move things around, figure out which OCA addons are
-    installed on your instance, and when done display a message about what
-    further manual steps are required, and what you need to check for. These
-    steps will also be saved to a file (see step 8 below).
+    The script will move things around, remove some of the submodules (odoo/src,
+    odoo/external-src/enterprise and odoo/external-src/odoo-cloud-platform), and
+    when done display a message about what further manual steps are required, and
+    what you need to check for. These steps will also be saved to a file (see step 9 below).
 
     Be careful, if you need to redo these steps, the submodules will have
     been removed by the script, you will need to run `git submodule update -i` again.
 
-7. Install pre-commit and run it on all files
+7.  Install pre-commit and run it on all files
 
     ```
     pre-commit install
@@ -107,11 +111,11 @@ Go to the root of your project and follow the steps below:
     ```
     Manually fix the issues that pre-commit is unable to fix by itself
 
-8. Stage all changes and commit
+8.  Stage all changes and commit
 
     ```
     git add .
     git commit -m "Convert to proj v2"
     ```
 
-9. Follow the steps in the generated `V2_MIG_NEXT_STEPS.todo` file
+9.  Follow the steps in the generated `V2_MIG_NEXT_STEPS.todo` file

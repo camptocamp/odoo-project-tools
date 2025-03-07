@@ -8,7 +8,6 @@ Please delete this when our last project has been converted.
 import argparse
 import ast
 import configparser
-import getpass
 import glob
 import os
 import os.path as osp
@@ -31,7 +30,6 @@ except ImportError:
 
 from ..config import get_conf_key
 from ..utils.path import root_path
-from ..utils.pending_merge import Repo
 from ..utils.proj import get_current_version
 from ..utils.pypi import odoo_name_to_pkg_name
 from ..utils.req import make_requirement_line_for_proj_fork
@@ -63,74 +61,38 @@ Next steps
 ==========
 
 1. check the diff between Dockerfile and Dockerfile.bak.
-   Look especially for
 
-    * the environment variables
-    * ADDONS_PATH
+    * update the ADDONS_PATH environment variable (`odoo/src` and
+      `odoo/external-src/enterprise` have moved,
+      `odoo-cloud-platform` must be removed)
+    * check other environment variables which could have been set
+    * check the differences introduced by an ongoing migration process
 
    meld Dockerfile Dockerfile.bak
 
-
-# TODO: there's no such backup file -> the sync will replace it
 
 2. check the diff between docker-compose.yml and docker-compose.yml.bak
 
     meld docker-compose.yml docker-compose.yml.bak
 
-3. check for pending merges in the OCA addons, and edit requirements.txt to match these (see below)
-4. check for pending merges in odoo or enterprise and find a way to cope with this XXXXX
-5. run docker build . and fix any build issues
+3. if you had a previous docker-compose.override.yml file, and you created a
+   backup before synchronizing the project, you can merge it with the new one
+
+4. check for pending merges in odoo or enterprise, and make sure you have patch
+   files for these that are placed in patches/odoo and patches/enterprise/
+   respectively. They will be processed by alphabetical order.
+
+5. run `docker build .` and fix any build issues
+
 6. configure github actions on your repository -> see
    https://confluence.camptocamp.com/confluence/display/DEV/How+to+deploy+Github+Actions+on+odoo+projects
+
 7. run your project and be happy!
 
 Try building the image with:
 
 docker build .
 
-"""
-
-PENDING_MERGE_MSG = """
-Repo(s) with pending merges
-===========================
-
-{repos_with_pending_merges}
-
-You can check PRs with: `otools-pending show path/to/repo`.
-
-Handling pending merges
-=======================
-
-If you have some pending merges, for instance in pending-merges/bank-payment.yml:
-
-```
-../odoo/external-src/bank-payment:
-  remotes:
-    camptocamp: git@github.com:camptocamp/bank-payment.git
-    OCA: git@github.com:OCA/bank-payment.git
-  target: camptocamp merge-branch-12345-master
-  merges:
-  - OCA $pinned-base
-  - OCA refs/pull/978/head
-```
-
-you need to do the following:
-1. check which addon is affected by the PR.
-   If the PR has been merged, then you can check which version of the module was created after the merge,
-   and use that version in requirements.txt, then remove the line from the aggregation file
-
-2. Otherwise, run
-
-    otools-addon add mod1 --pr https://github.com/OCA/bank-payment/pull/978
-    otools-addon add mod2 --pr https://github.com/OCA/bank-payment/pull/978
-
-   then remove the file from the aggregation file
-
-If you need/want to add requirements manually you can use
-
-    otools-addon print-req mod1 [--pr $pr] [--branch $branch] addon_name
-
-to generate the line to add.
 """
 
 
@@ -141,43 +103,16 @@ def main(args=None):
     if args is None:
         args = parse_args()
 
-    if args.disable_module_fetching:
-        installed_modules = set()
-    else:
-        installed_modules = get_installed_modules(
-            args.instance_host,
-            args.instance_port,
-            args.instance_database,
-            args.admin_login,
-            args.admin_password,
-        )
     # ensure project root is found
     root_path()
     move_files()
     submodules = collect_submodules()
     init_proj_v2()
-    handle_submodule_requirements(submodules.values(), installed_modules)
     remove_submodules(submodules)
     remove_files()
     copy_dockerfile()
     report(NEXT_STEPS_MSG)
     generate_report()
-
-
-def get_installed_modules(host, port, dbname, login, password):
-    if port == 443:
-        protocol = "jsonrpc+ssl"
-    else:
-        protocol = "jsonrpc"
-    odoo = odoorpc.ODOO(host, port=port, protocol=protocol)
-    odoo.login(dbname, login, password)
-    modules = odoo.execute(
-        "ir.module.module", "search_read", [("state", "=", "installed")], ["name"]
-    )
-    installed_modules = set()
-    for values in modules:
-        installed_modules.add(values["name"])
-    return installed_modules
 
 
 @dataclass
@@ -248,36 +183,18 @@ def collect_submodules():
 def remove_submodules(submodules):
     parser = configparser.ConfigParser(strict=False)
     parser.read(".git/config")
+
+    to_remove = [
+        "odoo/src",
+        "odoo/external-src/enterprise",
+        "odoo/external-src/odoo-cloud-platform",
+    ]
+    sections_to_remove = [f'submodule "{path}"' for path in to_remove]
     for section in submodules:
+        if section not in sections_to_remove:
+            continue
         parser.remove_section(section)
-        subprocess.run(["git", "rm", "--cached", submodules[section].path], check=False)
-        shutil.rmtree(submodules[section].path)
-    parser.write(open(".git/config2", "w"))
-    subprocess.run(["git", "rm", "-f", ".gitmodules"], check=False)
-    subprocess.run(["git", "rm", "-f", ".git/modules/odoo"], check=False)
-
-
-def handle_submodule_requirements(submodules, installed_modules):
-    repos_with_pending_merges = []
-    requirements_fp = open("requirements.txt", "a")
-    for submodule in submodules:
-        requirements = submodule.generate_requirements(installed_modules)
-        requirements_fp.write(requirements)
-        requirements_fp.write("\n")
-        repo = Repo(submodule.name, path_check=False)
-        if repo.has_pending_merges():
-            repos_with_pending_merges.append(submodule.name)
-    requirements_fp.close()
-    subprocess.run(["git", "add", "requirements.txt"], check=False)
-
-    if repos_with_pending_merges:
-        report(
-            PENDING_MERGE_MSG.format(
-                repos_with_pending_merges="\n -".join(repos_with_pending_merges)
-            )
-        )
-        # TODO: if we delete submodules before reaching this point
-        # devs will have to switch back to master to do such checks.
+        subprocess.run(["git", "rm", "-f", submodules[section].path], check=False)
 
 
 def init_proj_v2():
@@ -303,7 +220,6 @@ def move_files():
             check=False,
         )
     if glob.glob("odoo/local-src/*bundle"):
-        # @simo: @alex I don't get this!
         # the project is already using bundles -> drop the one generated by sync
         for dirname in glob.glob("odoo/addons/*bundle"):
             subprocess.run(["git", "rm", "-f", "-r", dirname], check=False)
@@ -334,6 +250,12 @@ def move_files():
         # shutil.move(filename, destdir)
         subprocess.run(["git", "mv", "-f", filename, destdir], check=False)
 
+    # the Dockerfile expect the patches/ directory to exist
+    if not os.path.isdir("patches"):
+        os.mkdir("patches")
+        open("patches/.gitkeep", "w").close()
+        subprocess.run(["git", "add", "patches/.gitkeep"], check=False)
+
 
 def remove_files():
     """cleanup no longer needed files"""
@@ -344,10 +266,8 @@ def remove_files():
         "odoo/start-entrypoint.d",
         "odoo/setup.py",
         "docs",
-        "travis",
-        "odoo/local-src/camptocamp_tools",
-        "odoo/local-src/camptocamp_website_tools",
-        # "odoo/external-src",
+        # "odoo/local-src/camptocamp_tools",
+        # "odoo/local-src/camptocamp_website_tools",
     ]
     for name in to_remove:
         if osp.isdir(name):
@@ -373,54 +293,8 @@ def parse_args():
         epilog="For a step by step guide on how to use this tool, check "
         "https://github.com/camptocamp/odoo-project-tools#project-conversion",
     )
-    parser.add_argument(
-        "-n",
-        "--no-module-from-instance",
-        action="store_true",
-        dest="disable_module_fetching",
-        help="don't fetch the list of installed module from a live Odoo instance",
-    )
-    parser.add_argument(
-        "-i",
-        "--instance-host",
-        action="store",
-        dest="instance_host",
-        default="localhost",
-        help="the name or ip address of a server running the unmigrated instance (used for fetching the list of installed modules)",
-    )
-    parser.add_argument(
-        "-p",
-        "--instance-port",
-        action="store",
-        type=int,
-        dest="instance_port",
-        default=443,
-        help="the port on which the server running the unmigrated instance is listening",
-    )
-    parser.add_argument(
-        "-d",
-        "--database",
-        action="store",
-        dest="instance_database",
-        default="odoodb",
-        help="the name of the database of the running unmigrated instance",
-    )
-    parser.add_argument(
-        "-a",
-        "--admin",
-        action="store",
-        dest="admin_login",
-        default="admin",
-        help="the login of an admin user on the unmigrated instance",
-    )
 
     args = parser.parse_args()
-    if not args.disable_module_fetching:
-        admin_password = os.getenv("CONV_ADMIN_PWD") or getpass.getpass(
-            "Instance admin password: "
-        )
-        args.admin_password = admin_password
-
     return args
 
 
