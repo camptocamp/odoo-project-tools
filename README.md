@@ -57,7 +57,7 @@ Go to the root of your project and follow the steps below:
 2. Run sync from Vincent's fork of odoo-template
 
     ```
-    invoke project.sync --version mig_to_core
+    invoke project.sync --version core-image
     ```
 
 3. Initialize the project at v1
