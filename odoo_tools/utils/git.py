@@ -19,6 +19,8 @@ class SubmoduleInfo(NamedTuple):
     path: str
     url: str
     branch: Optional[str]
+    exists: bool
+    cloned: bool
 
 
 def get_odoo_core(hash, dest="src/odoo", org="odoo", branch=None):
@@ -76,19 +78,28 @@ def iter_gitmodules(
         assert "url" in info, f"Missing `url` in {section}"
         if filter_path and not Path(info["path"]).is_relative_to(filter_path):
             continue
-        yield SubmoduleInfo(info["path"], info["url"], info.get("branch"))
+        path = Path(build_path(info["path"]))
+        exists = path.exists()
+        cloned = exists and Path(path / ".git").exists()
+        yield SubmoduleInfo(
+            info["path"], info["url"], info.get("branch"), exists, cloned
+        )
 
 
-def submodule_add(
-    url: str,
-    path: Union[str, PathLike],
-    branch: Optional[str] = None,
-) -> None:
+def submodule_init(submodule: SubmoduleInfo) -> None:
+    """Add a submodule"""
+    if submodule.exists:
+        submodule_update(submodule.path)
+    else:
+        submodule_add(submodule)
+
+
+def submodule_add(submodule: SubmoduleInfo) -> None:
     """Add a submodule"""
     cmd = ["git", "autoshare-submodule-add"]
-    args = ["--force", url, str(path)]
-    if branch:
-        args = ["-b", branch, *args]
+    args = ["--force", submodule.url, str(submodule.path)]
+    if submodule.branch:
+        args = ["-b", submodule.branch, *args]
     subprocess.run(cmd + args, check=True)
 
 
@@ -109,6 +120,7 @@ def submodule_update(path: Union[str, PathLike]):
     if submodule:
         __, autoshare_repo = find_autoshare_repository([submodule.url])
         if autoshare_repo:
+            ui.echo(f"Auto-share conf found for {autoshare_repo.repo_dir}")
             if not os.path.exists(autoshare_repo.repo_dir):
                 autoshare_repo.prefetch(True)
             args += ["--reference", autoshare_repo.repo_dir]

@@ -24,13 +24,9 @@ def init(ctx):
     """
     with path.cd(path.root_path()):
         for submodule in git.iter_gitmodules():
-            git.submodule_add(
-                url=submodule.url,
-                path=submodule.path,
-                branch=submodule.branch,
-            )
+            git.submodule_init(submodule)
 
-    ui.echo("Submodules added")
+    ui.echo("Submodules initialized.")
     ui.echo("")
     ui.echo("You can now update odoo/Dockerfile with this addons-path:")
     ui.echo("")
