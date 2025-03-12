@@ -1,6 +1,7 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+
 import click
 
 from ..utils import pending_merge as pm_utils
@@ -166,40 +167,63 @@ def add_pending(pr_url, addons=None, editable=True, aggregate=True, use_wool=Non
     # TODO: stage changes for commit
 
 
-@cli.command(name="print-req")
+@cli.command(name="add-req")
 @click.argument("name")
 @click.option("-v", "--version", "version")
 @click.option("-p", "--pr", "pr")
 @click.option("-b", "--branch", "branch")
 @click.option("-r", "--repo-name", "repo_name")
 @click.option("-u", "--upstream", "upstream")
+@click.option("-f", "--file", "file", help="file to add the requirement to")
 @click.option(
     "--odoo/--no-odoo",
     "odoo",
     default=True,
     help="use --no-odoo to install a python module which is not an Odoo addon",
 )
-def print_requirement(name, **kw):
-    """Print requirement line."""
-    opts = SmartDict(kw)
-    pkg_name = odoo_name_to_pkg_name(
-        name, odoo_serie=get_current_version(serie_only=True)
-    )
-    if opts.pr:
-        line = req_utils.make_requirement_line_for_pr(pkg_name, opts.pr)
-    elif opts.branch:
-        if not opts.repo_name:
-            ui.exit_msg("Repo name is required")
-        line = req_utils.make_requirement_line_for_proj_fork(
-            pkg_name, opts.repo_name, opts.branch, upstream=opts.upstream
-        )
-    else:
-        line = req_utils.make_requirement_line(pkg_name, version=opts.version)
+def add_requirement(name, **kw):
+    """Generate a python requirement line.
 
-    click.secho(f"Requirement line for: {name}", fg="green")
-    ui.echo("")
-    ui.echo(line)
-    ui.echo("")
+    You can simply copy the output and paste it in a requirements.txt file
+    or pass the --file option to append it to a file.
+
+    Example for a simple requirement line:
+
+        otools-addon add-req edi_oca -v 18 -f dev-requirements.txt
+
+    Example for a PR:
+
+        otools-addon add-req edi_oca -v 18 -p $pr_ref -f test-requirements.txt
+    """
+    opts = SmartDict(kw)
+
+    odoo_serie = get_current_version(serie_only=True)
+    pkg_name = odoo_name_to_pkg_name(name, odoo_serie=odoo_serie)
+
+    if opts.file:
+        req_utils.add_requirement(
+            pkg_name, pr=opts.pr, req_filepath=opts.file, version=opts.version
+        )
+        click.secho(f"Requirement line for {name} add to {opts.file}", fg="green")
+
+    else:
+        if opts.pr:
+            line = req_utils.make_requirement_line_for_pr(
+                pkg_name, opts.pr, use_wool=opts.use_wool
+            )
+        elif opts.branch:
+            if not opts.repo_name:
+                ui.exit_msg("Repo name is required")
+            line = req_utils.make_requirement_line_for_proj_fork(
+                pkg_name, opts.repo_name, opts.branch, upstream=opts.upstream
+            )
+        else:
+            line = req_utils.make_requirement_line(pkg_name, version=opts.version)
+
+        click.secho(f"Requirement line for: {name}", fg="green")
+        ui.echo("")
+        ui.echo(line)
+        ui.echo("")
 
 
 if __name__ == "__main__":
