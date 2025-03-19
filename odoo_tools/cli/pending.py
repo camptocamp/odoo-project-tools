@@ -54,7 +54,7 @@ def show_pending(repo_paths=(), state=None, purge=None):
     "--push/--no-push",
     "push",
     is_flag=True,
-    default=False,
+    default=True,
     help="push the result of the aggregation to a remote branch",
 )
 def aggregate(repo_path, target_branch=None, push=None):
