@@ -146,8 +146,7 @@ def sync_remote(submodule_path=None, repo=None, force_remote=False):
 
     new_remote_url = pm_utils.get_new_remote_url(repo=repo, force_remote=force_remote)
 
-    with path.cd(path.root_path()):
-        git.set_remote_url(repo.path, new_remote_url)
+    git.set_remote_url(repo.path, new_remote_url)
 
     print(f"Submodule {repo.path} is now being sourced from {new_remote_url}")
 

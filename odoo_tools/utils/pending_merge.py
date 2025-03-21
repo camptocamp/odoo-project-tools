@@ -393,7 +393,7 @@ class Repo:
                 " having troubles removing that:\n"
                 f"Looking for: {line_bit_to_drop}"
             )
-        conf["shell_command_after"] = patches
+        conf["shell_command_after"] = patches if patches else None
         self.update_merges_config(conf)
 
     # aggregator API
@@ -454,10 +454,16 @@ class Repo:
                 pr = pr_info_msg.format(**pr_info["raw"])
                 ui.echo(f"  {nr}) {pr}")
 
+        purged = None
         if purge and all_repos_prs.get("closed", []):
             kw = {f"purge_{purge}": True}
-            self._purge_closed_prs(all_repos_prs, **kw)
+            purged = self._purge_closed_prs(all_repos_prs, **kw)
 
+        if purged and self.has_pending_merges():
+            if ui.ask_confirmation("Do you want to re-aggregate and push?"):
+                aggregator = self.get_aggregator()
+                aggregator.aggregate()
+                aggregator.push()
         return all_repos_prs
 
     def _collect_prs(self):
@@ -504,6 +510,7 @@ class Repo:
         # If purge_closed is set to True, removed prs will not be returned
         unmerged_prs_urls = [pr.get("url") for pr in closed_unmerged_prs]
 
+        purged = False
         if closed_unmerged_prs and purge_closed:
             ui.echo("Purging closed ones...")
             for closed_pr_info in closed_unmerged_prs:
@@ -517,6 +524,7 @@ class Repo:
                             closed_pr_info["owner"], closed_pr_info["pr"]
                         )
                     unmerged_prs_urls.remove(closed_pr_info.get("url"))
+                    purged = True
                 except Exception as e:
                     ui.echo(
                         "An error occurs during '{}' removal : {}".format(
@@ -534,10 +542,10 @@ class Repo:
                     self.remove_pending_pull(
                         closed_pr_info["owner"], closed_pr_info["pr"]
                     )
-
+                purged = True
         if not self.has_any_pr_left():
             self._handle_empty_merges_file()
-        return unmerged_prs_urls
+        return purged
 
     def _handle_empty_merges_file(self):
         odoo_version = get_project_manifest_key("odoo_version")
@@ -573,10 +581,18 @@ class Repo:
             + "\n"
         )
         choice = ui.ask_question(msg, default=default_choice)
-        chosen_remote = next(opt for opt in sorted_options if opt.choice == choice)
-        if chosen_remote.remote:
+        opt = next(opt for opt in sorted_options if opt.choice == choice)
+        if opt.remote:
+            # FIXME: use an internal util to get remotes
+            remotes = self.get_aggregator()._get_remotes()
+            if opt.remote not in remotes:
+                new_remote_url = get_new_remote_url(repo=self, force_remote=opt.remote)
+                ui.echo(f"Adding missing remote: {opt.remote} -> {new_remote_url}")
+                git.set_remote_url(
+                    self.path, new_remote_url, remote=opt.remote, add=True
+                )
             with cd(self.abs_path):
-                git.checkout(odoo_version, remote=chosen_remote.remote)
+                git.checkout(odoo_version, remote=opt.remote)
         ui.echo("")
         if ui.ask_confirmation(f"Delete pending merge file {self.abs_merges_path}?"):
             self.abs_merges_path.unlink()
