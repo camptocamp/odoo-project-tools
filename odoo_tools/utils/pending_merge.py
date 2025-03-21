@@ -361,6 +361,7 @@ class Repo:
         print(f"✨ cherry pick {upstream}/{commit_sha} has been removed")
 
     def remove_pending_pull(self, upstream, pull_id):
+        # TODO: handle shell_after_command
         conf = self.merges_config()
         line_to_drop = f"{upstream} refs/pull/{pull_id}/head"
         if line_to_drop not in conf["merges"]:
@@ -406,12 +407,13 @@ class Repo:
             "      Shortcut: {shortcut}\n"
         )
         all_repos_prs = {}
-        aggregator = self.get_aggregator()
         ui.echo("--")
         ui.echo(f"Checking: {self.name}")
         ui.echo(f"Path: {self.path}")
         ui.echo(f"Merge file: {self.merges_path}")
-        all_prs = aggregator.collect_prs_info()
+
+        all_prs = self._collect_prs()
+
         if state is not None:
             if state == "merged":
                 all_prs = {"closed": all_prs.get("closed", [])}
@@ -434,6 +436,35 @@ class Repo:
             self._purge_closed_prs(all_repos_prs, **kw)
 
         return all_repos_prs
+
+    def _collect_prs(self):
+        aggregator = self.get_aggregator()
+        # Normal merges
+        all_prs = aggregator.collect_prs_info()
+        # patches
+        patch_merges = []
+        # Convert lines like:
+        # "curl -sSL https://github.com/OCA/manufacture/pull/1469.patch
+        # | git am -3 --keep-non-patch --exclude '*requirements.txt'"
+        # ...to...
+        # OCA refs/pull/1469/head
+        patches = self.merges_config().get("shell_command_after") or []
+        if not patches:
+            return all_prs
+        for line in patches:
+            if ".patch" in line and "git am" in line:
+                line = line.split(".patch")[0]
+                pr_info = gh.parse_github_url(line)
+                patch_merges.append(
+                    {
+                        "remote": pr_info["upstream"],
+                        "ref": f"refs/{pr_info['entity_type']}/{pr_info['entity_id']}/head",
+                    }
+                )
+        patch_merges = aggregator.collect_prs_info(merges=patch_merges)
+        for state, prs in patch_merges.items():
+            all_prs.setdefault(state, []).extend(prs)
+        return all_prs
 
     # TODO: add tests
     def _purge_closed_prs(self, all_repos_prs, purge_merged=False, purge_closed=False):
