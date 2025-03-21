@@ -27,3 +27,9 @@ def echo(msg, *pa, **kw):
     if kw.get("fg"):
         cmd = click.secho
     cmd(msg, *pa, **kw)
+
+
+def ask_question(message, default=None):
+    """Ask a question and return the answer."""
+    value = click.prompt(message, default=default)
+    return value

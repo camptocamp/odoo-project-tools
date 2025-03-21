@@ -14,8 +14,8 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from ..config import get_conf_key
 from ..exceptions import PathNotFound
-from ..utils.misc import get_docker_image_commit_hashes
-from . import gh, ui
+from ..utils.misc import SmartDict, get_docker_image_commit_hashes
+from . import gh, git, ui
 from .os_exec import run
 from .path import build_path, cd
 from .proj import get_current_version, get_project_manifest_key
@@ -108,6 +108,12 @@ class Repo:
             return False
         # either empty or commented out
         return bool(self.merges_config())
+
+    def has_any_pr_left(self):
+        if not self.has_pending_merges():
+            return False
+        config = self.merges_config()
+        return any("pull" in x for x in config.get("merges", []))
 
     def merges_config(self):
         with open(self.abs_merges_path) as f:
@@ -422,10 +428,11 @@ class Repo:
                 nr = str(i).zfill(2)
                 pr = pr_info_msg.format(**pr_info["raw"])
                 ui.echo(f"  {nr}) {pr}")
+
         if purge and all_repos_prs.get("closed", []):
             kw = {f"purge_{purge}": True}
             self._purge_closed_prs(all_repos_prs, **kw)
-            # TODO: ask for re-aggregate?
+
         return all_repos_prs
 
     # TODO: add tests
@@ -445,8 +452,8 @@ class Repo:
             ui.echo("Purging closed ones...")
             for closed_pr_info in closed_unmerged_prs:
                 try:
-                    self.remove_pending(
-                        closed_pr_info["owner"], closed_pr_info["shortcut"]
+                    self.remove_pending_pull(
+                        closed_pr_info["owner"], closed_pr_info["pr"]
                     )
                     unmerged_prs_urls.remove(closed_pr_info.get("url"))
                 except Exception as e:
@@ -458,8 +465,53 @@ class Repo:
         if closed_merged_prs and purge_merged:
             ui.echo("Purging merged ones...")
             for closed_pr_info in closed_merged_prs:
-                self.remove_pending(closed_pr_info["owner"], closed_pr_info["shortcut"])
+                self.remove_pending_pull(closed_pr_info["owner"], closed_pr_info["pr"])
+
+        if not self.has_any_pr_left():
+            self._handle_empty_merges_file()
         return unmerged_prs_urls
+
+    def _handle_empty_merges_file(self):
+        odoo_version = get_project_manifest_key("odoo_version")
+        ui.echo("")
+        update_options = [
+            SmartDict(choice="9", label="no update", remote="", ref=""),
+        ]
+        default_remote = "OCA"
+        avail_remotes = list(self.merges_config()["remotes"].keys())
+        if "OCA" not in avail_remotes:
+            if self.company_git_remote in avail_remotes:
+                default_remote = self.company_git_remote
+            else:
+                ui.exit_msg("No OCA or company remote found in merges config.")
+
+        for i, remote in enumerate(avail_remotes, start=1):
+            ref = f"{remote}/{odoo_version}"
+            update_options.append(
+                SmartDict(
+                    choice=str(i),
+                    label=ref,
+                    remote=remote,
+                    ref=ref,
+                    default=remote == default_remote,
+                )
+            )
+        sorted_options = sorted(update_options, key=lambda x: x.choice)
+        default_choice = next(opt for opt in sorted_options if opt.default).choice
+        msg = (
+            f"Submodule {self.name} has no pending merges. "
+            f"Choose if/how to update:\n"
+            + "\n".join([f"  {opt.choice}) {opt.label} " for opt in sorted_options])
+            + "\n"
+        )
+        choice = ui.ask_question(msg, default=default_choice)
+        chosen_remote = next(opt for opt in sorted_options if opt.choice == choice)
+        if chosen_remote.remote:
+            with cd(self.abs_path):
+                git.checkout(odoo_version, remote=chosen_remote.remote)
+        ui.echo("")
+        if ui.ask_confirmation(f"Delete pending merge file {self.abs_merges_path}?"):
+            self.abs_merges_path.unlink()
 
     def rebuild_consolidation_branch(self, push=False):
         aggregator = self.get_aggregator()
