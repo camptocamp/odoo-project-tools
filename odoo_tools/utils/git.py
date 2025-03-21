@@ -12,7 +12,7 @@ from git.config import GitConfigParser
 from git_autoshare.core import find_autoshare_repository
 
 from . import ui
-from .path import build_path, cd
+from .path import build_path, cd, root_path
 
 
 class SubmoduleInfo(NamedTuple):
@@ -128,14 +128,17 @@ def submodule_update(path: Union[str, PathLike]):
     subprocess.run(cmd + args, check=True)
 
 
-def set_remote_url(repo_path, url):
-    subprocess.run(
-        ["git", "config", "--file=.gitmodules", f"submodule.{repo_path}.url", url],
-        check=True,
-    )
-    # relative_name = repo_path.relative_to("../")
+def set_remote_url(repo_path, url, remote="origin", add=False):
+    with cd(root_path()):
+        subprocess.run(
+            ["git", "config", "--file=.gitmodules", f"submodule.{repo_path}.url", url],
+            check=True,
+        )
+    cmd = ["git", "remote", "set-url", remote, url]
+    if add:
+        cmd = ["git", "remote", "add", remote, url]
     with cd(build_path(repo_path)):
-        subprocess.run(["git", "remote", "set-url", "origin", url], check=True)
+        subprocess.run(cmd, check=True)
 
 
 def checkout(branch_name, remote="origin"):
