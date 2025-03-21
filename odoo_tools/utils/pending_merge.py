@@ -113,7 +113,10 @@ class Repo:
         if not self.has_pending_merges():
             return False
         config = self.merges_config()
-        return any("pull" in x for x in config.get("merges", []))
+        pr_refs = any("pull" in x for x in config.get("merges", []))
+        patches = config.get("shell_command_after", []) or []
+        pr_patches = any("pull" in x for x in patches)
+        return pr_refs or pr_patches
 
     def merges_config(self):
         with open(self.abs_merges_path) as f:
@@ -361,7 +364,6 @@ class Repo:
         print(f"✨ cherry pick {upstream}/{commit_sha} has been removed")
 
     def remove_pending_pull(self, upstream, pull_id):
-        # TODO: handle shell_after_command
         conf = self.merges_config()
         line_to_drop = f"{upstream} refs/pull/{pull_id}/head"
         if line_to_drop not in conf["merges"]:
@@ -371,6 +373,27 @@ class Repo:
                 f"Looking for: {line_to_drop}"
             )
         conf["merges"].remove(line_to_drop)
+        self.update_merges_config(conf)
+
+    def remove_pending_pull_from_patches(self, upstream, pull_id):
+        conf = self.merges_config()
+        patches = conf.get("shell_command_after") or []
+        if not patches:
+            return
+        line_bit_to_drop = f"pull/{pull_id}.patch"
+        found = False
+        for line in patches:
+            if line_bit_to_drop in line:
+                patches.remove(line)
+                found = True
+                break
+        if not found:
+            ui.exit_msg(
+                f"No such reference found in {self.abs_merges_path},"
+                " having troubles removing that:\n"
+                f"Looking for: {line_bit_to_drop}"
+            )
+        conf["shell_command_after"] = patches
         self.update_merges_config(conf)
 
     # aggregator API
@@ -463,6 +486,8 @@ class Repo:
                 )
         patch_merges = aggregator.collect_prs_info(merges=patch_merges)
         for state, prs in patch_merges.items():
+            for pr_info in prs:
+                pr_info["_patch"] = True
             all_prs.setdefault(state, []).extend(prs)
         return all_prs
 
@@ -483,9 +508,14 @@ class Repo:
             ui.echo("Purging closed ones...")
             for closed_pr_info in closed_unmerged_prs:
                 try:
-                    self.remove_pending_pull(
-                        closed_pr_info["owner"], closed_pr_info["pr"]
-                    )
+                    if closed_pr_info.get("_patch"):
+                        self.remove_pending_pull_from_patches(
+                            closed_pr_info["owner"], closed_pr_info["pr"]
+                        )
+                    else:
+                        self.remove_pending_pull(
+                            closed_pr_info["owner"], closed_pr_info["pr"]
+                        )
                     unmerged_prs_urls.remove(closed_pr_info.get("url"))
                 except Exception as e:
                     ui.echo(
@@ -496,7 +526,14 @@ class Repo:
         if closed_merged_prs and purge_merged:
             ui.echo("Purging merged ones...")
             for closed_pr_info in closed_merged_prs:
-                self.remove_pending_pull(closed_pr_info["owner"], closed_pr_info["pr"])
+                if closed_pr_info.get("_patch"):
+                    self.remove_pending_pull_from_patches(
+                        closed_pr_info["owner"], closed_pr_info["pr"]
+                    )
+                else:
+                    self.remove_pending_pull(
+                        closed_pr_info["owner"], closed_pr_info["pr"]
+                    )
 
         if not self.has_any_pr_left():
             self._handle_empty_merges_file()
