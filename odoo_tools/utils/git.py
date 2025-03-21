@@ -138,6 +138,6 @@ def set_remote_url(repo_path, url):
         subprocess.run(["git", "remote", "set-url", "origin", url], check=True)
 
 
-def checkout(branch_name):
-    subprocess.run(["git", "fetch", "origin", branch_name])
-    subprocess.run(["git", "checkout", f"origin/{branch_name}"])
+def checkout(branch_name, remote="origin"):
+    subprocess.run(["git", "fetch", remote, branch_name])
+    subprocess.run(["git", "checkout", f"{remote}/{branch_name}"])
