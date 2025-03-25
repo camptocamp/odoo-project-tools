@@ -464,6 +464,8 @@ class Repo:
                 aggregator = self.get_aggregator()
                 aggregator.aggregate()
                 aggregator.push()
+        if not self.has_any_pr_left():
+            self._handle_empty_merges_file()
         return all_repos_prs
 
     def _collect_prs(self):
@@ -543,8 +545,6 @@ class Repo:
                         closed_pr_info["owner"], closed_pr_info["pr"]
                     )
                 purged = True
-        if not self.has_any_pr_left():
-            self._handle_empty_merges_file()
         return purged
 
     def _handle_empty_merges_file(self):
