@@ -27,6 +27,10 @@ def cli():
     pass
 
 
+# TODO: this command ATM is kind of a mix between `add` and `add-pending`.
+# As we won't use yet pip installed modules.
+
+
 @cli.command()
 @click.argument("name")
 @click.option(
