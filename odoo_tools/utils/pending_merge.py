@@ -282,6 +282,20 @@ class Repo:
         self.update_merges_config(conf)
         return True
 
+    def add_pending_pull_request_patch(self, upstream, entity_url):
+        conf = self.merges_config()
+        line = f"curl -sSL {entity_url} | git am -3 --keep-non-patch --exclude '*requirements.txt'"
+        patches = self.merges_config().get("shell_command_after") or []
+        if line in patches:
+            ui.echo(
+                f"{self.abs_merges_path} already contains a reference to {entity_url}"
+            )
+            return
+        patches.append(line)
+        conf["shell_command_after"] = patches
+        self.update_merges_config(conf)
+        ui.echo(f"📋 patch {entity_url} has been added")
+
     def _get_pending_commit_lines(self, upstream: str, commit_sha: str):
         """Return the lines to add to the merges file for a given commit."""
         if self.template_version == 1:
@@ -613,7 +627,7 @@ class RepoAggregator(git_aggregator.repo.Repo):
         self.cwd = self.pm_repo.abs_path
 
 
-def add_pending(entity_url, aggregate=True):
+def add_pending(entity_url, aggregate=True, patch=False):
     """Add a pending merge using the given entity url.
 
     Adds the pending merge in the appropriate aggregation file (under pending-merges.d),
@@ -640,7 +654,14 @@ def add_pending(entity_url, aggregate=True):
         repo.update_pending_merges_file_base_merge()
 
     if entity_type == "pull":
-        repo.add_pending_pull_request(upstream, entity_id)
+        if entity_url.endswith(".patch"):
+            patch = True
+        elif patch and not entity_url.endswith(".patch"):
+            entity_url += ".patch"
+        if patch:
+            repo.add_pending_pull_request_patch(upstream, entity_url)
+        else:
+            repo.add_pending_pull_request(upstream, entity_id)
     elif entity_type in ("commit", "tree"):
         repo.add_pending_commit(upstream, entity_id)
     if aggregate:

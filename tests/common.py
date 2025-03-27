@@ -156,9 +156,12 @@ PENDING_MERGE_FILE_TMPL = """
 """
 
 
-def mock_pending_merge_repo_paths(repo_name, org_name="OCA", src=True, pending=True):
+def mock_pending_merge_repo_paths(
+    repo_name, org_name="OCA", src=True, pending=True, tmpl=PENDING_MERGE_FILE_TMPL
+):
     """Generate fake paths for given repo."""
     repo = Repo(repo_name, path_check=False)
+    path = None
     if src:
         path = repo.abs_path / ".git"
         os.makedirs(path, exist_ok=True)
@@ -168,13 +171,14 @@ def mock_pending_merge_repo_paths(repo_name, org_name="OCA", src=True, pending=T
         os.makedirs(path.parent, exist_ok=True)
         with open(path, "w") as fd:
             fd.write(
-                PENDING_MERGE_FILE_TMPL.format(
+                tmpl.format(
                     ext_src_rel_path=repo.ext_src_rel_path,
                     repo_name=repo_name,
                     org_name=org_name,
                     pid="1234",
                 )
             )
+    return path
 
 
 class MockCompletedProcess:

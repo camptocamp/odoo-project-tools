@@ -75,13 +75,21 @@ def aggregate(repo_path, target_branch=None, push=None):
     is_flag=True,
     default=True,
 )
-def add_pending(entity_url, aggregate=True):
+@click.option(
+    "--patch",
+    "patch",
+    help="Add a patch to the pending merge file instead of a PR. "
+    "Very handy to avoid conflicts or to prevent additional commits to be added to the repo.",
+    is_flag=True,
+    default=False,
+)
+def add_pending(entity_url, aggregate=True, patch=False):
     """Add a pending merge using given entity link"""
     # pattern, given an https://github.com/<user>/<repo>/pull/<pr-index>
     # # PR headline
     # # PR link as is
     # - refs/pull/<pr-index>/head
-    pm_utils.add_pending(entity_url, aggregate=aggregate)
+    pm_utils.add_pending(entity_url, aggregate=aggregate, patch=patch)
 
 
 @cli.command(name="remove")
