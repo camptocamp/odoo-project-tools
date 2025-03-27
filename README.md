@@ -25,19 +25,83 @@ pipx install git+https://github.com/camptocamp/odoo-project-tools.git
 Note: information below is subject to change.
 
 
-The package brings the following commands:
+The package brings the following commands.
 
 
 `otools-project`: manage proj
 
-`otools-addons`: tools to work with addons
+`otools-pending`: manage pendng merges
 
 `otools-release`: bump releases
 
-`otools-tasks`: access to the "old" invoke tasks, being rewritten.
+`otools-addon`: tools to work with addons and test requirements
 
+`otools-tasks`: access to the "old" invoke tasks, yet to be rewritten
 
 Use `--help` to get the list of subcommands.
+
+
+### otools-project
+
+Use the `init` command to initialize a new project to use these tools.
+
+Example:
+
+    ```
+    PROJ_TMPL_VER=1 otools-project init
+    ```
+
+This will create all configuration files that must be added to the project.
+
+
+### otools-pending
+
+Tool for managing pending merges and performing git aggregations on repositories.
+It includes commands for listing pull requests,
+aggregating branches, and adding or removing pending merges.
+
+Commands:
+    - `show`: List pull requests for specified repositories or all repositories
+      in the pending folder. Supports filtering by state and purging closed or
+      merged pull requests.
+    - `aggregate`: Perform a git aggregation on a specified repository and push
+      the result to a remote branch if desired.
+    - `add`: Add a pending merge using a given entity URL. Optionally, run git
+      aggregation or add a patch to the pending merge.
+    - `remove`: Remove a pending merge using a given entity URL. Optionally, run
+      git aggregation after removal.
+
+Run `otools-pending $cmd --help` to know more about the options.
+
+### otools-release
+
+Tool for preparing a release.
+
+It takes care of:
+
+* bumping the version
+* update changelog
+* update migration file
+
+Run `otools-release release --help` to know more about the options.
+
+
+### otools-addon
+
+NOTE: this tool is meant to be used mostly for future project versions
+where we'll have all modules installed via pip.
+
+The most handy feature at the moment is: `otools-addon add-req`.
+
+It allows to add requiments and test requirements on the fly to an existing req file.
+
+Example:
+
+    ```
+    otools-addon add-req edi_oca -v 18 -p $pr_ref -f test-requirements.txt
+    ```
+
+This will add the test dependency in the right way to the given file.
 
 ## Project conversion
 
