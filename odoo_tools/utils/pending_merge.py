@@ -113,7 +113,10 @@ class Repo:
         if not self.has_pending_merges():
             return False
         config = self.merges_config()
-        return any("pull" in x for x in config.get("merges", []))
+        pr_refs = any("pull" in x for x in config.get("merges", []))
+        patches = config.get("shell_command_after", []) or []
+        pr_patches = any("pull" in x for x in patches)
+        return pr_refs or pr_patches
 
     def merges_config(self):
         with open(self.abs_merges_path) as f:
@@ -279,6 +282,20 @@ class Repo:
         self.update_merges_config(conf)
         return True
 
+    def add_pending_pull_request_patch(self, upstream, entity_url):
+        conf = self.merges_config()
+        line = f"curl -sSL {entity_url} | git am -3 --keep-non-patch --exclude '*requirements.txt'"
+        patches = self.merges_config().get("shell_command_after") or []
+        if line in patches:
+            ui.echo(
+                f"{self.abs_merges_path} already contains a reference to {entity_url}"
+            )
+            return
+        patches.append(line)
+        conf["shell_command_after"] = patches
+        self.update_merges_config(conf)
+        ui.echo(f"📋 patch {entity_url} has been added")
+
     def _get_pending_commit_lines(self, upstream: str, commit_sha: str):
         """Return the lines to add to the merges file for a given commit."""
         if self.template_version == 1:
@@ -372,6 +389,27 @@ class Repo:
         conf["merges"].remove(line_to_drop)
         self.update_merges_config(conf)
 
+    def remove_pending_pull_from_patches(self, upstream, pull_id):
+        conf = self.merges_config()
+        patches = conf.get("shell_command_after") or []
+        if not patches:
+            return
+        line_bit_to_drop = f"pull/{pull_id}.patch"
+        found = False
+        for line in patches:
+            if line_bit_to_drop in line:
+                patches.remove(line)
+                found = True
+                break
+        if not found:
+            ui.exit_msg(
+                f"No such reference found in {self.abs_merges_path},"
+                " having troubles removing that:\n"
+                f"Looking for: {line_bit_to_drop}"
+            )
+        conf["shell_command_after"] = patches if patches else None
+        self.update_merges_config(conf)
+
     # aggregator API
     # TODO: add tests
     def get_aggregator(self, target_remote=None, target_branch=None, **extra_config):
@@ -406,12 +444,13 @@ class Repo:
             "      Shortcut: {shortcut}\n"
         )
         all_repos_prs = {}
-        aggregator = self.get_aggregator()
         ui.echo("--")
         ui.echo(f"Checking: {self.name}")
         ui.echo(f"Path: {self.path}")
         ui.echo(f"Merge file: {self.merges_path}")
-        all_prs = aggregator.collect_prs_info()
+
+        all_prs = self._collect_prs()
+
         if state is not None:
             if state == "merged":
                 all_prs = {"closed": all_prs.get("closed", [])}
@@ -429,11 +468,50 @@ class Repo:
                 pr = pr_info_msg.format(**pr_info["raw"])
                 ui.echo(f"  {nr}) {pr}")
 
+        purged = None
         if purge and all_repos_prs.get("closed", []):
             kw = {f"purge_{purge}": True}
-            self._purge_closed_prs(all_repos_prs, **kw)
+            purged = self._purge_closed_prs(all_repos_prs, **kw)
 
+        if purged and self.has_pending_merges():
+            if ui.ask_confirmation("Do you want to re-aggregate and push?"):
+                aggregator = self.get_aggregator()
+                aggregator.aggregate()
+                aggregator.push()
+        if not self.has_any_pr_left():
+            self._handle_empty_merges_file()
         return all_repos_prs
+
+    def _collect_prs(self):
+        aggregator = self.get_aggregator()
+        # Normal merges
+        all_prs = aggregator.collect_prs_info()
+        # patches
+        patch_merges = []
+        # Convert lines like:
+        # "curl -sSL https://github.com/OCA/manufacture/pull/1469.patch
+        # | git am -3 --keep-non-patch --exclude '*requirements.txt'"
+        # ...to...
+        # OCA refs/pull/1469/head
+        patches = self.merges_config().get("shell_command_after") or []
+        if not patches:
+            return all_prs
+        for line in patches:
+            if ".patch" in line and "git am" in line:
+                line = line.split(".patch")[0]
+                pr_info = gh.parse_github_url(line)
+                patch_merges.append(
+                    {
+                        "remote": pr_info["upstream"],
+                        "ref": f"refs/{pr_info['entity_type']}/{pr_info['entity_id']}/head",
+                    }
+                )
+        patch_merges = aggregator.collect_prs_info(merges=patch_merges)
+        for state, prs in patch_merges.items():
+            for pr_info in prs:
+                pr_info["_patch"] = True
+            all_prs.setdefault(state, []).extend(prs)
+        return all_prs
 
     # TODO: add tests
     def _purge_closed_prs(self, all_repos_prs, purge_merged=False, purge_closed=False):
@@ -448,14 +526,21 @@ class Repo:
         # If purge_closed is set to True, removed prs will not be returned
         unmerged_prs_urls = [pr.get("url") for pr in closed_unmerged_prs]
 
+        purged = False
         if closed_unmerged_prs and purge_closed:
             ui.echo("Purging closed ones...")
             for closed_pr_info in closed_unmerged_prs:
                 try:
-                    self.remove_pending_pull(
-                        closed_pr_info["owner"], closed_pr_info["pr"]
-                    )
+                    if closed_pr_info.get("_patch"):
+                        self.remove_pending_pull_from_patches(
+                            closed_pr_info["owner"], closed_pr_info["pr"]
+                        )
+                    else:
+                        self.remove_pending_pull(
+                            closed_pr_info["owner"], closed_pr_info["pr"]
+                        )
                     unmerged_prs_urls.remove(closed_pr_info.get("url"))
+                    purged = True
                 except Exception as e:
                     ui.echo(
                         "An error occurs during '{}' removal : {}".format(
@@ -465,11 +550,16 @@ class Repo:
         if closed_merged_prs and purge_merged:
             ui.echo("Purging merged ones...")
             for closed_pr_info in closed_merged_prs:
-                self.remove_pending_pull(closed_pr_info["owner"], closed_pr_info["pr"])
-
-        if not self.has_any_pr_left():
-            self._handle_empty_merges_file()
-        return unmerged_prs_urls
+                if closed_pr_info.get("_patch"):
+                    self.remove_pending_pull_from_patches(
+                        closed_pr_info["owner"], closed_pr_info["pr"]
+                    )
+                else:
+                    self.remove_pending_pull(
+                        closed_pr_info["owner"], closed_pr_info["pr"]
+                    )
+                purged = True
+        return purged
 
     def _handle_empty_merges_file(self):
         odoo_version = get_project_manifest_key("odoo_version")
@@ -505,10 +595,18 @@ class Repo:
             + "\n"
         )
         choice = ui.ask_question(msg, default=default_choice)
-        chosen_remote = next(opt for opt in sorted_options if opt.choice == choice)
-        if chosen_remote.remote:
+        opt = next(opt for opt in sorted_options if opt.choice == choice)
+        if opt.remote:
+            # FIXME: use an internal util to get remotes
+            remotes = self.get_aggregator()._get_remotes()
+            if opt.remote not in remotes:
+                new_remote_url = get_new_remote_url(repo=self, force_remote=opt.remote)
+                ui.echo(f"Adding missing remote: {opt.remote} -> {new_remote_url}")
+                git.set_remote_url(
+                    self.path, new_remote_url, remote=opt.remote, add=True
+                )
             with cd(self.abs_path):
-                git.checkout(odoo_version, remote=chosen_remote.remote)
+                git.checkout(odoo_version, remote=opt.remote)
         ui.echo("")
         if ui.ask_confirmation(f"Delete pending merge file {self.abs_merges_path}?"):
             self.abs_merges_path.unlink()
@@ -529,7 +627,7 @@ class RepoAggregator(git_aggregator.repo.Repo):
         self.cwd = self.pm_repo.abs_path
 
 
-def add_pending(entity_url, aggregate=True):
+def add_pending(entity_url, aggregate=True, patch=False):
     """Add a pending merge using the given entity url.
 
     Adds the pending merge in the appropriate aggregation file (under pending-merges.d),
@@ -556,7 +654,14 @@ def add_pending(entity_url, aggregate=True):
         repo.update_pending_merges_file_base_merge()
 
     if entity_type == "pull":
-        repo.add_pending_pull_request(upstream, entity_id)
+        if entity_url.endswith(".patch"):
+            patch = True
+        elif patch and not entity_url.endswith(".patch"):
+            entity_url += ".patch"
+        if patch:
+            repo.add_pending_pull_request_patch(upstream, entity_url)
+        else:
+            repo.add_pending_pull_request(upstream, entity_id)
     elif entity_type in ("commit", "tree"):
         repo.add_pending_commit(upstream, entity_id)
     if aggregate:

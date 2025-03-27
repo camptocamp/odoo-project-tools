@@ -67,41 +67,6 @@ def ls(dockerfile=False):
             ui.echo(line)
 
 
-# @cli.command()
-# @click.argument("submodule_path")
-# @click.option("--push/--no-push", default=True)
-# @click.option("-b", "--target-branch")
-# def merges(submodule_path, push=True, target_branch=None):
-#     """Regenerate a pending branch for a submodule.
-#
-#     Use case: a PR has been updated and you want to refresh it.
-#
-#     It reads pending-merges.d/sub-name.yml, runs gitaggregator on the submodule
-#     and pushes the new branch on dynamic target constructed as follows:
-#     camptocamp/merge-branch-<project_id>-<branch>-<commit>
-#
-#     By default, the branch is pushed on the camptocamp remote, but you
-#     can disable the push with ``--no-push``.
-#
-#     Beware, if you changed the remote of the submodule manually, you still need
-#     to run `sync_remote` manually.
-#     """
-#     ui.echo("Use otools-pending aggregate")
-#
-
-
-@cli.command()
-@click.argument("submodule_path")
-@click.option("-b", "--target-branch")
-def push(submodule_path, target_branch=None):
-    """[NOT IMPLEMENTED] Push a Submodule
-
-    Pushes the current state of your submodule to the target remote and branch
-    either given by you or specified in pending-merges.yml
-    """
-    pass
-
-
 @cli.command()
 @click.argument("submodule_path", default="")
 def update(submodule_path=None):
@@ -146,8 +111,7 @@ def sync_remote(submodule_path=None, repo=None, force_remote=False):
 
     new_remote_url = pm_utils.get_new_remote_url(repo=repo, force_remote=force_remote)
 
-    with path.cd(path.root_path()):
-        git.set_remote_url(repo.path, new_remote_url)
+    git.set_remote_url(repo.path, new_remote_url)
 
     print(f"Submodule {repo.path} is now being sourced from {new_remote_url}")
 
@@ -165,12 +129,6 @@ def sync_remote(submodule_path=None, repo=None, force_remote=False):
             with path.cd(repo.abs_path):
                 git.checkout(target_branch=odoo_version)
 
-
-# To add
-# * show prs -> otools-pending show
-# * show closed prs -> otools-pending show
-# * list_external_dependencies_installed
-# * upgrade
 
 if __name__ == "__main__":
     cli()

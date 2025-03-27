@@ -440,3 +440,56 @@ def test_remove_pending_commit_v2():
     shell_command_after = repo.merges_config().get("shell_command_after", [])
     expected = []
     assert shell_command_after == expected
+
+
+@pytest.mark.usefixtures("project")
+@pytest.mark.project_setup(proj_tmpl_ver=1)
+def test_remove_pending_patch_v1():
+    name = "edi"
+    tmpl = """
+    ../{ext_src_rel_path}/{repo_name}:
+        remotes:
+            camptocamp: git@github.com:camptocamp/{repo_name}.git
+            {org_name}: git@github.com:{org_name}/{repo_name}.git
+        target: camptocamp merge-branch-{pid}-master
+        merges:
+        - {org_name} 14.0
+        shell_command_after:
+        - curl -sSL https://github.com/OCA/edi/pull/1469.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'"
+    """
+    mock_pending_merge_repo_paths(name, tmpl=tmpl)
+    repo = Repo(name, path_check=False)
+    repo.remove_pending_pull_from_patches("OCA", "1469")
+    shell_command_after = repo.merges_config().get("shell_command_after", [])
+    assert not shell_command_after
+
+
+@pytest.mark.usefixtures("project")
+@pytest.mark.project_setup(proj_tmpl_ver=1)
+def add_pending_pull_request_patch():
+    name = "edi"
+    tmpl = """
+    ../{ext_src_rel_path}/{repo_name}:
+        remotes:
+            camptocamp: git@github.com:camptocamp/{repo_name}.git
+            {org_name}: git@github.com:{org_name}/{repo_name}.git
+        target: camptocamp merge-branch-{pid}-master
+        merges:
+        - {org_name} 14.0
+        shell_command_after:
+        - curl -sSL https://github.com/OCA/edi/pull/1469.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'"
+    """
+    mock_pending_merge_repo_paths(name, tmpl=tmpl)
+    repo = Repo(name, path_check=False)
+    repo.add_pending_pull_request_patch(
+        "OCA", "https://github.com/OCA/edi/pull/1470.patch"
+    )
+    repo.add_pending_pull_request_patch(
+        "OCA", "https://github.com/OCA/edi/pull/1471", patch=True
+    )
+    shell_command_after = repo.merges_config().get("shell_command_after", [])
+    line_tmpl = (
+        "curl -sSL {} | git am -3 --keep-non-patch --exclude '*requirements.txt'"
+    )
+    for pid in (1470, 1471):
+        assert line_tmpl.format(pid) in shell_command_after
