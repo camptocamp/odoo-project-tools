@@ -4,11 +4,23 @@
 import click
 
 from ..config import get_conf_key
+from ..utils.git import get_current_branch
 from ..utils.marabunta import MarabuntaFileHandler
 from ..utils.misc import get_ini_cfg_key
 from ..utils.os_exec import run
 from ..utils.path import build_path
 from ..utils.pending_merge import push_branches
+
+END_TIPS = [
+    "Please continue with the release by:",
+    " * Checking the diff",
+    " * Running:",
+    "\tgit add ... # pick the files",
+    '\tgit commit -m"Release {version}"',
+    "\tgit tag -a {version}  # optionally -s to sign the tag",
+    "\t# copy-paste the content of the release from HISTORY.rst in the annotation of the tag",
+    "\tgit push origin {branch} --tags",
+]
 
 
 def get_bumpversion_cfg_key(cfg_content, key):
@@ -79,6 +91,11 @@ def bump(rel_type, new_version=None, dry_run=False, commit=False):
     # TODO + run pip freeze and override requirements.txt
     # docker-compose build --build-arg DEV_MODE=1 odoo
     # doco --rm run odoo pip freeze > requirements.txt
+
+    branch = get_current_branch()
+    if branch and new_version:
+        end_tips = "\n".join(END_TIPS).format(branch=branch, version=new_version)
+        click.echo(end_tips)
 
 
 if __name__ == "__main__":

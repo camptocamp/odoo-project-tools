@@ -144,3 +144,13 @@ def set_remote_url(repo_path, url, remote="origin", add=False):
 def checkout(branch_name, remote="origin"):
     subprocess.run(["git", "fetch", remote, branch_name])
     subprocess.run(["git", "checkout", f"{remote}/{branch_name}"])
+
+
+def get_current_branch():
+    try:
+        branch = subprocess.check_output(
+            ["git", "branch", "--show-current"], text=True
+        ).strip()
+    except subprocess.CalledProcessError:
+        branch = None
+    return branch
