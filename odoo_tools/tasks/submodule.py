@@ -2,9 +2,9 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import logging
-import os
 import re
 from itertools import chain
+from pathlib import Path
 
 import requests
 from git import Repo as GitRepo
@@ -82,13 +82,13 @@ class Repo:
         self.name = self._safe_module_name(name_or_path)
 
     def _check_paths(self):
-        if not os.path.exists(os.path.join(self.path, ".git")):
+        if not (self.path / ".git").exists():
             exit_msg(
                 "GIT CONFIG NOT FOUND. "
                 f"{self.path} does not look like a mature repository. "
                 "Aborting."
             )
-        if not os.path.exists(self.abs_merges_path):
+        if not self.abs_merges_path.exists():
             exit_msg(f"NOT FOUND `{self.abs_merges_path}'.")
 
     @classmethod
@@ -101,9 +101,9 @@ class Repo:
         submodule_name = cls._safe_module_name(name_or_path)
         is_src = submodule_name in ("odoo", "ocb", "src")
         if is_src:
-            relative_path = "odoo/src"
+            relative_path = Path("odoo/src")
         else:
-            relative_path = f"odoo/external-src/{submodule_name}"
+            relative_path = Path(f"odoo/external-src/{submodule_name}")
         return relative_path
 
     @classmethod
@@ -116,10 +116,10 @@ class Repo:
         submodule_name = cls._safe_module_name(name_or_path)
         if submodule_name.lower() in ("odoo", "ocb"):
             submodule_name = "src"
-        base_path = PENDING_MERGES_DIR
+        base_path = Path(PENDING_MERGES_DIR)
         if relative:
-            base_path = os.path.basename(PENDING_MERGES_DIR)
-        return f"{base_path}/{submodule_name}.yml"
+            base_path = base_path.relative_to(base_path.parent)
+        return base_path / f"{submodule_name}.yml"
 
     def aggregator_config(self):
         return git_aggregator.config.load_config(self.abs_merges_path)[0]
@@ -133,38 +133,30 @@ class Repo:
 
     @classmethod
     def repositories_from_pending_folder(cls, path=None):
-        path = path or PENDING_MERGES_DIR
-        repo_names = []
-        for _root, _dirs, files in os.walk(path):
-            repo_names = [
-                os.path.splitext(fname)[0] for fname in files if fname.endswith(".yml")
-            ]
-        return [cls(name) for name in repo_names]
+        path = Path(path or PENDING_MERGES_DIR)
+        return [cls(yml_file.stem) for yml_file in path.glob("*.yml")]
 
     def has_pending_merges(self):
-        found = os.path.exists(self.abs_merges_path)
-        if not found:
+        if not self.abs_merges_path.exists():
             return False
         # either empty or commented out
         return bool(self.merges_config())
 
     def merges_config(self):
-        with open(self.abs_merges_path) as f:
-            data = yaml_load(f.read()) or {}
-            submodule_relpath = os.path.join(os.path.pardir, self.path)
-            return data.get(submodule_relpath, {})
+        data = yaml_load(self.abs_merges_path.read_text()) or {}
+        submodule_relpath = ".." / self.path
+        return data.get(submodule_relpath, {})
 
     def update_merges_config(self, config):
         # get former config if any
-        if os.path.exists(self.abs_merges_path):
-            with open(self.abs_merges_path) as f:
-                data = yaml_load(f.read())
+        if self.abs_merges_path.exists():
+            data = yaml_load(self.abs_merges_path.read_text())
         else:
             data = {}
-        submodule_relpath = os.path.join(os.path.pardir, self.path)
+        submodule_relpath = ".." / self.path
         data[submodule_relpath] = config
-        with open(self.abs_merges_path, "w") as f:
-            yaml.dump(data, f)
+        with self.abs_merges_path.open("w") as fobj:
+            yaml.dump(data, fobj)
 
     def api_url(self):
         return f"https://api.github.com/repos/{GIT_C2C_REMOTE_NAME}/{self.name}"
@@ -174,7 +166,7 @@ class Repo:
 
     @classmethod
     def build_ssh_url(cls, namespace, repo_name):
-        return f"git@github.com:{namespace}/{repo_name}.git"
+        return f"git@github.com:{namespace}/{repo_name}"
 
 
 def get_target_branch(ctx, target_branch=None):
@@ -186,17 +178,15 @@ def get_target_branch(ctx, target_branch=None):
     for rebase_file in ("rebase-merge", "rebase-apply"):
         # in case of rebase, the ref of the branch is in one of these
         # directories, in a file named "head-name"
-        path = ctx.run(
-            f"git rev-parse --git-path {rebase_file}", hide=True
-        ).stdout.strip()
-        if os.path.exists(path):
-            with open(os.path.join(path, "head-name")) as rf:
-                current_branch = rf.read().strip().replace("refs/heads/", "")
+        cmd = f"git rev-parse --git-path {rebase_file}"
+        path = Path(ctx.run(cmd, hide=True).stdout.strip())
+        if path.is_dir():
+            hname = (path / "head-name").read_text().strip()
+            current_branch = hname.replace("refs/heads/", "")
             break
     else:
-        current_branch = ctx.run(
-            "git symbolic-ref --short HEAD", hide=True
-        ).stdout.strip()
+        cmd = "git symbolic-ref --short HEAD"
+        current_branch = ctx.run(cmd, hide=True).stdout.strip()
     project_id = cookiecutter_context()["project_id"]
     if not target_branch:
         commit = ctx.run("git rev-parse HEAD", hide=True).stdout.strip()[:8]
@@ -281,9 +271,8 @@ def ls(ctx, dockerfile=True):
         blacklist = {"odoo/src"}
         lines = (line for line in content.splitlines() if line not in blacklist)
         lines = chain(lines, ["odoo/src/addons", "odoo/local-src"])
-        lines = (f"/{line}" for line in lines)
-        template = 'ENV ADDONS_PATH="%s" \\\n'
-        print(template % (", \\\n".join(lines)))
+        addons_path = ", \\\n".join(f"/{line}" for line in lines)
+        print(f'ENV ADDONS_PATH="{addons_path}" \\\n')
     else:
         print(content)
 
@@ -345,22 +334,20 @@ def push(ctx, submodule_path, target_branch=None):
 
 
 def process_travis_file(ctx, repo):
-    tf = ".travis.yml"
+    tf = repo.abs_path / ".travis.yml"
+    if not tf.exists():
+        print(f"{tf} does not exist. Skipping travis exclude commit")
+        return
+
+    print(f"Writing exclude branch option in {tf.name}")
+    with tf.open("a") as travis:
+        travis.write(BRANCH_EXCLUDE)
+
+    cmd = f'git commit {tf.name} --no-verify -m "Travis: exclude new branch from build"'
+
     with cd(repo.abs_path):
-        if not os.path.exists(tf):
-            print(
-                repo.abs_path + tf,
-                "does not exists. Skipping travis exclude commit",
-            )
-            return
-
-        print(f"Writing exclude branch option in {tf}")
-        with open(tf, "a") as travis:
-            travis.write(BRANCH_EXCLUDE)
-
-        cmd = 'git commit {} --no-verify -m "Travis: exclude new branch from build"'
-        commit = ctx.run(cmd.format(tf), hide=True)
-        print(f"Committed as:\n{commit.stdout.strip()}")
+        commit = ctx.run(cmd, hide=True)
+    print(f"Committed as:\n{commit.stdout.strip()}")
 
 
 @task
@@ -472,10 +459,11 @@ def _cmd_git_submodule_update(ctx, path, url):
     if AUTOSHARE_ENABLED:
         index, ar = find_autoshare_repository([url])
         if ar:
-            if not os.path.exists(ar.repo_dir):
+            ar_dir = Path(ar.repo_dir)
+            if not ar_dir.exists():
                 ar.prefetch(True)
-            update_cmd += f" --reference {ar.repo_dir}"
-    update_cmd = update_cmd + " " + path
+            update_cmd += f" --reference {ar_dir}"
+    update_cmd = f"{update_cmd} {path}"
     print(update_cmd)
     ctx.run(update_cmd)
 
@@ -497,23 +485,23 @@ def update(ctx, submodule_path=None):
 
     gitmodules = build_path(".gitmodules")
     paths = ctx.run(
-        f"git config --file {gitmodules} " "--get-regexp 'path' | awk '{ print $2 }' ",
+        f"git config --file {gitmodules} --get-regexp 'path' | awk '{{ print $2 }}' ",
         hide=True,
     )
     urls = ctx.run(
-        f"git config --file {gitmodules} " "--get-regexp 'url' | awk '{ print $2 }' ",
+        f"git config --file {gitmodules} --get-regexp 'url' | awk '{{ print $2 }}' ",
         hide=True,
     )
 
-    module_list = list(zip(paths.stdout.splitlines(), urls.stdout.splitlines()))
+    module_list = zip(paths.stdout.splitlines(), urls.stdout.splitlines())
 
     if submodule_path is not None:
-        submodule_path = os.path.normpath(submodule_path)
+        submodule_path = Path(submodule_path).resolve()
         sync_cmd += f" -- {submodule_path}"
         module_list = [
             (path, url)
             for path, url in module_list
-            if os.path.normpath(path) == submodule_path
+            if Path(path).resolve() == submodule_path
         ]
 
     with cd(root_path()):
@@ -543,25 +531,24 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
     repo = repo or Repo(submodule_path)
 
     if repo.has_pending_merges():
-        with open(repo.abs_merges_path) as pending_merges:
-            # read everything we can reach
-            # for reading purposes only
-            data = yaml_load(pending_merges.read())
-            submodule_pending_config = data[os.path.join(os.path.pardir, repo.path)]
-            merges_in_action = submodule_pending_config["merges"]
-            registered_remotes = submodule_pending_config["remotes"]
+        # read everything we can reach
+        # for reading purposes only
+        data = yaml_load(repo.abs_merges_path.read_text())
+        submodule_pending_config = data[str(Path("..") / repo.path)]
+        merges_in_action = submodule_pending_config["merges"]
+        registered_remotes = submodule_pending_config["remotes"]
 
-            if force_remote:
-                new_remote_url = registered_remotes[force_remote]
-            elif merges_in_action:
-                new_remote_url = registered_remotes[GIT_C2C_REMOTE_NAME]
-            else:
-                new_remote_url = next(
-                    remote
-                    for remote in registered_remotes.values()
-                    if remote != GIT_C2C_REMOTE_NAME
-                )
-    elif repo.path == "odoo/src":
+        if force_remote:
+            new_remote_url = registered_remotes[force_remote]
+        elif merges_in_action:
+            new_remote_url = registered_remotes[GIT_C2C_REMOTE_NAME]
+        else:
+            new_remote_url = next(
+                remote
+                for remote in registered_remotes.values()
+                if remote != GIT_C2C_REMOTE_NAME
+            )
+    elif repo.path == Path("odoo/src"):
         # special way to treat that particular submodule
         if ask_confirmation("Use odoo:odoo instead of OCA/OCB?"):
             new_remote_url = Repo.build_ssh_url("odoo", "odoo")
@@ -592,8 +579,8 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
             new_remote_url = Repo.build_ssh_url(new_namespace, new_repo)
 
     ctx.run(f"git config --file=.gitmodules submodule.{repo.path}.url {new_remote_url}")
-    relative_name = repo.path.replace("../", "")
-    with cd(build_path(relative_name)):
+    relative_name = str(repo.path).replace("../", "")
+    with cd(repo.abs_path):
         ctx.run(f"git remote set-url origin {new_remote_url}")
 
     print(f"Submodule {repo.path} is now being sourced from {new_remote_url}")
@@ -609,8 +596,8 @@ def sync_remote(ctx, submodule_path=None, repo=None, force_remote=False):
             f"Submodule {relative_name} has no pending merges. Update it to {odoo_version}?"
         ):
             with cd(repo.abs_path):
-                os.system(f"git fetch origin {odoo_version}")
-                os.system(f"git checkout origin/{odoo_version}")
+                ctx.run(f"git fetch origin {odoo_version}")
+                ctx.run(f"git checkout origin/{odoo_version}")
 
 
 def parse_github_url(entity_spec):
@@ -661,18 +648,17 @@ def generate_pending_merges_file_template(repo, upstream):
     That should be either `odoo/src` or `odoo/external-src/<module>`
     """
     # could be that this is the first PM ever added to this project
-    if not os.path.exists(PENDING_MERGES_DIR):
-        os.makedirs(PENDING_MERGES_DIR)
+    PENDING_MERGES_DIR.mkdir(parents=True, exists_ok=True)
 
     oca_ocb_remote = False
-    if repo.path == "odoo/src" and upstream == "odoo":
+    if repo.path == Path("odoo/src") and upstream == "odoo":
         oca_ocb_remote = not ask_confirmation("Use odoo:odoo instead of OCA/OCB?")
 
     remote_upstream_url = repo.ssh_url(upstream)
     remote_c2c_url = repo.ssh_url(GIT_C2C_REMOTE_NAME)
     cc_context = cookiecutter_context()
     odoo_version = cc_context["odoo_version"]
-    default_target = "merge-branch-{}-master".format(cc_context["project_id"])
+    default_target = f"merge-branch-{cc_context['project_id']}-master"
     remotes = CommentedMap()
     remotes.insert(0, upstream, remote_upstream_url)
 
@@ -759,9 +745,7 @@ def add_pending_commit(repo, conf, upstream, commit_sha):
         conf["shell_command_after"] = CommentedSeq()
 
     # TODO propose a default comment format
-    comment = input(
-        "Comment? " "(would appear just above new pending merge, optional):\n"
-    )
+    comment = input("Comment? (would appear just above new pending merge, optional):\n")
     conf["shell_command_after"].extend([fetch_commit_line, pending_mrg_line])
     # Add a comment in the list of shell commands
     pos = conf["shell_command_after"].index(fetch_commit_line)
@@ -786,7 +770,7 @@ def add_pending(ctx, entity_url):
     entity_id = parts.get("entity_id")
 
     repo = Repo(repo_name, path_check=False)
-    if not os.path.exists(repo.abs_merges_path):
+    if not repo.abs_merges_path.exists():
         generate_pending_merges_file_template(repo, upstream)
 
     conf = repo.merges_config()
@@ -858,7 +842,7 @@ def remove_pending(ctx, entity_url):
     patches = len(config.get("shell_command_after", {}))
 
     if not pending_merges_present and not patches:
-        os.remove(repo.abs_merges_path)
+        repo.abs_merges_path.unlink()
         sync_remote(ctx, repo=repo)
     else:
         repo.update_merges_config(config)
@@ -903,11 +887,10 @@ def list_external_dependencies_installed(ctx, submodule_path):
     migration_modules = get_migration_file_modules(MIGRATION_FILE)
     print(f"\nInstalled modules from {submodule_path}:\n")
     modules = []
-    with cd(submodule_path):
-        for mod in os.listdir():
-            if mod in migration_modules:
-                modules.append(mod)
-                print("\t- " + mod)
+    for mod in Path(submodule_path).iter():
+        if mod.name in migration_modules:
+            modules.append(mod.name)
+            print(f"\t- {mod.name}")
 
     # Construct a dependency name list by submodule
     submodules = {}
@@ -923,14 +906,13 @@ def list_external_dependencies_installed(ctx, submodule_path):
     if not submodules:
         return
     print("\n\nDependencies:")
-    submodule_names = submodules.keys()
-    submodule_names = sorted(submodule_names)
+    submodule_names = sorted(submodules)
     # Display dependencies
     for sub in submodule_names:
         deps = submodules[sub]
         print(f"\n{sub} :")
         for mod in deps:
-            print("\t- " + mod)
+            print(f"\t- {mod}")
 
 
 def _get_current_commit_from_submodule(ctx, path):
@@ -951,15 +933,17 @@ def _cmd_git_submodule_upgrade(ctx, path, url, branch=None):
     if AUTOSHARE_ENABLED:
         index, ar = find_autoshare_repository([url])
         if ar:
-            if not os.path.exists(ar.repo_dir):
+            reference_url = Path(ar.repo_dir)
+            if not reference_url.exists():
                 ar.prefetch(True)
-            reference_url = ar.repo_dir
 
     if branch:
         with cd(build_path(path)):
-            checkout_cmd = f"git reset HEAD --hard &&\
-                            git fetch {url} &&\
-                            git checkout {branch}"
+            checkout_cmd = (
+                "git reset HEAD --hard && "
+                f"git fetch {url} && "
+                f"git checkout {branch}"
+            )
             print(checkout_cmd)
             ctx.run(checkout_cmd)
     else:
