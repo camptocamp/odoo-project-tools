@@ -30,31 +30,26 @@ def generate(ctx, addon_path, update_po=True):
     container_po_path = os.path.join(container_path, "%s.po" % addon)
     user_id = ctx.run("id --user", hide="both").stdout.strip()
     cmd_init = (
-        "docker-compose run --rm  -e LOCAL_USER_ID=%(user)s "
+        f"docker compose run --rm -e LOCAL_USER_ID={user_id} "
         "-e DEMO=False -e MIGRATE=False odoo odoo "
         "--log-level=warn --workers=0 "
-        "--database %(dbname)s "
+        f"--database {dbname} "
         "--stop-after-init --without-demo=all "
-        "--init=%(addon)s"
-    ) % {"user": user_id, "dbname": dbname, "addon": addon}
+        f"--init={addon}"
+    )
     cmd_gen = (
-        "docker-compose run --rm  -e LOCAL_USER_ID=%(user)s "
+        f"docker compose run --rm -e LOCAL_USER_ID={user_id} "
         "-e DEMO=False -e MIGRATE=False odoo odoo "
         "--log-level=warn --workers=0 "
-        "--database %(dbname)s --i18n-export=%(path)s "
-        "--modules=%(addon)s --stop-after-init --without-demo=all "
-    ) % {
-        "user": user_id,
-        "path": container_po_path,
-        "dbname": dbname,
-        "addon": addon,
-    }
+        f"--database {dbname} --i18n-export={container_po_path} "
+        f"--modules={addon} --stop-after-init --without-demo=all"
+    )
     ctx.run(cmd_init)
     ctx.run(cmd_gen)
 
     ctx.run(
-        "docker-compose run --rm -e PGPASSWORD=odoo odoo "
-        "dropdb %s -U odoo -h db" % dbname
+        "docker compose run --rm -e PGPASSWORD=odoo odoo "
+        f"dropdb {dbname} -U odoo -h db"
     )
 
     # mv .po to .pot

@@ -24,7 +24,7 @@ def test_get_docker_image_commit_hashes():
     mock_fn = mock_subprocess_run(
         [
             {
-                "args": ["docker-compose", "run", "--rm", "odoo", "printenv"],
+                "args": ["docker", "compose", "run", "--rm", "odoo", "printenv"],
                 "stdout": "Starting with UID : 1043\nRunning without demo data\nPATH=/bin,/usr/bin\nCORE_HASH=12345\nENTERPRISE_HASH=56789\n",
             }
         ]

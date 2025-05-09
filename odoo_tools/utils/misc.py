@@ -48,7 +48,7 @@ def get_ini_cfg_key(cfg_content, header, key):
 def get_docker_image_commit_hashes():
     """Retrieve the odoo core and odoo enterprise commit hashes used in the project image"""
     process = subprocess.run(
-        ["docker-compose", "run", "--rm", "odoo", "printenv"],
+        ["docker", "compose", "run", "--rm", "odoo", "printenv"],
         check=True,
         stdout=subprocess.PIPE,
         text=True,
