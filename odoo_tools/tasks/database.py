@@ -44,16 +44,16 @@ def ensure_db_container_up(ctx):
     :return: True if already up, False if it wasn't
     """
     try:
-        ctx.run("docker-compose port db 5432", hide=True)
+        ctx.run("docker compose port db 5432", hide=True)
         started = True
     except Exception:
-        ctx.run("docker-compose up -d db", hide=True)
+        ctx.run("docker compose up -d db", hide=True)
         running = False
         # Wait for the container to start
         count = 0
         while not running:
             try:
-                ctx.run("docker-compose port db 5432", hide=True)
+                ctx.run("docker compose port db 5432", hide=True)
                 running = True
             except Exception as e:
                 count += 1
@@ -66,12 +66,12 @@ def ensure_db_container_up(ctx):
     yield
     # Stop the container if it wasn't already up and running
     if not started:
-        ctx.run("docker-compose stop db", hide=True)
+        ctx.run("docker compose stop db", hide=True)
 
 
 def get_db_container_port(ctx):
     """Get and return DB container port"""
-    run_res = ctx.run("docker-compose port db 5432", hide=True)
+    run_res = ctx.run("docker compose port db 5432", hide=True)
     return str(int(run_res.stdout.split(":")[-1]))
 
 
@@ -303,10 +303,10 @@ def restore_dump(ctx, dump_path, db_name="", hide_traceback=True):
         # ie: polished_morning_3582-20181114-031713
         db_name = os.path.splitext(os.path.basename(dump_path))[0]
     # rely on PG error if database already exists
-    ctx.run(f"docker-compose run --rm odoo createdb -O odoo {db_name}")
+    ctx.run(f"docker compose run --rm odoo createdb -O odoo {db_name}")
     print("Restoring", dump_path, "on", db_name)
     ctx.run(
-        "docker-compose run --rm odoo pg_restore -O "
+        "docker compose run --rm odoo pg_restore -O "
         f"-d {db_name} < {expand_path(dump_path)}",
         hide=hide_traceback,
     )
@@ -315,7 +315,7 @@ def restore_dump(ctx, dump_path, db_name="", hide_traceback=True):
         # print shortcut to run this new db
         print("You can Odoo on this DB:")
         print(
-            f"docker-compose run --rm -e DB_NAME={db_name} "
+            f"docker compose run --rm -e DB_NAME={db_name} "
             "-p 8069:8069 odoo odoo --workers=0"
         )
 

@@ -202,7 +202,7 @@ def checkout_local_odoo(
             """
 Then run:
 
-docker-compose run --rm odoo pip install --user -e /odoo/src/odoo
+docker compose run --rm odoo pip install --user -e /odoo/src/odoo
 """
         )
 

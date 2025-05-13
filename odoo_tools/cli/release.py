@@ -89,7 +89,7 @@ def bump(rel_type, new_version=None, dry_run=False, commit=False):
         push_branches(version=new_version)
 
     # TODO + run pip freeze and override requirements.txt
-    # docker-compose build --build-arg DEV_MODE=1 odoo
+    # docker compose build --build-arg DEV_MODE=1 odoo
     # doco --rm run odoo pip freeze > requirements.txt
 
     branch = get_current_branch()
