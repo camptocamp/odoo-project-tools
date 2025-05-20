@@ -40,6 +40,7 @@ dependencies = [
     "towncrier",
     "bump2version",
     "requirements-parser>=0.8.0",
+    "Jinja2",
     ]
 requires-python = ">=3.9"
 dynamic = ["version"]
@@ -57,6 +58,8 @@ otools-submodule = "odoo_tools.cli.submodule:cli"
 otools-release = "odoo_tools.cli.release:cli"
 otools-pending = "odoo_tools.cli.pending:cli"
 otools-conversion = "odoo_tools.conversion.convert_new_img:main"
+otools-ba = "odoo_tools.cli.batools:cli"
+
 
 [project.optional-dependencies]
 test = [

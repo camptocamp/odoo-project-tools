@@ -1,0 +1,5 @@
+new command otools-ba
+
+This command contains tools crafted to help functional people work, possibly
+not directly on a project, without having to bother with knowing tons of
+command line tools.
