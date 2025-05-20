@@ -1,0 +1,1 @@
+Use git autoshare in command otools-project checkout-local-odoo

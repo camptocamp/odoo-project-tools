@@ -38,20 +38,25 @@ def get_odoo_enterprise(hash, dest="src/enterprise", org="odoo", branch=None):
 
 
 def _clone_or_fetch_repo(org, repo, branch, dest):
-    # TODO: use git-autoshare clone
+    repo_url = f"git@github.com:{org}/{repo}"
+    __, autoshare_repo = find_autoshare_repository([repo_url])
     if os.path.isdir(os.path.join(dest, ".git")):
         ui.echo(f"Fetching {org}/{repo} {branch}")
         subprocess.run(["git", "-C", dest, "fetch", "--quiet", "--all"], check=True)
     else:
+        if autoshare_repo:
+            command = "autoshare-clone"
+        else:
+            command = "clone"
         ui.echo(f"Cloning {org}/{repo} on branch {branch}, be patient")
         subprocess.run(
             [
                 "git",
-                "clone",
+                command,
                 "--quiet",
                 "--branch",
                 branch,
-                f"git@github.com:{org}/{repo}",
+                repo_url,
                 dest,
             ],
             check=True,
