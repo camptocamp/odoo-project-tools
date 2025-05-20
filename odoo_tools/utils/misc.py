@@ -2,6 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import configparser
+import pathlib
 import shutil
 import subprocess
 from importlib.resources import files
@@ -15,6 +16,10 @@ def get_file_path(filepath):
 
 def get_template_path(filepath):
     return get_file_path("templates/" + filepath)
+
+
+def get_cache_path():
+    return pathlib.Path.home() / ".cache" / "otools"
 
 
 def copy_file(src_path, dest_path):

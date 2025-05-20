@@ -1,0 +1,20 @@
+New tool otools-ba run <odooversion>
+
+This tool can be used to run a vanilla Odoo, through the new docker images.
+
+```
+$ otools-ba run --help
+Usage: otools-ba run [OPTIONS] [VERSION]
+
+  Run a standard odoo version locally, for a demo or
+
+Options:
+  --empty-db / --no-empty-db      force recreation of an empty database.
+                                  Otherwise a previously created database for
+                                  that version can be reused.
+  -p, --port INTEGER              The network port on which you will need to
+                                  connect to access odoo.
+  --force-image-pull / --no-force-image-pull
+                                  Force pulling updated image
+  --help                          Show this message and exit.
+```

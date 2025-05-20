@@ -1,0 +1,83 @@
+services:
+  odoo:
+    image: ghcr.io/camptocamp/odoo-enterprise:{{odoo_version}}-latest
+    #image: ghcr.io/camptocamp/odoo-enterprise:18.0-latest
+    depends_on:
+      - db
+      - kwkhtmltopdf
+    tty: true
+    stdin_open: true
+    ports:
+      - 8069
+      - 8072
+    volumes:
+      # if you want to debug odoo using a local copy, edit docker-composer.override.yml
+      # to mount the checked out source code
+      - "data-odoo:/odoo/data/odoo"
+      - "data-odoo-db-cache:/.cachedb"
+      - "data-odoo-pytest-cache:/odoo/.cache"
+    environment:
+      DB_USER: odoo
+      DB_PASSWORD: odoo
+      DB_NAME: odoodb
+      ADMIN_PASSWD: mijaebohb8Thae1g
+      RUNNING_ENV: dev
+      PYTHONDONTWRITEBYTECODE: 1
+      # Enable if you use oca/connector:
+      # ODOO_QUEUE_JOB_CHANNELS: root:4
+      MARABUNTA_MODE: sample  # could be 'full' for the db with all the data
+      MARABUNTA_ALLOW_SERIE: 'True'  # should not be set in production
+      SERVER_WIDE_MODULES: web
+      ODOO_REPORT_URL: http://odoo:8069
+      KWKHTMLTOPDF_SERVER_URL: http://kwkhtmltopdf:8080
+      WORKERS: 0
+
+  kwkhtmltopdf:
+    {%- if odoo_version|int <= 15.0 %}
+    image: ghcr.io/camptocamp/kwkhtmltopdf:0.12.5-1.2.2
+    {%- else %}
+    image: ghcr.io/camptocamp/kwkhtmltopdf:2.0.2
+    {%- endif %}
+    ports:
+      - 8080
+
+  db:
+    image: ghcr.io/camptocamp/postgres:14-postgis-3
+    command: -c shared_buffers=256MB -c maintenance_work_mem=256MB -c wal_buffers=8MB -c effective_cache_size=1024MB -c shared_preload_libraries=pg_stat_statements
+    ports:
+      - 5432
+    environment:
+      POSTGRES_INITDB_ARGS: --encoding=UTF-8 --lc-collate=C --lc-ctype=C
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+    volumes:
+      - "data-db:/var/lib/postgresql/data"
+
+  nginx:
+    image: camptocamp/odoo-nginx:1.8.3
+    depends_on:
+      - odoo
+    ports:
+      - 80:80
+
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - 8025:8025
+
+  mailcatcher:
+    image: estelora/mailcatcher-imap
+    environment:
+      MAILCATCHER_USERNAME: mailcatcher
+      MAILCATCHER_PASSWORD: mailcatcher
+    ports:
+      - 1080:80
+      - 993:993
+      - "1025:25"
+
+volumes:
+  data-odoo:
+  data-db:
+  data-odoo-db-cache:
+  data-odoo-pytest-cache:
+  odoo-source:
