@@ -1,3 +1,11 @@
+0.10.1 (2025-05-21)
++++++++++++++++++++
+
+**Bugfixes**
+
+* otools-project: fix local checkout automated tests
+* Fix tests broken by change introduced in click 8.2.1
+
 0.10.0 (2025-05-21)
 +++++++++++++++++++
 

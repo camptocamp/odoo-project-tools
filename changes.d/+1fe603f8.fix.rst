@@ -1,1 +1,0 @@
-Fix tests broken by change introduced in click 8.2.1
