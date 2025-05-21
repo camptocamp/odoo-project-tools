@@ -86,7 +86,7 @@ def test_bump_changelog():
             with open(path, "w") as fd:
                 fd.write(change)
         result = runner.invoke(
-            release.bump, ["--type", "minor"], catch_exceptions=False
+            release.bump, ["--type", "minor"], catch_exceptions=False, input="n"
         )
         date = datetime.date.today().strftime("%Y-%m-%d")
         expected = "\n".join(
@@ -105,7 +105,7 @@ def test_bump_changelog():
             "Running: bumpversion minor",
             "Running: towncrier build --yes --version=14.0.0.2.0",
             "Updating marabunta migration file",
-            "Push local branches? [y/N]: ",
+            "Push local branches? [y/N]: n",
         ]
         assert result.exit_code == 0
 
@@ -117,7 +117,7 @@ def test_bump_update_marabunta_file():
         # run init to get all files ready (eg: bumpversion)
         runner.invoke(init, catch_exceptions=False)
         result = runner.invoke(
-            release.bump, ["--type", "minor"], catch_exceptions=False
+            release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
         )
         with get_conf_key("marabunta_mig_file_rel_path").open() as fd:
             content = fd.read()
