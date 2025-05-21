@@ -50,6 +50,10 @@ def test_init(project, version):
         expected = get_fixture(f"expected.proj.v{version}.cfg")
         compare_line_by_line(content, expected)
     assert result.exit_code == 0
+    autoshare_cache_dir = Path("./.cache/git-autoshare").absolute()
+    autoshare_config_dir = Path("./.config/git-autoshare").absolute()
+    os.environ["GIT_AUTOSHARE_CACHE_DIR"] = str(autoshare_cache_dir)
+    os.environ["GIT_AUTOSHARE_CONFIG_DIR"] = str(autoshare_config_dir)
 
 
 @pytest.mark.project_setup(proj_tmpl_ver=1)

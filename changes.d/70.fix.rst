@@ -1,0 +1,1 @@
+otools-project: fix local checkout automated tests
