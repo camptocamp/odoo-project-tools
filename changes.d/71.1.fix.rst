@@ -1,1 +1,0 @@
-crash of otools-project checkout-local-odoo on second run of the command

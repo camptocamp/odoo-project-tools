@@ -1,1 +1,0 @@
-otools-conversion: don't crash if odoorpc is not installed (esp. allow to call otools-conversion --help in that configuration)

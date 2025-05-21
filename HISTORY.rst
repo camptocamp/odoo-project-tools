@@ -1,3 +1,52 @@
+0.10.0 (2025-05-21)
++++++++++++++++++++
+
+**Features and Improvements**
+
+* New tool otools-ba run <odooversion>
+
+  This tool can be used to run a vanilla Odoo, through the new docker images.
+
+  ```
+  $ otools-ba run --help
+  Usage: otools-ba run [OPTIONS] [VERSION]
+
+    Run a standard odoo version locally, for a demo or
+
+  Options:
+    --empty-db / --no-empty-db      force recreation of an empty database.
+                                    Otherwise a previously created database for
+                                    that version can be reused.
+    -p, --port INTEGER              The network port on which you will need to
+                                    connect to access odoo.
+    --force-image-pull / --no-force-image-pull
+                                    Force pulling updated image
+    --help                          Show this message and exit.
+  ```
+* new command otools-ba
+
+  This command contains tools crafted to help functional people work, possibly
+  not directly on a project, without having to bother with knowing tons of
+  command line tools.
+* Use git autoshare in command otools-project checkout-local-odoo
+
+**Bugfixes**
+
+* otools-addon add: filter by odoo series
+  Without the patch, adding or upgrading an odoo addon would always get
+  the latest version, which could result in adding an addon meant for odoo
+  17 on a project using odoo 15.
+* otools-conversion: fix an issue preventing more than 1 addon in a given external-src subdirectory from being added to the requirements of the project.
+* crash of otools-project checkout-local-odoo on second run of the command
+* otools-conversion: don't crash if odoorpc is not installed (esp. allow to call otools-conversion --help in that configuration)
+* otools-conversion: stage some missed out files created / modified during the conversion process
+
+**Documentation**
+
+* improve the --help option output on the different tools
+* otools-conversion: improve the documented process in the project README file to mention when pre-commit should be enabled.
+* otools-conversion: document how to configure the CI with Github Actions on the project
+
 0.9.0 (2023-08-19)
 ++++++++++++++++++
 
