@@ -7,12 +7,12 @@ title_format = ""
 issue_format = "{issue}"
 
 [[tool.towncrier.type]]
-directory = "feature"
+directory = "feat"
 name = "Features and Improvements"
 showcontent = true
 
 [[tool.towncrier.type]]
-directory = "bugfix"
+directory = "bug"
 name = "Bugfixes"
 showcontent = true
 
