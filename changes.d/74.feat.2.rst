@@ -1,0 +1,1 @@
+[add] utils.git.submodule_set_url: to control submodule urls
