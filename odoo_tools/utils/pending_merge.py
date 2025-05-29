@@ -424,7 +424,7 @@ class Repo:
         return RepoAggregator(self, **extra_config)
 
     # TODO: add tests
-    def show_prs(self, state=None, purge=None):
+    def show_prs(self, state=None, purge=None, yes_all=False):
         """Show all pull requests in pending merges.
 
         :param state: list only matching states
@@ -474,12 +474,12 @@ class Repo:
             purged = self._purge_closed_prs(all_repos_prs, **kw)
 
         if purged and self.has_pending_merges():
-            if ui.ask_confirmation("Do you want to re-aggregate and push?"):
+            if yes_all or ui.ask_confirmation("Do you want to re-aggregate and push?"):
                 aggregator = self.get_aggregator()
                 aggregator.aggregate()
                 aggregator.push()
         if not self.has_any_pr_left():
-            self._handle_empty_merges_file()
+            self._handle_empty_merges_file(delete_file=yes_all)
         return all_repos_prs
 
     def _collect_prs(self):
@@ -561,7 +561,7 @@ class Repo:
                 purged = True
         return purged
 
-    def _handle_empty_merges_file(self):
+    def _handle_empty_merges_file(self, delete_file=False):
         odoo_version = get_project_manifest_key("odoo_version")
         ui.echo("")
         update_options = [
@@ -594,21 +594,30 @@ class Repo:
             + "\n".join([f"  {opt.choice}) {opt.label} " for opt in sorted_options])
             + "\n"
         )
-        choice = ui.ask_question(msg, default=default_choice)
+        if delete_file:
+            choice = default_choice
+        else:
+            choice = ui.ask_question(msg, default=default_choice)
         opt = next(opt for opt in sorted_options if opt.choice == choice)
         if opt.remote:
             # FIXME: use an internal util to get remotes
             remotes = self.get_aggregator()._get_remotes()
+            new_remote_url = get_new_remote_url(repo=self, force_remote=opt.remote)
             if opt.remote not in remotes:
-                new_remote_url = get_new_remote_url(repo=self, force_remote=opt.remote)
                 ui.echo(f"Adding missing remote: {opt.remote} -> {new_remote_url}")
                 git.set_remote_url(
                     self.path, new_remote_url, remote=opt.remote, add=True
                 )
+            else:
+                # Sync submodule conf
+                ui.echo(f"Updating submodule conf: {opt.remote} -> {new_remote_url}")
+                git.submodule_set_url(self.path, new_remote_url, remote=opt.remote)
             with cd(self.abs_path):
                 git.checkout(odoo_version, remote=opt.remote)
         ui.echo("")
-        if ui.ask_confirmation(f"Delete pending merge file {self.abs_merges_path}?"):
+        if delete_file or ui.ask_confirmation(
+            f"Delete pending merge file {self.abs_merges_path}?"
+        ):
             self.abs_merges_path.unlink()
 
     def rebuild_consolidation_branch(self, push=False):
@@ -756,23 +765,21 @@ def get_new_remote_url(repo=None, force_remote=False):
             if force_remote:
                 new_remote_url = registered_remotes[force_remote]
             elif merges_in_action:
-                new_remote_url = registered_remotes[gh.GIT_C2C_REMOTE_NAME]
+                new_remote_url = registered_remotes[repo.company_git_remote]
             else:
                 new_remote_url = next(
                     remote
                     for remote in registered_remotes.values()
-                    if remote != gh.GIT_C2C_REMOTE_NAME
+                    if remote != repo.company_git_remote
                 )
     else:
-        # resolve what's the parent repository from which C2C consolidation
-        # one was forked
+        # resolve what's the parent repository
+        # from which company remote consolidation was forked
         response = requests.get(repo.api_url())
         if response.ok:
             info = response.json()
             parent = info.get("parent", {})
             if parent:
-                # resolve w/ parent repository
-                # C2C consolidation was forked from
                 new_remote_url = parent.get("ssh_url")
             else:
                 # not a forked repo (eg: camptocamp/connector-jira)

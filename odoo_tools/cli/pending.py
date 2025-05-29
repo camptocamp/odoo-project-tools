@@ -4,6 +4,7 @@
 import click
 
 from ..utils import pending_merge as pm_utils
+from ..utils import ui
 
 
 @click.group()
@@ -31,14 +32,23 @@ def cli():
     help="remove the pull request in a state matching the value if the option from the git-aggregator file",
     type=click.Choice(["closed", "merged"], case_sensitive=False),
 )
-def show_pending(repo_paths=(), state=None, purge=None):
+@click.option(
+    "--yes-all/--no-all",
+    "yes_all",
+    is_flag=True,
+    default=True,
+    help="assume yes to all questions, useful for automation",
+)
+def show_pending(repo_paths=(), state=None, purge=None, yes_all=True):
     """List pull requests on <repo_path>"""
+    if yes_all:
+        ui.echo("``--yes-all`` flag on -> Assuming yes to all questions")
     if not repo_paths:
         repositories = pm_utils.Repo.repositories_from_pending_folder()
     else:
         repositories = [pm_utils.Repo(repo_path) for repo_path in repo_paths]
     for repo in repositories:
-        repo.show_prs(state=state, purge=purge)
+        repo.show_prs(state=state, purge=purge, yes_all=yes_all)
 
 
 # TODO: add tests
