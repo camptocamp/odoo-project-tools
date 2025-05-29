@@ -424,7 +424,7 @@ class Repo:
         return RepoAggregator(self, **extra_config)
 
     # TODO: add tests
-    def show_prs(self, state=None, purge=None):
+    def show_prs(self, state=None, purge=None, yes_all=False):
         """Show all pull requests in pending merges.
 
         :param state: list only matching states
@@ -474,12 +474,12 @@ class Repo:
             purged = self._purge_closed_prs(all_repos_prs, **kw)
 
         if purged and self.has_pending_merges():
-            if ui.ask_confirmation("Do you want to re-aggregate and push?"):
+            if yes_all or ui.ask_confirmation("Do you want to re-aggregate and push?"):
                 aggregator = self.get_aggregator()
                 aggregator.aggregate()
                 aggregator.push()
         if not self.has_any_pr_left():
-            self._handle_empty_merges_file()
+            self._handle_empty_merges_file(delete_file=yes_all)
         return all_repos_prs
 
     def _collect_prs(self):
@@ -561,7 +561,7 @@ class Repo:
                 purged = True
         return purged
 
-    def _handle_empty_merges_file(self):
+    def _handle_empty_merges_file(self, delete_file=False):
         odoo_version = get_project_manifest_key("odoo_version")
         ui.echo("")
         update_options = [
@@ -594,7 +594,10 @@ class Repo:
             + "\n".join([f"  {opt.choice}) {opt.label} " for opt in sorted_options])
             + "\n"
         )
-        choice = ui.ask_question(msg, default=default_choice)
+        if delete_file:
+            choice = default_choice
+        else:
+            choice = ui.ask_question(msg, default=default_choice)
         opt = next(opt for opt in sorted_options if opt.choice == choice)
         if opt.remote:
             # FIXME: use an internal util to get remotes
@@ -612,7 +615,9 @@ class Repo:
             with cd(self.abs_path):
                 git.checkout(odoo_version, remote=opt.remote)
         ui.echo("")
-        if ui.ask_confirmation(f"Delete pending merge file {self.abs_merges_path}?"):
+        if delete_file or ui.ask_confirmation(
+            f"Delete pending merge file {self.abs_merges_path}?"
+        ):
             self.abs_merges_path.unlink()
 
     def rebuild_consolidation_branch(self, push=False):
