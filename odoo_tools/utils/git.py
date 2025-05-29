@@ -133,12 +133,16 @@ def submodule_update(path: Union[str, PathLike]):
     subprocess.run(cmd + args, check=True)
 
 
-def set_remote_url(repo_path, url, remote="origin", add=False):
+def submodule_set_url(repo_path, url, remote="origin"):
     with cd(root_path()):
         subprocess.run(
             ["git", "config", "--file=.gitmodules", f"submodule.{repo_path}.url", url],
             check=True,
         )
+
+
+def set_remote_url(repo_path, url, remote="origin", add=False):
+    submodule_set_url(repo_path, url, remote=remote)
     cmd = ["git", "remote", "set-url", remote, url]
     if add:
         cmd = ["git", "remote", "add", remote, url]
