@@ -599,12 +599,16 @@ class Repo:
         if opt.remote:
             # FIXME: use an internal util to get remotes
             remotes = self.get_aggregator()._get_remotes()
+            new_remote_url = get_new_remote_url(repo=self, force_remote=opt.remote)
             if opt.remote not in remotes:
-                new_remote_url = get_new_remote_url(repo=self, force_remote=opt.remote)
                 ui.echo(f"Adding missing remote: {opt.remote} -> {new_remote_url}")
                 git.set_remote_url(
                     self.path, new_remote_url, remote=opt.remote, add=True
                 )
+            else:
+                # Sync submodule conf
+                ui.echo(f"Updating submodule conf: {opt.remote} -> {new_remote_url}")
+                git.submodule_set_url(self.path, new_remote_url, remote=opt.remote)
             with cd(self.abs_path):
                 git.checkout(odoo_version, remote=opt.remote)
         ui.echo("")
