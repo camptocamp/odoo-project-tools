@@ -8,8 +8,6 @@ from . import ui
 from .os_exec import run
 from .proj import get_project_manifest_key
 
-GIT_C2C_REMOTE_NAME = "camptocamp"
-
 
 def parse_github_url(entity_spec):
     # "entity" is either a PR, commit or a branch

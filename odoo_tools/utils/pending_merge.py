@@ -760,23 +760,21 @@ def get_new_remote_url(repo=None, force_remote=False):
             if force_remote:
                 new_remote_url = registered_remotes[force_remote]
             elif merges_in_action:
-                new_remote_url = registered_remotes[gh.GIT_C2C_REMOTE_NAME]
+                new_remote_url = registered_remotes[repo.company_git_remote]
             else:
                 new_remote_url = next(
                     remote
                     for remote in registered_remotes.values()
-                    if remote != gh.GIT_C2C_REMOTE_NAME
+                    if remote != repo.company_git_remote
                 )
     else:
-        # resolve what's the parent repository from which C2C consolidation
-        # one was forked
+        # resolve what's the parent repository
+        # from which company remote consolidation was forked
         response = requests.get(repo.api_url())
         if response.ok:
             info = response.json()
             parent = info.get("parent", {})
             if parent:
-                # resolve w/ parent repository
-                # C2C consolidation was forked from
                 new_remote_url = parent.get("ssh_url")
             else:
                 # not a forked repo (eg: camptocamp/connector-jira)
