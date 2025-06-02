@@ -142,14 +142,18 @@ def run(empty_db, port, force_image_pull, version):
                 bufsize=1,
                 text=True,
             )
-            for line in pipe.stderr:
-                logfile.write(line)
-                if "Registry loaded" in line:
-                    ui.echo(f"You can connect to http://localhost:{port}")
-
-            subprocess.run(
-                ["docker", "compose", "down"]
-            )  # avoid error with another Odoo running in the same port
+            try:
+                for line in pipe.stderr:
+                    logfile.write(line)
+                    if "Registry loaded" in line or "Modules loaded" in line:
+                        ui.echo(f"You can connect to http://localhost:{port}")
+                        subprocess.Popen(["xdg-open", f"http://localhost:{port}"])
+            except KeyboardInterrupt:
+                ui.echo("Exiting...")
+            finally:
+                subprocess.run(
+                    ["docker", "compose", "down"]
+                )  # avoid error with another Odoo running in the same port
 
 
 if __name__ == "__main__":
