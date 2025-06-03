@@ -74,8 +74,15 @@ def get_init_template_files():
     )
 
 
+def _backup(dest):
+    backup_dest = dest.with_suffix(f"{dest.suffix}.bak")
+    ui.echo(f"Backing up existing file {dest} to {backup_dest}")
+    copy_file(dest, backup_dest)
+
+
 def bootstrap_files(opts):
     # Generate specific templated files
+
     for item in get_init_template_files():
         source = get_template_path(item["source"])
         dest = item["destination"]
@@ -91,9 +98,13 @@ def bootstrap_files(opts):
                     content = content.replace(f"${k}", v)
                     # avoid errors from end-of-file-fixer in pre-commit
                     content = content.rstrip("\n") + "\n"
+                if opts.backup and dest.exists():
+                    _backup(dest)
                 with open(dest, "w") as dest_fd:
                     dest_fd.write(content)
         else:
+            if opts.backup and dest.exists():
+                _backup(dest)
             copy_file(source, dest)
 
     # towncrier stuff TODO: move to odoo-template?
@@ -114,6 +125,14 @@ def cli():
     "--version",
     "version",
     help="Use 1 for a project using the 'old image' format, and 2 for 'new image'",
+)
+@click.option(
+    "-b",
+    "--backup",
+    "backup",
+    help="Backup existing files before overriding them",
+    is_flag=True,
+    default=True,
 )
 def init(**kw):
     """Initialize a project"""
