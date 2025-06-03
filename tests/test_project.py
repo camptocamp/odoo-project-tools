@@ -62,11 +62,14 @@ def test_init_proj_conf_already_existing(project):
     expected = orig_content + "\nfoo = baz"
     with open(".proj.cfg", "w") as fd:
         fd.write(expected)
+    with open("docker-compose.override.yml", "w") as fd:
+        fd.write("version: '9.7'\nservices:\n  odoo:\n    image: odoo:16.0\n")
     result = project.invoke(init, catch_exceptions=False)
     with open(".proj.cfg") as fd:
         content = fd.read()
         # original cfg has been preserved
         assert content == expected
+    assert build_path("docker-compose.override.yml.bak").exists()
     assert result.exit_code == 0
 
 
