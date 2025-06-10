@@ -1,0 +1,1 @@
+[fix] utils.pending_merge.Repo: fix submodule update on purge

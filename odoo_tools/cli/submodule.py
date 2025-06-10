@@ -2,7 +2,7 @@ from itertools import chain
 
 import click
 
-from ..utils import gh, git, path, proj, ui
+from ..utils import git, path, proj, ui
 from ..utils import pending_merge as pm_utils
 
 
@@ -118,7 +118,7 @@ def sync_remote(submodule_path=None, repo=None, force_remote=False):
     if repo.has_pending_merges():
         # we're being polite here, excode 1 doesn't apply to this answer
         ui.ask_or_abort(f"Rebuild consolidation branch for {repo.name}?")
-        push = ui.ask_confirmation(f"Push it to `{gh.GIT_C2C_REMOTE_NAME}'?")
+        push = ui.ask_confirmation(f"Push it to `{repo.company_git_remote}'?")
         repo.rebuild_consolidation_branch(push=push)
 
     else:
