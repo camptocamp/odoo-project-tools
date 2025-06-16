@@ -38,6 +38,8 @@ The package brings the following commands.
 
 `otools-tasks`: access to the "old" invoke tasks, yet to be rewritten
 
+`otools-ba`: tools for functional people, see [documentation](doc/otools-ba.md).
+
 Use `--help` to get the list of subcommands.
 
 

@@ -1,5 +1,0 @@
-[IMP] otools-ba run
-
-* fix detection of instance ready on Odoo 14.0
-* start browser when instance is ready
-* handle SIGINT / Keyboard Interrupt to shutdown the instance properly

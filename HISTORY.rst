@@ -1,3 +1,21 @@
+0.11.0 (2025-06-16)
++++++++++++++++++++
+
+**Features and Improvements**
+
+* [add] cli.pendng.show: add opt --yes-all
+* [add] utils.git.submodule_set_url: to control submodule urls
+* [imp] otools-ba run
+
+  * fix detection of instance ready on Odoo 14.0
+  * start browser when instance is ready
+  * handle SIGINT / Keyboard Interrupt to shutdown the instance properly
+
+**Bugfixes**
+
+* [fix] utils.pending_merge.Repo: fix submodule update on purge
+* [fix] references to c2c remote
+
 0.10.1 (2025-05-21)
 +++++++++++++++++++
 
