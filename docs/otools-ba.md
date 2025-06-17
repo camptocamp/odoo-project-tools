@@ -18,6 +18,32 @@ Then
     pipx install  -f  git+https://github.com/camptocamp/odoo-project-tools.git
 
 
+Run a quick test:
+
+    otools-ba  --help
+
+This should print a help summary such as:
+
+    Usage: otools-ba [OPTIONS] COMMAND [ARGS]...
+
+    Options:
+    --help  Show this message and exit.
+
+    Commands:
+    run  Run a standard odoo version locally, for a customer demo or...
+
+
+If you get an error message such as:
+
+    otools-ba: command not found
+
+Then you need to perform a simple operation to fix the configuration:
+
+    echo -e '\nexport PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc
+
+
+Then logout of your session and reauthenticate for the configuration to be taken into account.
+
 ## Commands
 
 
