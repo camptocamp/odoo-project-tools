@@ -1,0 +1,1 @@
+Add documentation for otools-ba, including how to authenticate on ghcr.io

@@ -4,7 +4,7 @@
 
 Please report issues and feature requests on https://github.com/camptocamp/odoo-project-tools/issues
 
-## installing
+## Installing
 
 otools-ba is installed together with the rest of odoo-project-tools. The easiest way is to use pipx as an installer. If that command is not available on your laptop, you can run:
 
@@ -43,6 +43,44 @@ Then you need to perform a simple operation to fix the configuration:
 
 
 Then logout of your session and reauthenticate for the configuration to be taken into account.
+
+
+## Docker configuration
+
+Some of the commands are going to use docker images, and these are often on private repositories, so you need to be authenticated to access them.
+
+To test if this configuration has been done already, you can run the following command:
+
+    docker pull ghcr.io/camptocamp/odoo-enterprise:18.0-latest
+
+If the download starts, you're good. If you get an error message saying "unauthorized" then you need to perform the following steps:
+
+1. Go to https://github.com/settings/tokens (you may need to log in github to get there)
+2. click on the "Generate new token" button and select a "new token (Classic)" token
+
+    ![Github token generation](images/github_token_generation.png)
+
+3. in the form set
+
+   - name : "Token for docker images"
+   - expiration: "No expiration" (this is safe, the token has very limited access)
+   - and check "read: packages"
+
+    ![Github token settings](images/github_token_settings.png)
+
+4. click on the "Generate Token" green button at the bottom of the page. You will get back to the page with the token. Copy it, and save it on your personal lastpass folder in case you need it again later.
+5. open a command line window and type:
+
+        export GH_TOKEN="the_token_you_just_generated"
+        export GH_LOGIN="your github login"
+
+        echo $GH_TOKEN | docker login ghcr.io -u $GH_LOGIN --password-stdin
+
+You can now test again the downloading of the image:
+
+    docker pull ghcr.io/camptocamp/odoo-enterprise:18.0-latest
+
+which should now work.
 
 ## Commands
 
