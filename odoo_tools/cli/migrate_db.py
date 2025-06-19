@@ -129,7 +129,16 @@ def cli(
     for i, step in enumerate(steps, start=1):
         title = f"{i:>2} - {step.__name__}..."
         print(f"{dt()}: {title:<40}", end="", flush=True)
-        step()
+        start = datetime.now()
+        is_done = step()
+        # print elapsed time, e.g. '+00:10:40' if step has been processed
+        if is_done:
+            end = datetime.now()
+            elapsed = end - start
+            elapsed_str = " +" + str(elapsed).split(".")[0]
+            print(elapsed_str)
+        else:
+            print()
 
 
 @click.pass_context
@@ -172,6 +181,7 @@ def _prepare_parameters(ctx):
 
 @click.pass_context
 def pre_migrate_restore_prod(ctx):
+    is_done = False
     db_path = ctx.obj["input_db_path"]
     db_name = ctx.obj["db_prod"]
     if not _db_exists(db_name):
@@ -179,14 +189,15 @@ def pre_migrate_restore_prod(ctx):
             _run_docker_compose_cmd(f"run --rm odoo dropdb --if-exists {db_name}")
             _run_docker_compose_cmd(f"run --rm odoo createdb {db_name}")
             _run_docker_compose_cmd(
-                f"run -T --rm odoo pg_restore -O -d {db_name} < {db_path}"
+                f"run -T --rm odoo pg_restore -x -O -d {db_name} < {db_path}"
             )
         except subprocess.CalledProcessError:
             print("💥")
             raise
-        print("✅")
+        print("✅", end="")
+        is_done = True
     else:
-        print("ℹ️  (skipped: prod database already restored)")
+        print("ℹ️  (skipped: prod database already restored)", end="")
     # Retrieve Odoo Contract Number from prod database
     if not ctx.obj["contract_number"]:
         res = _execute_db_request(
@@ -201,10 +212,12 @@ def pre_migrate_restore_prod(ctx):
                     "Unable to retrieve the Odoo Contract Number from prod database. "
                     "Please provide it with --contract-number / -c parameter."
                 )
+    return is_done
 
 
 @click.pass_context
 def pre_migrate_fix_prod_data(ctx):
+    is_done = False
     db_prod = ctx.obj["db_prod"]
     db_prod_fixed = ctx.obj["db_prod_fixed"]
     script_path = build_path(ctx.obj["pre_migration_sql_path"])
@@ -223,23 +236,25 @@ def pre_migrate_fix_prod_data(ctx):
             except subprocess.CalledProcessError:
                 print("💥")
                 raise
-            print("✅")
+            print("✅", end="")
+            is_done = True
         else:
-            print("ℹ️  (skipped: fixed production database already exists)")
-        return True
-    print("ℹ️  (skipped: no pre-migration.sql script to run)")
+            print("ℹ️  (skipped: fixed production database already exists)", end="")
+        return is_done
+    print("ℹ️  (skipped: no pre-migration.sql script to run)", end="")
     # Force the fixed DB name to current one if there is no pre-migration script
     ctx.obj["db_prod_fixed"] = ctx.obj["db_prod"]
-    return False
+    return is_done
 
 
 @click.pass_context
 def pre_migrate_dump_prod(ctx):
+    is_done = False
     db_name = ctx.obj["db_prod_fixed"]
     dump_path = _get_db_prod_fixed_dump_path()
     if dump_path.exists():
-        print("ℹ️  (skipped: production database dump already exists)")
-        return False
+        print("ℹ️  (skipped: production database dump already exists)", end="")
+        return is_done
     script_path = build_path(ctx.obj["pre_migration_sql_path"])
     if not script_path.exists():
         # No pre-migration.sql script means we don't need to dump the fixed
@@ -247,8 +262,9 @@ def pre_migrate_dump_prod(ctx):
         # A simple copy of the .pg file to .dump is enough to satisfy
         # Odoo S.A. upgrade script.
         shutil.copy(ctx.obj["input_db_path"], dump_path)
-        print("✅")
-        return True
+        print("✅", end="")
+        is_done = True
+        return is_done
     container_dump_path = _get_db_prod_fixed_dump_path(in_container=True)
     mount_opts = f"-v {ctx.obj['store_path']}:/{ctx.obj['container_store_path']}"
     try:
@@ -259,7 +275,7 @@ def pre_migrate_dump_prod(ctx):
     except subprocess.CalledProcessError:
         print("💥")
         raise
-    print("✅")
+    print("✅", end="")
     return True
 
 
@@ -269,7 +285,7 @@ def migrate_odoo(ctx):
     if ctx.params["restart"] and upgraded_zip_path.exists():
         upgraded_zip_path.unlink()
     if upgraded_zip_path.exists():
-        print("ℹ️  (skipped: upgraded.zip file already exists)")
+        print("ℹ️  (skipped: upgraded.zip file already exists)", end="")
         return False
     prod_dump_path = _get_db_prod_fixed_dump_path()
     script_path = ctx.obj["store_path"].joinpath("odoo_upgrade.py")
@@ -288,9 +304,9 @@ def migrate_odoo(ctx):
     if ret.returncode:
         print("💥 FAILED 💥")
         log_path = ctx.obj["store_path"].joinpath("upgrade.log")
-        print("=> Check logs located at", log_path)
-        return
-    print("✅")
+        raise SystemExit(f"=> Check logs located at {log_path}")
+    print("✅", end="")
+    return True
 
 
 @click.pass_context
@@ -298,8 +314,8 @@ def restore_odoo_migrated(ctx):
     # Check if Odoo S.A. database is already restored
     db_name = ctx.obj["db_odoo_migrated"]
     if _db_exists(db_name) and not ctx.params["restart"]:
-        print("ℹ️  (skipped: Odoo S.A. migrated database already restored)")
-        return
+        print("ℹ️  (skipped: Odoo S.A. migrated database already restored)", end="")
+        return False
     # Unzip upgraded.zip archive
     upgraded_zip_path = ctx.obj["store_path"].joinpath("upgraded.zip")
     upgraded_dir_path = ctx.obj["store_path"].joinpath("upgraded")
@@ -324,7 +340,8 @@ def restore_odoo_migrated(ctx):
         raise
     assert upgraded_dir_path.exists()
     shutil.rmtree(upgraded_dir_path)
-    print("✅")
+    print("✅", end="")
+    return True
 
 
 @click.pass_context
@@ -333,7 +350,7 @@ def dump_odoo_migrated(ctx):
     # (lighter than raw dump.sql to share it on Celebrimbor afterwards)
     odoo_migrated_path = _get_db_odoo_migrated_dump_path()
     if odoo_migrated_path.exists() and not ctx.params["restart"]:
-        print("ℹ️  (skipped: Odoo S.A. migrated dump already exists)")
+        print("ℹ️  (skipped: Odoo S.A. migrated dump already exists)", end="")
         return False
     db_name = ctx.obj["db_odoo_migrated"]
     container_odoo_migrated_path = _get_db_odoo_migrated_dump_path(in_container=True)
@@ -346,7 +363,8 @@ def dump_odoo_migrated(ctx):
     except subprocess.CalledProcessError:
         print("💥")
         raise
-    print("✅")
+    print("✅", end="")
+    return True
 
 
 @click.pass_context
@@ -357,8 +375,8 @@ def migrate_c2c_core(ctx):
         and not ctx.params["restart_c2c"]
         and not ctx.params["restart"]
     ):
-        print("ℹ️  (skipped: C2C core database already migrated)")
-        return
+        print("ℹ️  (skipped: C2C core database already migrated)", end="")
+        return False
     # Force next C2C migration steps if '--force-odoo' is set
     if ctx.params["restart"]:
         ctx.params["restart_c2c"] = True
@@ -378,9 +396,9 @@ def migrate_c2c_core(ctx):
         )
     except subprocess.CalledProcessError:
         print("💥 C2C core migration failed.")
-        print("=> Check logs located at", log_file)
-        raise SystemExit  # noqa: B904
-    print("✅")
+        raise SystemExit(f"=> Check logs located at {log_file}")  # noqa: B904
+    print("✅", end="")
+    return True
 
 
 @click.pass_context
@@ -390,8 +408,8 @@ def migrate_c2c_external(ctx):
         ctx.params["restart_c2c"] = True
     db_external = ctx.obj["db_c2c_external"]
     if _db_exists(db_external) and not ctx.params["restart_c2c"]:
-        print("ℹ️  (skipped: C2C external database already migrated)")
-        return
+        print("ℹ️  (skipped: C2C external database already migrated)", end="")
+        return False
     db_name = ctx.obj["db_name"]
     log_file = ctx.obj["store_path"].joinpath(f"{db_name}_c2c_external.log")
     try:
@@ -407,9 +425,9 @@ def migrate_c2c_external(ctx):
         )
     except subprocess.CalledProcessError:
         print("💥 C2C external migration failed.")
-        print("=> Check logs located at", log_file)
-        raise SystemExit  # noqa: B904
-    print("✅")
+        raise SystemExit(f"=> Check logs located at {log_file}")  # noqa: B904
+    print("✅", end="")
+    return True
 
 
 @click.pass_context
@@ -419,8 +437,8 @@ def migrate_c2c_local(ctx):
         ctx.params["restart_c2c"] = True
     db_local = ctx.obj["db_c2c_local"]
     if _db_exists(db_local) and not ctx.params["restart_c2c"]:
-        print("ℹ️  (skipped: C2C local database already migrated)")
-        return
+        print("ℹ️  (skipped: C2C local database already migrated)", end="")
+        return False
     db_name = ctx.obj["db_name"]
     log_file = ctx.obj["store_path"].joinpath(f"{db_name}_c2c_local.log")
     try:
@@ -436,9 +454,9 @@ def migrate_c2c_local(ctx):
         )
     except subprocess.CalledProcessError:
         print("💥 C2C local migration failed.")
-        print("=> Check logs located at", log_file)
-        raise SystemExit  # noqa: B904
-    print("✅")
+        raise SystemExit(f"=> Check logs located at {log_file}")  # noqa: B904
+    print("✅", end="")
+    return True
 
 
 @click.pass_context
@@ -448,8 +466,8 @@ def migrate_c2c_cleanup(ctx):
         ctx.params["restart_c2c"] = True
     db_cleanup = ctx.obj["db_c2c_cleanup"]
     if _db_exists(db_cleanup) and not ctx.params["restart_c2c"]:
-        print("ℹ️  (skipped: C2C cleanup database already migrated)")
-        return
+        print("ℹ️  (skipped: C2C cleanup database already migrated)", end="")
+        return False
     db_name = ctx.obj["db_name"]
     log_file = ctx.obj["store_path"].joinpath(f"{db_name}_c2c_cleanup.log")
     try:
@@ -465,16 +483,16 @@ def migrate_c2c_cleanup(ctx):
         )
     except subprocess.CalledProcessError:
         print("💥 C2C cleanup migration failed.")
-        print("=> Check logs located at", log_file)
-        raise SystemExit  # noqa: B904
-    print("✅")
+        raise SystemExit(f"=> Check logs located at {log_file}")  # noqa: B904
+    print("✅", end="")
+    return True
 
 
 @click.pass_context
 def dump_c2c_migrated(ctx):
     c2c_migrated_path = _get_db_c2c_migrated_dump_path()
     if c2c_migrated_path.exists() and not ctx.params["restart_c2c"]:
-        print("ℹ️  (skipped: C2C migrated dump already exists)")
+        print("ℹ️  (skipped: C2C migrated dump already exists)", end="")
         return False
     db_cleanup = ctx.obj["db_c2c_cleanup"]
     assert _db_exists(db_cleanup)
@@ -488,7 +506,8 @@ def dump_c2c_migrated(ctx):
     except subprocess.CalledProcessError:
         print("💥 Dump of C2C cleanup snapshot failed.")
         raise
-    print("✅")
+    print("✅", end="")
+    return True
 
 
 @click.pass_context
