@@ -296,6 +296,7 @@ def migrate_odoo(ctx):
         f"-c {ctx.obj['contract_number']} "
         f"--dump {prod_dump_path} "
         f"-t {ctx.obj['target_version']} "
+        f"--no-restore "
     )
     env_file_path = ctx.obj["odoo_upgrade_env_path"]
     if env_file_path.exists():
