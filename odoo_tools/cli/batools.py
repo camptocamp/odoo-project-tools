@@ -8,7 +8,7 @@ import subprocess
 import click
 import jinja2
 
-from ..utils import ui
+from ..utils import docker_compose, ui
 from ..utils.misc import get_cache_path
 from ..utils.path import cd
 
@@ -71,72 +71,47 @@ def run(empty_db, port, force_image_pull, version):
             else:
                 policy = "missing"
             subprocess.run(
-                [
-                    "docker",
-                    "compose",
-                    "pull",
-                    "--quiet",
-                    "--policy",
-                    policy,
-                    "--include-deps",
-                    "odoo",
-                ],
+                docker_compose.pull(
+                    "odoo", pull_policy=policy, quiet=True, include_deps=True
+                ),
                 stdout=logfile,
             )
+        run_environment = {"MIGRATE": "false"}
         with open("odoo_logs.txt", "w", buffering=1) as logfile:
             ui.echo("Initializing the database")
             subprocess.run(
-                ["docker", "compose", "down"]
+                docker_compose.down()
             )  # avoid error with another Odoo running in the same port
             if empty_db:
                 ui.echo("Remove previous database")
                 subprocess.run(
-                    [
-                        "docker",
-                        "compose",
-                        "run",
-                        "--rm",
-                        "-e",
-                        "MIGRATE=false",
+                    docker_compose.run(
                         "odoo",
-                        "sh -c dropdb odoodb",
-                    ],
+                        ["sh", "-c", "dropdb", "odoodb"],
+                        environment=run_environment,
+                    ),
                     stdout=logfile,
                     stderr=logfile,
                     text=True,
                 )
             subprocess.run(
-                [
-                    "docker",
-                    "compose",
-                    "run",
-                    "--rm",
-                    "-e",
-                    "MIGRATE=false",
-                    "odoo",
-                    "odoo",
-                    "--stop-after-init",
-                ],
+                docker_compose.run(
+                    "odoo", ["odoo", "--stop-after-init"], environment=run_environment
+                ),
                 stdout=logfile,
                 stderr=logfile,
                 text=True,
             )
             ui.echo("Starting Odoo")
             pipe = subprocess.Popen(
-                [
-                    "docker",
-                    "compose",
-                    "run",
-                    "--rm",
-                    "-q",
-                    "-e",
-                    "MIGRATE=false",
-                    "--interactive=false",
-                    "-p",
-                    f"{port}:8069",
+                docker_compose.run(
                     "odoo",
-                    "odoo",
-                ],
+                    ["odoo"],
+                    quiet=True,
+                    environment=run_environment,
+                    interactive=False,
+                    port_mapping=[(port, 8069)],
+                ),
                 stderr=subprocess.PIPE,
                 stdout=logfile,
                 bufsize=1,
@@ -151,9 +126,7 @@ def run(empty_db, port, force_image_pull, version):
             except KeyboardInterrupt:
                 ui.echo("Exiting...")
             finally:
-                subprocess.run(
-                    ["docker", "compose", "down"]
-                )  # avoid error with another Odoo running in the same port
+                subprocess.run(docker_compose.down())
 
 
 if __name__ == "__main__":

@@ -31,12 +31,12 @@ def get_venv():
 def run(cmd, drop_trailing_spaces=True):
     """Execute system commands and return output.
 
-    :param cmd: the command to execute
+    :param cmd: the command to execute, as a string or a preparsed list
     :param drop_trailing_eol: remove trailing end-of-line chars or other wrapping spaces.
     """
-    res = subprocess.run(
-        shlex.split(cmd), stdout=subprocess.PIPE, env=get_venv(), check=False
-    )
+    if isinstance(cmd, str):
+        cmd = shlex.split(cmd)
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, env=get_venv(), check=False)
     output = res.stdout.decode()
     if drop_trailing_spaces:
         output = output.strip()
