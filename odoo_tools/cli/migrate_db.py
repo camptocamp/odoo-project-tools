@@ -292,7 +292,7 @@ def migrate_odoo(ctx):
     urlretrieve(ODOO_UPGRADE_SCRIPT, script_path)
     os.chdir(ctx.obj["store_path"])
     cmd = (
-        f"/usr/bin/env python3 {script_path} production "
+        f"TMPDIR=$(mktemp -d) /usr/bin/env python3 {script_path} production "
         f"-c {ctx.obj['contract_number']} "
         f"--dump {prod_dump_path} "
         f"-t {ctx.obj['target_version']} "
