@@ -55,25 +55,14 @@ To test if this configuration has been done already, you can run the following c
 
 If the download starts, you're good. If you get an error message saying "unauthorized" then you need to perform the following steps:
 
-1. Go to https://github.com/settings/tokens (you may need to log in github to get there)
-2. click on the "Generate new token" button and select a "new token (Classic)" token
+1. Open your [lastpass vault](https://lastpass.com/vault/), and search for "Read only token to access docker images on ghcr.io"
 
-    ![Github token generation](images/github_token_generation.png)
+2. Open the entry, it should feature an expiration date. If that date is in the past, ask on slack to get a new token generated.
 
-3. in the form set
+3. Run the commands which are in the note, which should look like:
 
-   - name : "Token for docker images"
-   - expiration: "No expiration" (this is safe, the token has very limited access)
-   - and check "read: packages"
-
-    ![Github token settings](images/github_token_settings.png)
-
-4. click on the "Generate Token" green button at the bottom of the page. You will get back to the page with the token. Copy it, and save it on your personal lastpass folder in case you need it again later.
-5. open a command line window and type:
-
-        export GH_TOKEN="the_token_you_just_generated"
         export GH_LOGIN="your github login"
-
+        export GH_TOKEN="the_token_to_access_the_docker_image"
         echo $GH_TOKEN | docker login ghcr.io -u $GH_LOGIN --password-stdin
 
 You can now test again the downloading of the image:
