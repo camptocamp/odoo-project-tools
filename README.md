@@ -8,17 +8,15 @@
 ## Installation
 This repository contains helper tasks for working with Camptocamp Odoo projects.
 
-Create a virtual environment and activate it, then run:
+Install with [pipx](https://pypa.github.io/pipx/):
 
-```
-pip install --user git+https://github.com/camptocamp/odoo-project-tools.git
-```
 
-If you use  [pipx](https://pypa.github.io/pipx/) then you can run instead:
+    pipx install git+https://github.com/camptocamp/odoo-project-tools.git
 
-```
-pipx install git+https://github.com/camptocamp/odoo-project-tools.git
-```
+
+You may need to have some build dependencies installed:
+
+    sudo apt install pipx git libpq-dev gcc python3-dev
 
 ## Usage
 
