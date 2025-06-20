@@ -334,7 +334,10 @@ def restore_odoo_migrated(ctx):
         _run_docker_compose_cmd(f"run --rm odoo createdb {db_name}")
         _run_docker_compose_cmd(
             f"run {mount_opts} -T --rm odoo psql -d {db_name} "
-            f"-f {container_dump_sql_path}"
+            f"-f {container_dump_sql_path}",
+            # Errors regarding owner or extensions for instance could exists
+            # in raw SQL file, they have to be ignored.
+            raise_on_error=False,
         )
     except subprocess.CalledProcessError:
         print("💥")
