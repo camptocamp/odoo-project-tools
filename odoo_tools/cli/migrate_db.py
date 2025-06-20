@@ -522,7 +522,7 @@ def migration_done(ctx):
     print("\nYou can now upload on the relevant Celebrimbor environment:")
     print(f"\t- {odoo_migrated_path}")
     print("\t  (useful for your teammates to run C2C migration steps on top of it)")
-    print(f"\t- {c2c_migrated_path} (ready to deploy")
+    print(f"\t- {c2c_migrated_path} (ready to deploy)")
 
 
 @click.pass_context
