@@ -1,3 +1,14 @@
+0.11.1 (2025-06-20)
++++++++++++++++++++
+
+**Bugfixes**
+
+* Fix otools-ba run on pop os 22.04 (work around older docker compose version limitations)
+
+**Documentation**
+
+* Add documentation for otools-ba, including how to authenticate on ghcr.io
+
 0.11.0 (2025-06-16)
 +++++++++++++++++++
 
