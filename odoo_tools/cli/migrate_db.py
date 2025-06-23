@@ -89,6 +89,11 @@ def dt():
     is_flag=True,
     help="Restart the C2C migration from the 'local' snapshot.",
 )
+@click.option(
+    "--no-db-snapshot",
+    is_flag=True,
+    help="Do not generate database snapshots after each migration step.",
+)
 @click.pass_context
 def cli(
     ctx: click.Context,
@@ -100,6 +105,7 @@ def cli(
     restart_c2c_external: bool,
     restart_c2c_local: bool,
     restart_c2c_cleanup: bool,
+    no_db_snapshot: bool,
 ):
     """Run a full database migration (Odoo S.A. + C2C).
 
@@ -394,8 +400,9 @@ def migrate_c2c_core(ctx):
             _run_docker_compose_cmd(
                 f"run --rm odoo createdb {db_name} -T {db_odoo_migrated}"
             )
+        make_db_snapshot = 0 if ctx.params["no_db_snapshot"] else 1
         _run_docker_compose_cmd(
-            f"run --rm -e DB_NAME={db_name} -e MAKE_DB_SNAPSHOT=1 "
+            f"run --rm -e DB_NAME={db_name} -e MAKE_DB_SNAPSHOT={make_db_snapshot} "
             f"migrate-db migrate-db-core > {log_file}"
         )
     except subprocess.CalledProcessError:
@@ -423,8 +430,9 @@ def migrate_c2c_external(ctx):
             _run_docker_compose_cmd(
                 f"run --rm odoo createdb {db_name} -T {db_previous}"
             )
+        make_db_snapshot = 0 if ctx.params["no_db_snapshot"] else 1
         _run_docker_compose_cmd(
-            f"run --rm -e DB_NAME={db_name} -e MAKE_DB_SNAPSHOT=1 "
+            f"run --rm -e DB_NAME={db_name} -e MAKE_DB_SNAPSHOT={make_db_snapshot} "
             f"migrate-db migrate-db-external > {log_file}"
         )
     except subprocess.CalledProcessError:
@@ -452,8 +460,9 @@ def migrate_c2c_local(ctx):
             _run_docker_compose_cmd(
                 f"run --rm odoo createdb {db_name} -T {db_previous}"
             )
+        make_db_snapshot = 0 if ctx.params["no_db_snapshot"] else 1
         _run_docker_compose_cmd(
-            f"run --rm -e DB_NAME={db_name} -e MAKE_DB_SNAPSHOT=1 "
+            f"run --rm -e DB_NAME={db_name} -e MAKE_DB_SNAPSHOT={make_db_snapshot} "
             f"migrate-db migrate-db-local > {log_file}"
         )
     except subprocess.CalledProcessError:
@@ -481,8 +490,9 @@ def migrate_c2c_cleanup(ctx):
             _run_docker_compose_cmd(
                 f"run --rm odoo createdb {db_name} -T {db_previous}"
             )
+        make_db_snapshot = 0 if ctx.params["no_db_snapshot"] else 1
         _run_docker_compose_cmd(
-            f"run --rm -e DB_NAME={db_name} -e MAKE_DB_SNAPSHOT=1 "
+            f"run --rm -e DB_NAME={db_name} -e MAKE_DB_SNAPSHOT={make_db_snapshot} "
             f"migrate-db migrate-db-cleanup > {log_file}"
         )
     except subprocess.CalledProcessError:
