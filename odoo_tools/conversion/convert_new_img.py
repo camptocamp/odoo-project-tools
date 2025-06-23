@@ -51,9 +51,8 @@ Next steps
 
 1. check the diff between Dockerfile and Dockerfile.bak.
 
-    * update the ADDONS_PATH environment variable (`odoo/src` and
-      `odoo/external-src/enterprise` have moved,
-      `odoo-cloud-platform` must be removed)
+    * check the ADDONS_PATH environment variable: the paths have changed and the script may not know of
+      the specificities of your project (esp. paid addons)
     * check other environment variables which could have been set
     * check the differences introduced by an ongoing migration process
 
@@ -270,9 +269,52 @@ def remove_files():
             raise ValueError(f"unexpected file {name}. Is it a symlink?")
 
 
+def convert_env_lines(old_env_lines):
+    new_env_lines = []
+    for line in old_env_lines:
+        new_line = (
+            line.replace(
+                "/odoo/src/addons", "/odoo/src/odoo/odoo/addons, /odoo/src/odoo/addons"
+            )
+            .replace("/odoo/external-src/paid-modules", "/odoo/odoo/paid-modules")
+            .replace("/odoo/external-src/enterprise", "/odoo/src/enterprise")
+            .replace("/odoo/external-src", "/odoo/odoo/external-src")
+            .replace("/odoo/local-src", "/odoo/odoo/addons")
+        )
+        if "odoo-cloud-platform" in new_line:
+            continue
+        new_env_lines.append(new_line)
+    return new_env_lines
+
+
 def copy_dockerfile():
     shutil.move("odoo/Dockerfile", "Dockerfile.bak")
+    old_env_lines = []
+    with open("Dockerfile.bak") as old_dockerfile:
+        found_env = False
+        for line in old_dockerfile:
+            if line.strip().startswith("ENV ADDONS"):
+                found_env = True
+            if found_env:
+                old_env_lines.append(line)
+                if not line.strip().endswith("\\"):
+                    found_env = False
     subprocess.run(["git", "rm", "-f", "odoo/Dockerfile"], check=False)
+    new_env_lines = convert_env_lines(old_env_lines)
+    new_docker_file_lines = []
+    with open("Dockerfile") as new_dockerfile:
+        found_env = False
+        for line in new_dockerfile:
+            if line.strip().startswith("ENV ADDONS"):
+                found_env = True
+                new_docker_file_lines += new_env_lines
+            if found_env:
+                if not line.strip().endswith("\\"):
+                    found_env = False
+            else:
+                new_docker_file_lines.append(line)
+    with open("Dockerfile", "w") as new_dockerfile:
+        new_dockerfile.writelines(new_docker_file_lines)
 
 
 def parse_args():
