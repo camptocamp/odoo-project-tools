@@ -430,12 +430,13 @@ def show_closed_prs(ctx, submodule_path=None, purge_closed=False, purge_merged=F
     Pass `-s path/to/submodule` to check specific ones.
     """
     all_repos_prs = show_prs(ctx, submodule_path=submodule_path, state="closed")
-    return _purge_closed_prs(
-        ctx,
-        all_repos_prs,
-        purge_closed=purge_closed,
-        purge_merged=purge_merged,
-    )
+    if any([purge_closed, purge_merged]):
+        return _purge_closed_prs(
+            ctx,
+            all_repos_prs,
+            purge_closed=purge_closed,
+            purge_merged=purge_merged,
+        )
 
 
 def _purge_closed_prs(ctx, all_repos_prs, purge_merged=False, purge_closed=False):
