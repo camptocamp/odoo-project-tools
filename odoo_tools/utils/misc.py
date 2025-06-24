@@ -52,8 +52,23 @@ def get_ini_cfg_key(cfg_content, header, key):
 
 def get_docker_image_commit_hashes():
     """Retrieve the odoo core and odoo enterprise commit hashes used in the project image"""
+    with open("Dockerfile") as fobj:
+        for line in fobj:
+            if line.startswith("FROM ghcr.io/camptocamp/odoo-enterprise"):
+                image = line.strip().split()[1]
+                break
     process = subprocess.run(
-        ["docker", "compose", "run", "--rm", "odoo", "printenv"],
+        [
+            "docker",
+            "run",
+            "--quiet",
+            "--rm",
+            "--pull",
+            "always",
+            "--entrypoint",
+            "printenv",
+            image,
+        ],
         check=True,
         stdout=subprocess.PIPE,
         text=True,

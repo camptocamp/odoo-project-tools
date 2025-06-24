@@ -1,0 +1,1 @@
+better detection of the commit hashes of odoo and enterprise in the parent images
