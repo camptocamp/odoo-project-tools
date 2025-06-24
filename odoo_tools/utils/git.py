@@ -12,6 +12,7 @@ from git.config import GitConfigParser
 from git_autoshare.core import find_autoshare_repository
 
 from . import ui
+from .os_exec import run
 from .path import build_path, cd, root_path
 
 
@@ -113,7 +114,7 @@ def submodule_sync(path: Union[str, PathLike]):
     sync_cmd = ["git", "submodule", "sync"]
     if path:
         sync_cmd += ["--", str(path)]
-    subprocess.run(sync_cmd, check=True)
+    run(sync_cmd, check=True)
 
 
 def submodule_update(path: Union[str, PathLike]):
@@ -130,12 +131,12 @@ def submodule_update(path: Union[str, PathLike]):
                 autoshare_repo.prefetch(True)
             args += ["--reference", autoshare_repo.repo_dir]
     args.append(str(path))
-    subprocess.run(cmd + args, check=True)
+    run(cmd + args, check=True)
 
 
 def submodule_set_url(repo_path, url, remote="origin"):
     with cd(root_path()):
-        subprocess.run(
+        run(
             ["git", "config", "--file=.gitmodules", f"submodule.{repo_path}.url", url],
             check=True,
         )
@@ -147,12 +148,12 @@ def set_remote_url(repo_path, url, remote="origin", add=False):
     if add:
         cmd = ["git", "remote", "add", remote, url]
     with cd(build_path(repo_path)):
-        subprocess.run(cmd, check=True)
+        run(cmd, check=True)
 
 
 def checkout(branch_name, remote="origin"):
-    subprocess.run(["git", "fetch", remote, branch_name])
-    subprocess.run(["git", "checkout", f"{remote}/{branch_name}"])
+    run(["git", "fetch", remote, branch_name])
+    run(["git", "checkout", f"{remote}/{branch_name}"])
 
 
 def get_current_branch():
@@ -163,3 +164,7 @@ def get_current_branch():
     except subprocess.CalledProcessError:
         branch = None
     return branch
+
+
+def delete_branch(branch_name):
+    run(["git", "branch", "-D", branch_name])

@@ -59,6 +59,7 @@ otools-release = "odoo_tools.cli.release:cli"
 otools-pending = "odoo_tools.cli.pending:cli"
 otools-conversion = "odoo_tools.conversion.convert_new_img:main"
 otools-ba = "odoo_tools.cli.batools:cli"
+otools-pr = "odoo_tools.cli.pr:cli"
 
 
 [project.optional-dependencies]

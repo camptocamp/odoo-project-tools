@@ -28,7 +28,7 @@ def get_venv():
     return env
 
 
-def run(cmd, drop_trailing_spaces=True):
+def run(cmd, drop_trailing_spaces=True, check=False):
     """Execute system commands and return output.
 
     :param cmd: the command to execute, as a string or a preparsed list
@@ -36,8 +36,11 @@ def run(cmd, drop_trailing_spaces=True):
     """
     if isinstance(cmd, str):
         cmd = shlex.split(cmd)
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, env=get_venv(), check=False)
-    output = res.stdout.decode()
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, env=get_venv(), check=check)
+    if res.stdout is None:
+        output = ""
+    else:
+        output = res.stdout.decode()
     if drop_trailing_spaces:
         output = output.strip()
     return output

@@ -38,6 +38,8 @@ The package brings the following commands.
 
 `otools-ba`: tools for functional people, see [documentation](docs/otools-ba.md).
 
+`otools-pr`: tools to test pull request on a local odoo running a database dump, see [documentation](docs/otools-pr.md).
+
 Use `--help` to get the list of subcommands.
 
 
