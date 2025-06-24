@@ -6,7 +6,7 @@ Please report issues and feature requests on https://github.com/camptocamp/odoo-
 
 ## Installing
 
-otools-ba is installed together with the rest of odoo-project-tools. The easiest way is to use pipx as an installer. If that command is not available on your laptop, you can run:
+`otools-ba` is installed together with the rest of odoo-project-tools. The easiest way is to use pipx as an installer. If that command is not available on your laptop, you can run:
 
     sudo apt update
     sudo apt install pipx git libpq-dev gcc python3-dev
