@@ -59,7 +59,8 @@ Next steps
    meld Dockerfile Dockerfile.bak
 
 
-2. check the diff between docker-compose.yml and docker-compose.yml.bak
+2. check the diff between docker-compose.yml and docker-compose.yml.bak and restore any customizations
+   you could have done (environment variables...)
 
     meld docker-compose.yml docker-compose.yml.bak
 
@@ -70,7 +71,18 @@ Next steps
    files for these that are placed in patches/odoo and patches/enterprise/
    respectively. They will be processed by alphabetical order.
 
-5. run `docker build .` and fix any build issues
+   * if you have patch files in the  `patches/` directory that don't match any pending merge in
+     `pending-merges.d/src.yml` or `pending-merges.d/enterprise.yml`, remove them
+   * if you have pending merges in `pending-merges.d/src.yml` (resp. `pending-merges.d/enterprise.yml`)
+     and you have the matching patch files in the `patches/` directory, move the patch files to `patches/odoo/`
+     (resp. `patches/enterprise/`)
+   * if you have pending merges in `pending-merges.d/src.yml` (resp. `pending-merges.d/enterprise.yml`)
+     but you don't have the matching  patch files in the `patches/`, you can regenerate them with
+     `otools-pending add <url-to-commit>`
+
+5. run `docker build .` and fix any build issues. The base Python version may have changed, so you
+   could need to update the version of some dependencies that were frozen to be compatible with Python 3.9
+   for instance.
 
 6. configure github actions on your repository -> see
    https://confluence.camptocamp.com/confluence/display/DEV/How+to+deploy+Github+Actions+on+odoo+projects
