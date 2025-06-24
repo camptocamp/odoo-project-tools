@@ -29,6 +29,7 @@ def project(request, runner):
             manifest=dict(odoo_version="16.0"),
             proj_version="16.0.1.1.0",
         )
+        @pytest.mark.usefixtures("project")
         def test_something(project):
             pass
     """
