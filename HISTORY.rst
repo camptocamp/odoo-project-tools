@@ -1,3 +1,15 @@
+0.12.0 (2025-06-25)
++++++++++++++++++++
+
+**Features and Improvements**
+
+* better detection of the commit hashes of odoo and enterprise in the parent images
+* otools-pr test: tool for a local test of a pull request on the project
+
+**Bugfixes**
+
+* otools-tasks: fix show_closed_prs to allow it to show the PRs without cleaning
+
 0.11.1 (2025-06-20)
 +++++++++++++++++++
 
