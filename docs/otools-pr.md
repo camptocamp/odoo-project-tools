@@ -5,36 +5,43 @@
 
 ## Installing
 
-Please refer to the "Installing" section of the (otools-ba)[otools-ba.md] page.
+Please refer to the "Installing" section of the [otools-ba](otools-ba.md) page.
 
 ## Configuration
 
-
-### Celebrimbor
-
-You need to be able to download a database dump of the project to your laptop. This is done with the `celebrimbor_cli` command line utility. If it is not installed, you can run:
-
-    pipx install -f git+ssh://git@github.com/camptocamp/celebrimbor-cli#egg=celebrimbor_cli
-    mkdir -p ~/.config/celebrimbor-cli
-
-If you have the lastpass client installed, you can run:
-
-    lpass sync
-    lpass show --notes 5553291744224198495 > ~/.config/celebrimbor-cli/platforms.conf
-
-Otherwise, open your [lastpass vault](https://lastpass.com/vault/), look for "Celebrimbor CLI configuration parameters". In a shell, type:
-
-    gnome-text-editor ~/.config/celebrimbor-cli/platforms.conf
-
-Then in the window that opens, copy paste the content of the note, save and exit the text editor.
-
-### Github
+### Git and Github
 
 You will need to have git installed and configured on your workstation:
 
     sudo apt install git
 
 Normally, the setup should have been taken care of during your onboarding. If not check with your mentor to get this fixed before you go on.
+
+To check if this setup was done you can run:
+
+    git clone --depth 1 git@github.com:camptocamp/celebrimbor-cli
+
+If everything goes well, you can clean up the created directory:
+
+    rm -rf celebrimbor-cli
+
+However, if you have an error message saying you don't have permission, then there are some parts of the configuration of your workstation that is missing. This is beyond this document's scope, get in touch with the helpdesk for assistance.
+
+### Celebrimbor
+
+You need to be able to download a database dump of the project to your laptop. This is done with the `celebrimbor_cli` command line utility. If it is not installed, you can run:
+
+    mkdir -p ~/.config/celebrimbor-cli
+    pipx install -f git+ssh://git@github.com/camptocamp/celebrimbor-cli#egg=celebrimbor_cli
+
+
+Open your [lastpass vault](https://lastpass.com/vault/), look for "Celebrimbor CLI configuration parameters". In a shell, type:
+
+    gnome-text-editor ~/.config/celebrimbor-cli/platforms.conf
+
+Then in the window that opens, copy paste the content of the note, save and exit the text editor.
+
+
 
 ### Git autoshare
 
@@ -43,17 +50,18 @@ If you start working a lot with projects, having git autoshare installed and con
     pipx install git-autoshare
     if [ ! -e ~/.config/git-autoshare/repos.yml ]
     then
+    mkdir -p ~/.config/git-autoshare
     cat << EOF > ~/.config/git-autoshare/repos.yml
     github.com:
-    odoo:
-        orgs:
-            - odoo
-            - camptocamp
-    enterprise:
-        orgs:
-            - odoo
-            - camptocamp
-        private: True
+        odoo:
+            orgs:
+                - odoo
+                - camptocamp
+        enterprise:
+            orgs:
+                - odoo
+                - camptocamp
+            private: True
     EOF
     fi
     git autoshare-prefetch --quiet &
@@ -65,22 +73,37 @@ If you start working a lot with projects, having git autoshare installed and con
 
 We are almost there!
 
-First get the source code of the project of your customer, it should be something like:
+First get the source code of the project of your customer. Different things depend on the name of the customer, so you can create a variable to help you in copy-pasting the commands:
+
+    export CUSTOMER=customername
+
+Then:
 
     cd work/projects
-    git clone git@github.com:camptocamp/customername_odoo  # change this with the real name
-    cd customer_odoo
+    git clone git@github.com:camptocamp/${CUSTOMER}_odoo  # change this with the real name
+    cd ${CUSTOMER}_odoo
     otools-submodule update
     docker compose build odoo
 
+
+
 ### Getting a database dump
 
-Then download a database dump of the project, this could be:
+Then download a database dump of the project. The command depends on the platform (CH or FR) of your project.
 
-    # Swiss platform
-    celebrimbor_cli -p ch download -e prod -c customername  # change with the real name
-    # French platform
-    celebrimbor_cli -p fr download -e prod -c customername  # change with the real name
+**⚠️ Important**
+
+Most of the time, the name of the customer on the hosting platform and on the github project are the same, but not always. In the commands below, we use the same variable `CUSTOMER` for the name of the project on the platform as in the name of the project. If you get errors, it can be because the names are different. Ask a dev in your team, they will be able to help.
+
+
+For the Swiss platform:
+
+
+    celebrimbor_cli -p ch download -e prod -c ${CUSTOMER}  # change with the real name
+
+For the French platform:
+
+    celebrimbor_cli -p fr download -e prod -c ${CUSTOMER}  # change with the real name
 
 This will, after some time, get you a file. To get the name of the file, use:
 
