@@ -14,7 +14,7 @@ Please refer to the "Installing" section of the (otools-ba)[otools-ba.md] page.
 
 You need to be able to download a database dump of the project to your laptop. This is done with the `celebrimbor_cli` command line utility. If it is not installed, you can run:
 
-    pipx install -f git+ssh://git@github.com/camptocamp/celebrimbor-cli#egg=celebrimbor_cli`
+    pipx install -f git+ssh://git@github.com/camptocamp/celebrimbor-cli#egg=celebrimbor_cli
     mkdir -p ~/.config/celebrimbor-cli
 
 If you have the lastpass client installed, you can run:
