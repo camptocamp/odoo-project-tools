@@ -31,3 +31,8 @@ repos:
     rev: v2.2.4
     hooks:
     - id: codespell
+
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.18.1
+    hooks:
+    - id: markdownlint-cli2

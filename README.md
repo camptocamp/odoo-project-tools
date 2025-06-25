@@ -87,7 +87,6 @@ It takes care of:
 
 Run `otools-release release --help` to know more about the options.
 
-
 ### otools-addon
 
 NOTE: this tool is meant to be used mostly for future project versions
