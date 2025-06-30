@@ -1,0 +1,1 @@
+fix detection of instance readiness and avoid launching the browser multiple times

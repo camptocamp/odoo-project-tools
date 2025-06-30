@@ -123,6 +123,9 @@ def run(empty_db, port, force_image_pull, version):
                     if "Registry loaded" in line or "Modules loaded" in line:
                         ui.echo(f"You can connect to http://localhost:{port}")
                         subprocess.Popen(["xdg-open", f"http://localhost:{port}"])
+                        break
+                for line in pipe.stderr:
+                    logfile.write(line)
             except KeyboardInterrupt:
                 ui.echo("Exiting...")
             finally:
