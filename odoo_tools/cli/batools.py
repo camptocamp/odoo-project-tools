@@ -1,9 +1,9 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-
 import re
 import subprocess
+from datetime import datetime, timedelta
 
 import click
 import jinja2
@@ -11,6 +11,11 @@ import jinja2
 from ..utils import docker_compose, ui
 from ..utils.misc import get_cache_path
 from ..utils.path import cd
+
+
+def _check_docker_compose_file_is_old(dcfile) -> bool:
+    dcfile_ctime = datetime.fromtimestamp(dcfile.lstat().st_ctime)
+    return datetime.now() - dcfile_ctime > timedelta(weeks=1)
 
 
 @click.group()
@@ -39,9 +44,11 @@ def cli():
     help="The network port on which you will need to connect to access odoo.",
 )
 @click.option(
-    "--force-image-pull/--no-force-image-pull",
-    default=False,
+    "--force-image-pull",
+    default="ask",
+    required=False,
     help="Force pulling updated image",
+    type=click.Choice(["yes", "no", "ask"]),
 )
 def run(empty_db, port, force_image_pull, version):
     # we are storing the data and the logs in ~/.cache/otools/batools/localrun-<version>
@@ -51,6 +58,21 @@ def run(empty_db, port, force_image_pull, version):
     run_dir.mkdir(parents=True, exist_ok=True)
     if not re.match(r"^\d\d.\d$", version):
         ui.exit_msg("Version must be an odoo version (e.g. 17.0)")
+
+    # Check image pull policy
+    # By default, we use "missing" as pull policy; we update it to "always" in case we
+    # receive ``--force-image-pull=yes``, or the docker-compose.yml file has not been
+    # updated for more than 1 week and the user confirms the force pull policy
+    policy = "missing"
+    if force_image_pull == "yes":
+        policy = "always"
+    elif force_image_pull == "ask":
+        docker_compose_yml = run_dir.joinpath("docker-compose.yml")
+        if not docker_compose_yml.exists() or (
+            _check_docker_compose_file_is_old(docker_compose_yml)
+            and ui.ask_confirmation("Force-pull docker images?")
+        ):
+            policy = "always"
 
     jinja_env = jinja2.Environment(
         loader=jinja2.PackageLoader("odoo_tools"),
@@ -64,12 +86,6 @@ def run(empty_db, port, force_image_pull, version):
             ui.echo(
                 f"Pulling docker image (this can be long). Logs are in {run_dir/'docker_logs.txt'}"
             )
-            if force_image_pull:
-                # todo: force image pulling if the docker-compose file is more than 1w old
-                # (meaning there has been a new image built since the last use of the tool)
-                policy = "always"
-            else:
-                policy = "missing"
             subprocess.run(
                 docker_compose.pull(
                     "odoo", pull_policy=policy, quiet=True, include_deps=True
