@@ -7,6 +7,19 @@
 
 Please refer to the "Installing" section of the [otools-ba](otools-ba.md) page.
 
+## The lazy way
+
+Instead of (or in addition to) using `otools-pr`, you can also access an odoo instance running on someone else's computer.
+
+For this, you and that other person should be on the same local network (both at the office, or both on the VPN).
+
+Kindly as that other person to start odoo, and then ask for his/her IP address and for the odoo port.
+ - IP address can be retrieved with `ip -4 a` (the interface should be `ppp0` if on the VPN);
+ - The Odoo port usually is 8069, but it might vary depending on practices.
+
+With those information, you should be able to connect to an odoo instance from your browser with that url `http://<IP ADDRESS>:<ODOO PORT>`.
+
+
 ## Configuration
 
 ### Git and Github
