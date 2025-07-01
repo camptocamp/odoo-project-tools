@@ -103,6 +103,25 @@ If you want to work on two versions in parallel, to compare them, you will need 
 
     otools-ba run --port 8081 18.0
 
-As a final note, the images used are updated on a regular basis with the latest version of the source code of Odoo. In order to preserve bandwidth, `otools-ba run` will reuse an image it has already downloaded. If you want to refresh the image, you can use the `--force-image-pull` option:
+As a final note, the images used are updated on a regular basis with the latest version of the source code of Odoo.
+To preserve bandwidth, images are reused after being downloaded the first time.
+However, if the image is older than a week, ``otools-ba run`` will ask you if you want to download a new image.
+You can also force the download, or avoid it completely, by using the ``--force-image-pull`` argument (accepted values: ``yes``, ``no``, ``ask``).
 
-    otools-ba run --force-image-pull 18.0
+    # This will refresh the image if it's older than 1 week, after asking for confirmation (default)
+    otools-ba run 18.0
+
+    # This will refresh the image if it's older than 1 week, after asking for confirmation
+    otools-ba run --force-image-pull ask 18.0
+    otools-ba run --force-image-pull=ask 18.0
+    otools-ba run --force-image-pull='ask' 18.0
+
+    # This will always refresh the image
+    otools-ba run --force-image-pull yes 18.0
+    otools-ba run --force-image-pull=yes 18.0
+    otools-ba run --force-image-pull='yes' 18.0
+
+    # This will never refresh the image
+    otools-ba run --force-image-pull no 18.0
+    otools-ba run --force-image-pull=no 18.0
+    otools-ba run --force-image-pull='no' 18.0
