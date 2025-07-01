@@ -12,7 +12,7 @@ from . import os_exec
 
 def get_version():
     version = os_exec.run("docker compose version --short")
-    return [int(x) for x in version.split(".")]
+    return [int(x) for x in version.split(".") if x.isdigit()]
 
 
 def up(override=None):
