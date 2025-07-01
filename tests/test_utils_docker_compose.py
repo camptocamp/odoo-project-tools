@@ -128,7 +128,7 @@ def test_run_version_2_33():
         [
             {
                 "args": ["docker", "compose", "version", "--short"],
-                "stdout": b"2.33.1",
+                "stdout": b"2.33.1-ubuntuLTS",
             }
         ]
     )
