@@ -88,6 +88,18 @@ def test(
 
 @cli.command()
 @click.argument("pr_number")
+@click.option(
+    "-b",
+    "--base-branch",
+    default="master",
+    help="the base branch on which the PR is based",
+)
+def checkout(pr_number, base_branch):
+    handle_git_repository(pr_number, base_branch)
+
+
+@cli.command()
+@click.argument("pr_number")
 def clean(pr_number):
     """clean the branch and database created by otools-pr test"""
     ui.echo("🛁 Removing branch")
