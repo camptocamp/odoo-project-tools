@@ -105,7 +105,7 @@ def clean(pr_number):
     ui.echo("🛁 Removing branch")
     try:
         git.checkout("master")
-        git.delete_branch(pr_number)
+        git.delete_branch(f"pr-{pr_number}")
     except Exception as exc:
         ui.echo(f"Error while trying to remove branch: {exc}")
     ui.echo("🛁 Removing database")
