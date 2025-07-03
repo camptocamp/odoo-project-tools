@@ -29,7 +29,9 @@ def echo(msg, *pa, **kw):
     cmd(msg, *pa, **kw)
 
 
-def ask_question(message, default=None):
-    """Ask a question and return the answer."""
-    value = click.prompt(message, default=default)
-    return value
+def ask_question(message, **prompt_kwargs):
+    """Ask a question and return the answer
+
+    Wrapper around ``click.prompt()``
+    """
+    return click.prompt(message, **prompt_kwargs)
