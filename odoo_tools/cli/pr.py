@@ -5,7 +5,7 @@ from pathlib import PosixPath
 
 import click
 
-from ..utils import docker_compose, gh, git, ui
+from ..utils import db, docker_compose, gh, git, ui
 from ..utils.os_exec import run
 from ..utils.path import cd, root_path
 
@@ -30,7 +30,7 @@ def cli():
 )
 @click.option(
     "-t",
-    "--template_db",
+    "--template-db",
     help="the name of a template database to use for restoring the project's database",
 )
 @click.option(
@@ -46,39 +46,57 @@ def cli():
     default=8069,
     help="the network port on which Odoo will listen",
 )
+@click.option(
+    "--keep-db",
+    is_flag=True,
+    default=False,
+    help="keep using preexisting DBs",
+)
 @click.argument("pr_number")
 def test(
     pr_number,
     database_dump=None,
-    # get_remote_db=None,
     template_db=None,
     create_template=None,
+    keep_db=False,
     port=8069,
     base_branch="master",
 ):
-    """test a pull request on a restored database dump"""
+    """Test a pull request
+
+    :param str pr_number: pull request number
+    :param str database_dump: DB dump filename (within local filesystem)
+    :param str template_db: template DB name (within docker DB container)
+    :param bool create_template: if True, a new template DB is created
+        when restoring a DB dump
+    :param bool keep_db: if True, DBs are not handled by this script
+    :param int port: network port on which Odoo will listen
+    :param str base_branch: base branch on which the PR is based
+    """
     run(docker_compose.down())
     docker_yml_name = f"docker-compose.override-{pr_number}.yml"
-    dbname = f"odoodb-{pr_number}"
-    template_db_name = _template_db_name(pr_number)
+    db_name = _get_db_name(pr_number)
     handle_git_repository(pr_number, base_branch)
-    generate_docker_yml(dbname, port, docker_yml_name)
-    if database_dump:
-        fname = database_dump
-
-        if create_template:
-            _handle_database_template(template_db_name, database_dump)
-            _restore_database_from_template(dbname, template_db_name)
+    generate_docker_yml(db_name, port, docker_yml_name)
+    # No DB updates if ``--keep-db`` is used
+    if not keep_db:
+        template_db_name = create_template and _get_db_name(pr_number, True) or ""
+        # Case 1: ``--database-dump`` is specified
+        if database_dump:
+            db.create_db_from_db_dump(
+                db_name=db_name,
+                db_dump=database_dump,
+                template_db_name=template_db_name,
+            )
+        # Case 2: ``--template-db`` is specified
+        elif template_db:
+            db.create_db_from_db_template(db_name=db_name, db_template=template_db)
+        # Case 3: no DB dump or DB template, check among local files
         else:
-            _load_database(dbname, fname)
-    else:
-        if template_db:
-            template_db_name = template_db
-        else:
-            # assume the template db was previously created for this PR
-            template_db_name = _template_db_name(pr_number)
-        _restore_database_from_template(dbname, template_db_name)
-
+            db.create_db_from_local_files(
+                db_name=db_name,
+                template_db_name=template_db_name,
+            )
     ui.echo("Starting container")
     ui.echo(
         "✨ Database migration started you can reach database on http://localhost:8069"
@@ -165,40 +183,5 @@ services:
         f.write(data)
 
 
-def _load_database(db_name, fname):
-    run(docker_compose.drop_db(db_name))
-    run(docker_compose.create_db(db_name))
-
-    if PosixPath(fname).is_file():
-        try:
-            ui.echo(f"🥡 Restoring database {db_name} from dump {fname}")
-            docker_compose.run_restore_db(db_name, fname)
-        except Exception:
-            pass
-    else:
-        msg = f"❌ ** Database file {fname} for restore was not found**"
-        ui.exit_msg(msg)
-        return
-    return fname
-
-
-def _template_db_name(pr_number):
-    return f"odoodb{pr_number}-template"
-
-
-def _handle_database_template(template_db_name, database_dump):
-    # at this point we should have the database loaded under proper name
-    run(docker_compose.drop_db(template_db_name))
-    run(docker_compose.create_db(template_db_name))
-    try:
-        ui.echo(f"🥡 Creating template {template_db_name} from dump {database_dump}")
-        docker_compose.run_restore_db(template_db_name, database_dump)
-    except Exception:
-        # to ignore warnings on db restore
-        pass
-
-
-def _restore_database_from_template(db_name, template):
-    ui.echo(f"🥡 Restore database {db_name} from template {template}")
-    run(docker_compose.drop_db(db_name))
-    run(docker_compose.restore_db_from_template(db_name, template))
+def _get_db_name(pr_number, is_template: bool = False) -> str:
+    return f"odoodb-{pr_number}" + ("-template" if is_template else "")
