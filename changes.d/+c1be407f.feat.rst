@@ -1,0 +1,1 @@
+otools-pr: add command ``checkout``
