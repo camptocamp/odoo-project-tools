@@ -18,9 +18,7 @@ classifiers = [
 dependencies = [
     "invoke==2.2.0",
     "requests==2.32.4",
-    # "git-aggregator>=4.0",
-    # TMP dep to use https://github.com/acsone/git-aggregator/pull/91
-    "git-aggregator @ git+https://github.com/acsone/git-aggregator.git#egg=git-aggregator",
+    "git-aggregator>=4.1",
     "git-autoshare",
     "passlib",
     "clipboard",
