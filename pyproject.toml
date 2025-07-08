@@ -34,6 +34,7 @@ dependencies = [
     "wheel",
     "cookiecutter",
     "click>=8.1",
+    "rich",
     "towncrier",
     "bump2version",
     "requirements-parser>=0.8.0",
@@ -58,6 +59,8 @@ otools-conversion = "odoo_tools.conversion.convert_new_img:main"
 otools-ba = "odoo_tools.cli.batools:cli"
 otools-pr = "odoo_tools.cli.pr:cli"
 otools-migrate-db = "odoo_tools.cli.migrate_db:cli"
+otools-db = "odoo_tools.cli.db:cli"
+otools-cloud = "odoo_tools.cli.cloud:cli"
 
 
 [project.optional-dependencies]

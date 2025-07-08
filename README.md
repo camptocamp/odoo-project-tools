@@ -4,8 +4,8 @@
 [![tests](https://github.com/camptocamp/odoo-project-tools/actions/workflows/test.yml/badge.svg)](https://github.com/camptocamp/odoo-project-tools/actions/workflows/test.yml)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-
 ## Installation
+
 This repository contains helper tasks for working with Camptocamp Odoo projects.
 
 Install with [pipx](https://pypa.github.io/pipx/):
@@ -41,6 +41,10 @@ The package brings the following commands.
 `otools-ba`: tools for functional people, see [documentation](docs/otools-ba.md).
 
 `otools-pr`: tools to test pull request on a local odoo running a database dump, see [documentation](docs/otools-pr.md).
+
+`otools-db`: tools to manage local databases
+
+`otools-cloud`: tools to interact with the cloud platform
 
 Use `--help` to get the list of subcommands.
 
@@ -106,6 +110,66 @@ Example:
     ```
 
 This will add the test dependency in the right way to the given file.
+
+### otools-db
+
+```
+Usage: otools-db [OPTIONS] COMMAND [ARGS]...
+
+  Database management commands.
+
+Options:
+  --debug
+  --help   Show this message and exit.
+
+Commands:
+  dump           Create a PostgreSQL dump of the specified database.
+  list           List all databases in the container.
+  list-versions  Print a table of DBs with Marabunta version and install...
+  restore        Restore a PostgreSQL dump to a database.
+```
+
+### otools-cloud
+
+Tools to interact with the cloud platform.
+
+#### otools-cloud dump
+
+Tools to interact with the cloud platform database dumps.
+
+```
+Usage: otools-cloud dump [OPTIONS] COMMAND [ARGS]...
+
+  Cloud platform dump management commands.
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  create             Generate a new dump on the cloud platform.
+  download           Download a dump from the cloud platform.
+  list               List available dumps on the cloud platform.
+  restore            Restore an uploaded dump on the cloud platform.
+  upload             Upload a dump file to the cloud platform.
+```
+
+##### Download a dump and restore it locally
+
+```
+otools-cloud dump download --env prod --restore-to-db odoodb
+```
+
+Optionally, specify exactly the dump to download:
+
+```
+otools-cloud dump download --env prod --name celebrimbor-database-name.pg.gpg --restore-to-db odoodb
+```
+
+##### Dump a local database and upload it to the cloud platform
+
+```
+otools-cloud dump upload --from-db odoodb --env labs.my-lab
+```
 
 ## Project conversion
 
