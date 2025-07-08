@@ -59,7 +59,7 @@ def ls(dockerfile=False):
             lines,
             ["odoo/odoo/paid-modules"],
         )
-        lines = ("/%s" % line for line in lines)
+        lines = (f"/{line}" for line in lines)
         template = 'ENV ADDONS_PATH="%s" \\\n'
         print(template % (", \\\n".join(lines)))
     else:

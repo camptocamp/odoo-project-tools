@@ -22,12 +22,12 @@ def generate(ctx, addon_path, update_po=True):
     dbname = "tmp_generate_pot"
     addon = addon_path.strip("/").split("/")[-1]
     path = build_path(addon_path)
-    assert path.exists(), "%s not found" % addon_path
+    assert path.exists(), f"{addon_path} not found"
     container_path = os.path.join("/", addon_path, "i18n")
     i18n_dir = path / "i18n"
     if not i18n_dir.exists():
         os.mkdir(i18n_dir)
-    container_po_path = os.path.join(container_path, "%s.po" % addon)
+    container_po_path = os.path.join(container_path, f"{addon}.po")
     user_id = ctx.run("id --user", hide="both").stdout.strip()
     cmd_init = (
         f"docker compose run --rm -e LOCAL_USER_ID={user_id} "
@@ -53,15 +53,15 @@ def generate(ctx, addon_path, update_po=True):
     )
 
     # mv .po to .pot
-    source = os.path.join(i18n_dir, "%s.po" % addon)
+    source = os.path.join(i18n_dir, f"{addon}.po")
     pot_file = source + "t"
     # dirty hack to remove duplicated entries for paths
     ctx.run(f"mv {source} {pot_file}")
     ctx.run(rf'sed -i "/local-src\|external-src/d" {pot_file}')
 
     if update_po:
-        for po_file in glob.glob("%s/*.po" % i18n_dir):
+        for po_file in glob.glob(f"{i18n_dir}/*.po"):
             ctx.run(f"msgmerge {po_file} {pot_file} -o {po_file}")
             # dirty hack to remove duplicated entries for paths
             ctx.run(rf'sed -i "/local-src\|external-src/d" {po_file}')
-    print("%s.pot generated" % addon)
+    print(f"{addon}.pot generated")

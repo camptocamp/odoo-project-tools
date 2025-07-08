@@ -224,7 +224,7 @@ def init(ctx):
         add_command = "git autoshare-submodule-add"
     gitmodules = build_path(".gitmodules")
     res = ctx.run(
-        r"git config -f %s --get-regexp '^submodule\..*\.path$'" % gitmodules,
+        rf"git config -f {gitmodules} --get-regexp '^submodule\..*\.path$'",
         hide=True,
     )
     odoo_version = cookiecutter_context()["odoo_version"]
@@ -237,10 +237,7 @@ def init(ctx):
                 hide=True,
             ).stdout
             try:
-                ctx.run(
-                    "%s -b %s %s %s"
-                    % (add_command, odoo_version, url.strip(), path.strip())
-                )
+                ctx.run(f"{add_command} -b {odoo_version} {url.strip()} {path.strip()}")
             except exceptions.Failure:
                 pass
 
@@ -276,7 +273,7 @@ def ls(ctx, dockerfile=True):
     """
     gitmodules = build_path(".gitmodules")
     res = ctx.run(
-        "git config --file %s --get-regexp path | awk '{ print $2 }' " % gitmodules,
+        f"git config --file {gitmodules} --get-regexp path | awk '{{ print $2 }}' ",
         hide=True,
     )
     content = res.stdout
@@ -284,7 +281,7 @@ def ls(ctx, dockerfile=True):
         blacklist = {"odoo/src"}
         lines = (line for line in content.splitlines() if line not in blacklist)
         lines = chain(lines, ["odoo/src/addons", "odoo/local-src"])
-        lines = ("/%s" % line for line in lines)
+        lines = (f"/{line}" for line in lines)
         template = 'ENV ADDONS_PATH="%s" \\\n'
         print(template % (", \\\n".join(lines)))
     else:
@@ -500,13 +497,11 @@ def update(ctx, submodule_path=None):
 
     gitmodules = build_path(".gitmodules")
     paths = ctx.run(
-        "git config --file %s "
-        "--get-regexp 'path' | awk '{ print $2 }' " % (gitmodules,),
+        f"git config --file {gitmodules} " "--get-regexp 'path' | awk '{ print $2 }' ",
         hide=True,
     )
     urls = ctx.run(
-        "git config --file %s "
-        "--get-regexp 'url' | awk '{ print $2 }' " % (gitmodules,),
+        f"git config --file {gitmodules} " "--get-regexp 'url' | awk '{ print $2 }' ",
         hide=True,
     )
 
@@ -940,7 +935,7 @@ def list_external_dependencies_installed(ctx, submodule_path):
 
 def _get_current_commit_from_submodule(ctx, path):
     """Returns the current in stage commit for a submodule path"""
-    ref_cmd = "git submodule status | grep '%s' | awk '{ print $1 }'" % path
+    ref_cmd = f"git submodule status | grep '{path}' | awk '{{ print $1 }}'"
     commit_hash = ctx.run(ref_cmd, hide=True).stdout
     # Clean for last carriage return and + at the beginning if stage has changed
     return commit_hash.strip("\n").strip("+")
@@ -962,12 +957,9 @@ def _cmd_git_submodule_upgrade(ctx, path, url, branch=None):
 
     if branch:
         with cd(build_path(path)):
-            checkout_cmd = (
-                "git reset HEAD --hard &&\
-                            git fetch %s &&\
-                            git checkout %s"
-                % (url, branch)
-            )
+            checkout_cmd = f"git reset HEAD --hard &&\
+                            git fetch {url} &&\
+                            git checkout {branch}"
             print(checkout_cmd)
             ctx.run(checkout_cmd)
     else:
@@ -1041,7 +1033,7 @@ def upgrade(ctx, submodule_path=None, force_branch=None):
                         " major version (this can lead to impossible upgrade,"
                         " you should also properly indicate it in the"
                         " gitmodules file). "
-                        "Replace by odoo version '%s'?" % odoo_version
+                        f"Replace by odoo version '{odoo_version}'?"
                     ):
                         branch = odoo_version
 

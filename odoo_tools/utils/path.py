@@ -17,7 +17,9 @@ def get_root_marker():
 # to find out the root of the project w/o relying on marker files.
 
 
-def root_path(marker_file=get_root_marker(), raise_if_missing=True):
+def root_path(marker_file=None, raise_if_missing=True):
+    if marker_file is None:
+        marker_file = get_root_marker()
     current_dir = (
         os.getcwd()
     )  # directory from where search for .cookiecutter.context.yml starts

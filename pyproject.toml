@@ -103,9 +103,6 @@ select = [
 ]
 ignore = [
   "E501",     # line too long (if black is happy, we're happy)
-  "UP031",    # pyupgrade: use format specifiers instead of percent format (TODO: enable)
-  "E721",     # do not compare types, use 'isinstance()' (TODO: enable)
-  "B008",     # do not perform calls in argument defaults (TODO: enable)
 ]
 
 [tool.ruff.lint.mccabe]

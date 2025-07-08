@@ -72,12 +72,14 @@ def make_fake_project_root(
     proj_tmpl_ver="1",
     proj_cfg=None,
     manifest=None,
-    marker_file=get_root_marker(),
+    marker_file=None,
     req_file="requirements.txt",
     proj_version="14.0.0.1.0",
     mock_marabunta_file=False,
     extra_files=None,
 ):
+    if marker_file is None:
+        marker_file = get_root_marker()
     proj_cfg_data = FAKE_PROJ_CFG_BY_VER[str(proj_tmpl_ver)].copy()
     proj_cfg_data.update(proj_cfg or {})
     with open(".proj.cfg", "w") as fd:

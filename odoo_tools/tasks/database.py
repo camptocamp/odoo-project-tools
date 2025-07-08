@@ -370,7 +370,7 @@ def local_dump(ctx, db_name="odoodb", path="."):
             f"pg_dump -h localhost -p {db_port} --format=c -U odoo --file {dump_file_path} {db_name}",
             hide=True,
         )
-        print("Dump successfully generated at %s" % dump_file_path)
+        print(f"Dump successfully generated at {dump_file_path}")
     return dump_file_path
 
 
@@ -403,7 +403,7 @@ def dump_and_share(
     dump_file_path = local_dump(ctx, db_name=db_name, path=tmp_path)
     upload_dump(ctx, dump_file_path, p_platform, p_customer, env)
     if not keep_local_dump:
-        ctx.run("rm %s" % dump_file_path)
+        ctx.run(f"rm {dump_file_path}")
 
 
 def _download_from_azure(ctx, platform, customer, env, dump_name):
