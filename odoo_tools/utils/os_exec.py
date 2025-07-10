@@ -36,7 +36,7 @@ def run(cmd, drop_trailing_spaces=True, check=False):
     """
     if isinstance(cmd, str):
         cmd = shlex.split(cmd)
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, env=get_venv(), check=check)
+    res = subprocess.run(cmd, capture_output=True, env=get_venv(), check=check)
     if res.stdout is None:
         output = ""
     else:
