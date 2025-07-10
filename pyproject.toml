@@ -22,7 +22,6 @@ dependencies = [
     "git-autoshare",
     "passlib",
     "clipboard",
-    "marabunta",
     "pre-commit",
     "psycopg2-binary>=2.7.6",
     "gitpython",
