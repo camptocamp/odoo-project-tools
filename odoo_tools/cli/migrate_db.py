@@ -229,9 +229,12 @@ def pre_migrate_fix_prod_data(ctx):
     script_path = build_path(ctx.obj["pre_migration_sql_path"])
     container_script_path = "/" + ctx.obj["pre_migration_sql_path"]
     if script_path.exists():
-        if not _db_exists(db_prod_fixed):
-            # Fixed prod db doesn't exist => create it
+        if not _db_exists(db_prod_fixed) or ctx.params["restart"]:
+            # Fixed prod db doesn't exist or restart enabled => create it
             try:
+                _run_docker_compose_cmd(
+                    f"run --rm odoo dropdb --if-exists {db_prod_fixed}"
+                )
                 _run_docker_compose_cmd(
                     f"run --rm odoo createdb {db_prod_fixed} -T {db_prod}"
                 )
@@ -258,6 +261,8 @@ def pre_migrate_dump_prod(ctx):
     is_done = False
     db_name = ctx.obj["db_prod_fixed"]
     dump_path = _get_db_prod_fixed_dump_path()
+    if ctx.params["restart"] and dump_path.exists():
+        dump_path.unlink()
     if dump_path.exists():
         print("ℹ️  (skipped: production database dump already exists)", end="")
         return is_done
