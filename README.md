@@ -11,7 +11,7 @@ This repository contains helper tasks for working with Camptocamp Odoo projects.
 Install with [pipx](https://pypa.github.io/pipx/):
 
 
-    pipx install git+https://github.com/camptocamp/odoo-project-tools.git
+    pipx install git+https://github.com/camptocamp/odoo-project-tools
 
 
 You may need to have some build dependencies installed:
@@ -26,13 +26,15 @@ Note: information below is subject to change.
 The package brings the following commands.
 
 
-`otools-project`: manage proj
+`otools-project`: manage project
 
-`otools-pending`: manage pendng merges
+`otools-pending`: manage pending merges
 
 `otools-release`: bump releases
 
 `otools-addon`: tools to work with addons and test requirements
+
+`otools-submodule`: manage submodules
 
 `otools-tasks`: access to the "old" invoke tasks, yet to be rewritten
 
@@ -85,7 +87,7 @@ It takes care of:
 * update changelog
 * update migration file
 
-Run `otools-release release --help` to know more about the options.
+Run `otools-release bump --help` to know more about the options.
 
 
 ### otools-addon
