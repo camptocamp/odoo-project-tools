@@ -16,7 +16,7 @@ END_TIPS = [
     " * Checking the diff",
     " * Running:",
     "\tgit add ... # pick the files",
-    '\tgit commit -m"Release {version}"',
+    '\tgit commit -m "Release {version}"',
     "\tgit tag -a {version}  # optionally -s to sign the tag",
     "\t# copy-paste the content of the release from HISTORY.rst in the annotation of the tag",
     "\tgit push origin {branch} --tags",
