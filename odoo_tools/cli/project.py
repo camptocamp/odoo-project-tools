@@ -69,6 +69,10 @@ def get_init_template_files():
             "source": ".towncrier-template.tmpl.rst",
             "destination": build_path(".towncrier-template.rst"),
         },
+        {
+            "source": "HISTORY.tmpl.rst",
+            "destination": build_path("./HISTORY.rst"),
+        },
     )
 
 

@@ -39,6 +39,7 @@ def test_init(project, version):
         "changes.d/.gitkeep",
         "towncrier.toml",
         ".towncrier-template.rst",
+        "HISTORY.rst",
     )
     for path in paths:
         assert os.path.exists(path), f"`{path}` missing"
