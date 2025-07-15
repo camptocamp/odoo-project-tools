@@ -1,6 +1,5 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
-import os
 import shutil
 import subprocess
 import venv
@@ -16,8 +15,7 @@ from .yaml import yaml_load
 @cache
 def get_project_manifest(key=None):
     path = root_path() / get_root_marker()
-    with open(path) as f:
-        return yaml_load(f.read())
+    return yaml_load(path.read_text())
 
 
 def get_project_manifest_key(key):
@@ -26,8 +24,7 @@ def get_project_manifest_key(key):
 
 def get_current_version(serie_only=False):
     ver_file = build_path(get_conf_key("version_file_rel_path"))
-    with ver_file.open() as fd:
-        ver = fd.read().strip()
+    ver = ver_file.read_text().strip()
     if serie_only:
         ver = ver.split(".")[0]
     return ver
@@ -72,7 +69,7 @@ def generate_odoo_config_file(
     database_name=None,
 ):
     if database_name is None:
-        database_name = os.path.dirname(root_path())
+        database_name = root_path().parent.name
     config_file = build_path(config_file)
     if config_file.is_file():
         ui.echo(f"Reusing existing configuration file {config_file}")
@@ -95,11 +92,11 @@ def generate_odoo_config_file(
             check=False,
         )
     config_has_running_env = False
-    with open(config_file) as odoo_cfg:
+    with config_file.open() as odoo_cfg:
         for line in odoo_cfg:
             if line.strip().startswith("running_env"):
                 config_has_running_env = True
                 break
     if not config_has_running_env:
-        with open(config_file, "a+") as odoo_cfg:
+        with config_file.open("a+") as odoo_cfg:
             odoo_cfg.write("\nrunning_env=dev\n")

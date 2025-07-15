@@ -1,7 +1,8 @@
 # Copyright 2017 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-import os
+from ast import literal_eval
+from pathlib import Path
 
 from invoke import task
 
@@ -10,11 +11,13 @@ def get_addons_path():
     """Reconstruct addons_path based on known odoo module locations"""
     # TODO: change depending on new structure
     # use root_path to get root project directory
-    addons_path = ["odoo/src/addons", "odoo/local-src"]
-    ext_path = "odoo/external-src/"
-    addons_path.extend(
-        [ext_path + i for i in os.listdir(ext_path) if os.path.isdir(ext_path + i)]
-    )
+    odoo_dir = Path("odoo")
+    addons_path = [
+        odoo_dir / "src" / "addons",
+        odoo_dir / "local-src",
+    ]
+    ext_path = odoo_dir / "external-src"
+    addons_path.extend(dir_pth for dir_pth in ext_path.iter() if dir_pth.is_dir())
     return addons_path
 
 
@@ -26,38 +29,34 @@ class Module:
     def dir(self):
         """Gives the location of a module
 
-        Search in know locations
+        Search in known locations
 
         :returns directory
 
         """
         addons_path = get_addons_path()
         for folder in addons_path:
-            if self.name in os.listdir(folder):
+            if (folder / self.name).exists():
                 return folder
         # TODO: change depending on new structure
         # use root_path to get root project directory
         if self.name == "base":
-            return "odoo/src/odoo/addons"
+            return Path("odoo/src/odoo/addons")
         raise Exception(f"module {self.name} not found")
 
     @property
     def path(self):
-        directory = self.dir
-        return os.path.join(directory, self.name)
+        return self.dir / self.name
 
     def get_dependencies(self):
         if self.name == "base":
             return []
-        path = self.path
-        try:
-            manifest_path = os.path.join(path, "__manifest__.py")
-            with open(manifest_path) as f:
-                return eval(f.read()).get("depends", [])
-        except OSError:
-            manifest_path = os.path.join(path, "__openerp__.py")
-            with open(manifest_path) as f:
-                return eval(f.read()).get("depends", [])
+        manifest_path = self.path / "__manifest__.py"
+        # Compatible with old Odoo versions
+        openerp_path = self.path / "__openerp__.py"
+        if not manifest_path.exists() and openerp_path.exists():
+            manifest_path = openerp_path
+        return literal_eval(manifest_path.read_text()).get("depends", [])
 
 
 @task

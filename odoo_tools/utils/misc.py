@@ -15,7 +15,7 @@ def get_file_path(filepath):
 
 
 def get_template_path(filepath):
-    return get_file_path("templates/" + filepath)
+    return get_file_path(f"templates/{filepath}")
 
 
 def get_cache_path():

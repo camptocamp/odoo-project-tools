@@ -46,8 +46,8 @@ def validate_config(config: dict[str, Any]) -> ProjectConfig:
 def load_config(config_path: PathLike = PROJ_CFG_FILE) -> ProjectConfig:
     """Loads the configuration file."""
     try:
-        with open(build_path(config_path, from_root=True)) as f:
-            config = dict(parse_ini_cfg(f.read(), "conf")["conf"])
+        content = build_path(config_path, from_root=True).read_text()
+        config = dict(parse_ini_cfg(content, "conf")["conf"])
     except FileNotFoundError as e:
         raise ProjectConfigException(e) from e
     try:

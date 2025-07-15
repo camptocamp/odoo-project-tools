@@ -1,8 +1,8 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-import os
 import re
+from pathlib import Path
 
 from . import ui
 from .os_exec import run
@@ -57,10 +57,11 @@ def get_current_rebase_branch():
     for rebase_file in ("rebase-merge", "rebase-apply"):
         # in case of rebase, the ref of the branch is in one of these
         # directories, in a file named "head-name"
-        path = run(f"git rev-parse --git-path {rebase_file}")
-        if os.path.exists(path):
-            with open(os.path.join(path, "head-name")) as rf:
-                current_branch = rf.read().strip().replace("refs/heads/", "")
+        rebase_dir = run(f"git rev-parse --git-path {rebase_file}")
+        rebase_dir = Path(rebase_dir)
+        if rebase_dir.exists():
+            head_name = (rebase_dir / "head-name").read_text().strip()
+            current_branch = head_name.replace("refs/heads/", "")
             break
     return current_branch
 
