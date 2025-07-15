@@ -1,7 +1,6 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-import os
 import subprocess
 from collections.abc import Iterator
 from os import PathLike
@@ -41,9 +40,12 @@ def get_odoo_enterprise(hash, dest="src/enterprise", org="odoo", branch=None):
 def _clone_or_fetch_repo(org, repo, branch, dest):
     repo_url = f"git@github.com:{org}/{repo}"
     __, autoshare_repo = find_autoshare_repository([repo_url])
-    if os.path.isdir(os.path.join(dest, ".git")):
+    dest = Path(dest)
+    if (dest / ".git").is_dir():
         ui.echo(f"Fetching {org}/{repo} {branch}")
-        subprocess.run(["git", "-C", dest, "fetch", "--quiet", "--all"], check=True)
+        subprocess.run(
+            ["git", "-C", str(dest), "fetch", "--quiet", "--all"], check=True
+        )
     else:
         if autoshare_repo:
             command = "autoshare-clone"
@@ -58,14 +60,14 @@ def _clone_or_fetch_repo(org, repo, branch, dest):
                 "--branch",
                 branch,
                 repo_url,
-                dest,
+                str(dest),
             ],
             check=True,
         )
 
 
 def _get_gitmodules():
-    return str(build_path(".gitmodules"))
+    return build_path(".gitmodules")
 
 
 def iter_gitmodules(
@@ -75,7 +77,7 @@ def iter_gitmodules(
 
     :param filter_path: if provided, only yield the submodules on the given path
     """
-    config = GitConfigParser(_get_gitmodules(), read_only=True)
+    config = GitConfigParser(str(_get_gitmodules()), read_only=True)
     if filter_path:
         filter_path = Path(filter_path)
     for section in config.sections():
@@ -127,7 +129,7 @@ def submodule_update(path: Union[str, PathLike]):
         __, autoshare_repo = find_autoshare_repository([submodule.url])
         if autoshare_repo:
             ui.echo(f"Auto-share conf found for {autoshare_repo.repo_dir}")
-            if not os.path.exists(autoshare_repo.repo_dir):
+            if not Path(autoshare_repo.repo_dir).exists():
                 autoshare_repo.prefetch(True)
             args += ["--reference", autoshare_repo.repo_dir]
     args.append(str(path))

@@ -13,7 +13,6 @@ from ..utils.misc import (
     get_docker_image_commit_hashes,
     get_template_path,
 )
-from ..utils.os_exec import run
 from ..utils.path import build_path
 from ..utils.proj import (
     generate_odoo_config_file,
@@ -91,17 +90,15 @@ def bootstrap_files(opts):
             continue
         var_getter = item.get("variables_getter")
         if var_getter:
-            with open(source) as source_fd:
-                content = source_fd.read()
-                # TODO: use better variable tmpl?
-                for k, v in var_getter(opts).items():
-                    content = content.replace(f"${k}", v)
-                    # avoid errors from end-of-file-fixer in pre-commit
-                    content = content.rstrip("\n") + "\n"
-                if opts.backup and dest.exists():
-                    _backup(dest)
-                with open(dest, "w") as dest_fd:
-                    dest_fd.write(content)
+            content = source.read_text()
+            # TODO: use better variable tmpl?
+            for k, v in var_getter(opts).items():
+                content = content.replace(f"${k}", v)
+                # avoid errors from end-of-file-fixer in pre-commit
+                content = content.rstrip("\n") + "\n"
+            if opts.backup and dest.exists():
+                _backup(dest)
+            dest.write_text(content)
         else:
             if opts.backup and dest.exists():
                 _backup(dest)
@@ -110,8 +107,8 @@ def bootstrap_files(opts):
     # towncrier stuff TODO: move to odoo-template?
     path = build_path("./changes.d/.gitkeep")
     if not path.exists():
-        os.makedirs(path.parent, exist_ok=True)
-        run(f"touch {path}")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
 
 
 @click.group()

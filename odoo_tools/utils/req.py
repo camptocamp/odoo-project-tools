@@ -3,7 +3,7 @@
 
 import fileinput
 import operator
-import os
+from pathlib import Path
 
 import requirements
 
@@ -25,17 +25,17 @@ def get_project_dev_req():
 
 
 def get_requirements(req_filepath=None):
-    req_filepath = req_filepath or get_project_req()
+    req_filepath = Path(req_filepath or get_project_req())
     res = {}
-    with open(req_filepath) as fd:
+    with req_filepath.open() as fd:
         for req in requirements.parse(fd):
             res[req.name] = req
     return res
 
 
 def get_addon_requirement(addon, req_filepath=None):
-    req_filepath = req_filepath or get_project_req()
-    with open(req_filepath) as fd:
+    req_filepath = Path(req_filepath or get_project_req())
+    with req_filepath.open() as fd:
         for req in requirements.parse(fd):
             if req.name in (addon, pkg_name_to_odoo_name(addon)):
                 return req
@@ -94,7 +94,7 @@ def make_requirement_line_for_editable(
 def add_requirement(
     pkg_name, version=None, req_filepath=None, pr=None, editable=False, use_wool=None
 ):
-    req_filepath = req_filepath or get_project_req()
+    req_filepath = Path(req_filepath or get_project_req())
     if use_wool is None:
         # assume a project on Odoo 17 is using wool
         use_wool = version is None or version >= "17"
@@ -105,8 +105,8 @@ def add_requirement(
         line = handler(pkg_name, pr, use_wool=use_wool)
     else:
         line = make_requirement_line(pkg_name, version=version)
-    sep = "\n" if os.path.exists(req_filepath) else ""
-    with open(req_filepath, "a") as fd:
+    sep = "\n" if req_filepath.exists() else ""
+    with req_filepath.open("a") as fd:
         fd.write(sep + line)
 
 
@@ -146,8 +146,4 @@ OP = {
 
 
 def allowed_version(req, check_version):
-    for _op, version in req.specs:
-        op = OP[_op]
-        if not op(check_version, version):
-            return False
-    return True
+    return all(OP[oper](check_version, version) for (oper, version) in req.specs)

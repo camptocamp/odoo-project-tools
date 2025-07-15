@@ -2,8 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import logging
-import os
-from pathlib import PosixPath
+from pathlib import Path
 
 import click
 import git_aggregator.config
@@ -63,10 +62,7 @@ class Repo:
 
     @staticmethod
     def _safe_repo_name(name_or_path):
-        # TODO: try to avoid this not homogeneous handling
-        if isinstance(name_or_path, PosixPath):
-            name_or_path = name_or_path.as_posix()
-        return name_or_path.rstrip("/").rsplit("/", 1)[-1]
+        return Path(name_or_path).name
 
     def make_repo_path(self, name_or_path):
         """Return a submodule path by a submodule name."""
@@ -94,20 +90,12 @@ class Repo:
     @classmethod
     def repositories_from_pending_folder(cls, path=None):
         pending_merge_abs_path = build_path(get_conf_key("pending_merge_rel_path"))
-        path = path or pending_merge_abs_path
-        repo_names = []
-        for __, __, files in os.walk(path):
-            repo_names = [
-                os.path.splitext(fname)[0] for fname in files if fname.endswith(".yml")
-            ]
-        return [cls(name) for name in repo_names]
+        path = Path(path or pending_merge_abs_path)
+        return [cls(pth.stem) for pth in path.rglob("*.yml")]
 
     def has_pending_merges(self):
-        found = os.path.exists(self.abs_merges_path)
-        if not found:
-            return False
         # either empty or commented out
-        return bool(self.merges_config())
+        return bool(self.abs_merges_path.exists() and self.merges_config())
 
     def has_any_pr_left(self):
         if not self.has_pending_merges():
@@ -119,24 +107,21 @@ class Repo:
         return pr_refs or pr_patches
 
     def merges_config(self):
-        with open(self.abs_merges_path) as f:
-            data = yaml_load(f.read()) or {}
-            # FIXME: this should be relative
-            # to the position of the pending merge folder
-            repo_relpath = ".." / self.path
-            return data.get(repo_relpath.as_posix(), {})
+        data = yaml_load(self.abs_merges_path.read_text()) or {}
+        # FIXME: this should be relative
+        # to the position of the pending merge folder
+        repo_relpath = ".." / self.path
+        return data.get(repo_relpath.as_posix(), {})
 
     def update_merges_config(self, config):
         # get former config if any
-        if os.path.exists(self.abs_merges_path):
-            with open(self.abs_merges_path) as f:
-                data = yaml_load(f.read())
+        if self.abs_merges_path.exists():
+            data = yaml_load(self.abs_merges_path.read_text())
         else:
             data = {}
-        repo_relpath = os.path.join(os.path.pardir, self.path)
-        data[repo_relpath] = config
-        with open(self.abs_merges_path, "w") as f:
-            yaml_dump(data, f)
+        data[(".." / self.path).as_posix()] = config
+        with self.abs_merges_path.open("w") as fobj:
+            yaml_dump(data, fobj)
 
     def api_url(self, upstream=None):
         return f"https://api.github.com/repos/{upstream or self.company_git_remote}/{self.name}"
@@ -152,8 +137,7 @@ class Repo:
     def generate_pending_merges_file_template(self, upstream):
         """Create git-aggregator config for current repo"""
         # could be that this is the first PM ever added to this project
-        if not os.path.exists(self.pending_merge_abs_path):
-            os.makedirs(self.pending_merge_abs_path)
+        self.pending_merge_abs_path.mkdir(parents=True, exist_ok=True)
 
         oca_ocb_remote = False
         if (
@@ -701,7 +685,7 @@ def remove_pending(entity_url, aggregate=True):
     patches = len(config.get("shell_command_after", {}))
 
     if not pending_merges_present and not patches:
-        os.remove(repo.abs_merges_path)
+        repo.abs_merges_path.unlink()
     if aggregate:
         aggregator = repo.get_aggregator()
         aggregator.aggregate()
@@ -754,11 +738,11 @@ def push_branches(version=None, force=False):
 
 def get_new_remote_url(repo=None, force_remote=False):
     if repo.has_pending_merges():
-        with open(repo.abs_merges_path) as pending_merges:
+        with repo.abs_merges_path.open() as pending_merges:
             # read everything we can reach
             # for reading purposes only
             data = yaml_load(pending_merges)
-            submodule_pending_config = data[str(PosixPath("..") / repo.path)]
+            submodule_pending_config = data[(Path("..") / repo.path).as_posix()]
             merges_in_action = submodule_pending_config["merges"]
             registered_remotes = submodule_pending_config["remotes"]
 

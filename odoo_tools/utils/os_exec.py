@@ -6,6 +6,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 
 def get_venv():
@@ -15,16 +16,17 @@ def get_venv():
     might not have been installed globally, we need make sure the PATH is set
     correctly so that the executables are found.
     """
+    env_PATH = os.getenv("PATH")
     # If PATH is not set, we're likely running the tests
-    if not os.environ.get("PATH"):
+    if not env_PATH:
         return os.environ
-    bin_path = os.path.dirname(sys.executable)
+    bin_path = Path(sys.executable).parent
     # If the bin_path is already there, perhaps this is a global install
-    if bin_path in os.environ["PATH"]:
+    if str(bin_path) in env_PATH:
         return os.environ
     # Return a copy of the environment, with the venv bin path prepended to PATH
     env = os.environ.copy()
-    env["PATH"] = f"{bin_path}:{env['PATH']}"
+    env["PATH"] = f"{bin_path}:{env_PATH}"
     return env
 
 

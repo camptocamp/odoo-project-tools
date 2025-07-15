@@ -173,7 +173,7 @@ def _prepare_parameters(ctx):
     ctx.obj["odoo_upgrade_env_path"] = build_path(
         "odoo/songs/migration_db/odoo_upgrade_env_file"
     )
-    ctx.obj["db_name"] = os.path.splitext(prod_dump_path.name)[0]
+    ctx.obj["db_name"] = prod_dump_path.stem
     ctx.obj["db_prod"] = ctx.obj["db_name"] + "_prod"
     ctx.obj["db_prod_fixed"] = ctx.obj["db_name"] + "_prod_fixed"
     ctx.obj["db_odoo_migrated"] = ctx.obj["db_name"] + "_odoo_migrated"
