@@ -209,7 +209,7 @@ def init_proj_v2():
 
 
 def move_files():
-    cwd = Path(".")
+    cwd = Path()
     odoo_dir = cwd / "odoo"
     if (odoo_dir / "local-src/server_environment_files").is_dir():
         # the project has a server_environment_files module -> use this one

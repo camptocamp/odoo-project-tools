@@ -4,6 +4,7 @@
 import re
 import subprocess
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import click
 import jinja2
@@ -80,9 +81,8 @@ def run(empty_db, port, force_image_pull, version):
     template = jinja_env.get_template("localrun_docker_compose.yml.tmpl")
     dkr_compose = template.render(odoo_version=version)
     with cd(run_dir):
-        with open("docker-compose.yml", "w") as fobj:
-            fobj.write(dkr_compose)
-        with open("docker_logs.txt", "wb") as logfile:
+        Path("docker-compose.yml").write_text(dkr_compose)
+        with Path("docker_logs.txt").open("wb") as logfile:
             ui.echo(
                 f"Pulling docker image (this can be long). Logs are in {run_dir/'docker_logs.txt'}"
             )
@@ -93,7 +93,7 @@ def run(empty_db, port, force_image_pull, version):
                 stdout=logfile,
             )
         run_environment = {"MIGRATE": "false"}
-        with open("odoo_logs.txt", "w", buffering=1) as logfile:
+        with Path("odoo_logs.txt").open("w", buffering=1) as logfile:
             ui.echo("Initializing the database")
             subprocess.run(
                 docker_compose.down()

@@ -51,7 +51,7 @@ def create_db_from_local_files(
     :param str db_name: name of the DB to create
     :param str template_db_name: if set, a new template DB of the given name is created
     """
-    if dumps := [d.name for d in Path(".").absolute().glob("*.pg") if d.is_file()]:
+    if dumps := [d.name for d in Path().absolute().glob("*.pg") if d.is_file()]:
         dumps.sort()  # Sort alphabetically to make it easier to read for users
         choices = dict(enumerate(dumps, start=1))
         ui.echo(
