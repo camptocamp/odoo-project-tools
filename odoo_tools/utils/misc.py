@@ -2,10 +2,10 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import configparser
-import pathlib
 import shutil
 import subprocess
 from importlib.resources import files
+from pathlib import Path
 
 PKG_NAME = "odoo_tools"
 
@@ -19,7 +19,7 @@ def get_template_path(filepath):
 
 
 def get_cache_path():
-    return pathlib.Path.home() / ".cache" / "otools"
+    return Path.home() / ".cache" / "otools"
 
 
 def copy_file(src_path, dest_path):
@@ -52,7 +52,7 @@ def get_ini_cfg_key(cfg_content, header, key):
 
 def get_docker_image_commit_hashes():
     """Retrieve the odoo core and odoo enterprise commit hashes used in the project image"""
-    with open("Dockerfile") as fobj:
+    with Path("Dockerfile").open() as fobj:
         for line in fobj:
             if line.startswith("FROM ghcr.io/camptocamp/odoo-enterprise"):
                 image = line.strip().split()[1]

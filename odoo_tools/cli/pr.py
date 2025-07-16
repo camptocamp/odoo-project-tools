@@ -1,7 +1,7 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-from pathlib import PosixPath
+from pathlib import Path
 
 import click
 
@@ -146,14 +146,14 @@ def handle_git_repository(pr_number, branch):
         run(f"git fetch origin +refs/pull/{pr_number}/merge")
         run("git reset --hard FETCH_HEAD")
 
-        dockerfile = PosixPath("Dockerfile")
+        dockerfile = Path("Dockerfile")
         if not dockerfile.is_file():
             # old layout
-            dockerfile = PosixPath("Dockerfile")
-        requirements = PosixPath("odoo/requirements.txt")
+            dockerfile = Path("Dockerfile")
+        requirements = Path("odoo/requirements.txt")
         if not requirements.is_file():
             # old layout
-            requirements = PosixPath("odoo/requirements.txt")
+            requirements = Path("odoo/requirements.txt")
 
         docker_diff = run(f"git diff pr-{pr_number} {master} -- {dockerfile}")
         req_diff = run(f"git diff pr-{pr_number} {master} -- {requirements}")
@@ -169,8 +169,7 @@ def handle_git_repository(pr_number, branch):
 
 def generate_docker_yml(dbname, port, file_name):
     # generate additional docker-compose file
-    with open(file_name, "w+") as f:
-        data = f"""
+    data = f"""
 services:
   odoo:
     environment:
@@ -180,6 +179,7 @@ services:
     ports:
       - {port}:80
         """
+    with Path(file_name).open("w+") as f:
         f.write(data)
 
 
