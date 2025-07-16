@@ -78,6 +78,16 @@ def test_bump_changelog():
     ) as runner:
         # run init to get all files ready (eg: bumpversion)
         runner.invoke(init, catch_exceptions=False)
+        hist_part_1 = (
+            ".. :changelog:\n"
+            ".. DO NOT EDIT. File is generated from fragments.\n\n"
+            "Release History\n"
+            "---------------\n\n"
+            ".. towncrier release notes start\n\n"
+        )
+        hist_part_2 = (
+            "14.0.0.1.0 (2011-10-09)\n" "+++++++++++++++++++++++\n\n" "* Blah\n"
+        )
         changes = (
             ("Fixed a thing!", "./changes.d/1234.bug"),
             ("Added a thing!", "./changes.d/2345.feat"),
@@ -85,20 +95,22 @@ def test_bump_changelog():
         for change, path in changes:
             with open(path, "w") as fd:
                 fd.write(change)
+        with open("HISTORY.rst", "w") as fd:
+            fd.write(hist_part_1 + hist_part_2)
         result = runner.invoke(
             release.bump, ["--type", "minor"], catch_exceptions=False, input="n"
         )
-        date = datetime.date.today().strftime("%Y-%m-%d")
-        expected = "\n".join(
-            (
-                f"14.0.0.2.0 ({date})",
-                "+++++++++++++++++++++++",
-                "\n**Features and Improvements**\n"
-                "* 2345: Added a thing!"
-                "\n**Bugfixes**\n"
-                "* 1234: Fixed a thing!",
-            )
+        new_part = (
+            f"14.0.0.2.0 ({datetime.date.today():%Y-%m-%d})\n"
+            "+++++++++++++++++++++++\n\n"
+            "**Features and Improvements**\n"
+            "* 2345: Added a thing!\n\n"
+            "**Bugfixes**\n"
+            # Note the 2 empty lines to separate versions
+            "* 1234: Fixed a thing!\n\n\n"
         )
+
+        expected = hist_part_1 + new_part + hist_part_2
         with open("HISTORY.rst") as fd:
             compare_line_by_line(fd.read(), expected)
         assert result.output.splitlines() == [
