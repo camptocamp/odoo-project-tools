@@ -620,7 +620,7 @@ class RepoAggregator(git_aggregator.repo.Repo):
         self.cwd = self.pm_repo.abs_path
 
 
-def add_pending(entity_url, aggregate=True, patch=False):
+def add_pending(entity_url, aggregate=True, patch=False, push=True):
     """Add a pending merge using the given entity url.
 
     Adds the pending merge in the appropriate aggregation file (under pending-merges.d),
@@ -660,6 +660,8 @@ def add_pending(entity_url, aggregate=True, patch=False):
     if aggregate:
         aggregator = repo.get_aggregator()
         aggregator.aggregate()
+        if push:
+            aggregator.push()
     return repo
 
 
