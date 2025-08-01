@@ -93,13 +93,20 @@ def aggregate(repo_path, target_branch=None, push=None):
     is_flag=True,
     default=False,
 )
-def add_pending(entity_url, aggregate=True, patch=False):
+@click.option(
+    "--push/--no-push",
+    "push",
+    is_flag=True,
+    default=True,
+    help="push the result of the aggregation to a remote branch",
+)
+def add_pending(entity_url, aggregate=True, patch=False, push=True):
     """Add a pending merge using given entity link"""
     # pattern, given an https://github.com/<user>/<repo>/pull/<pr-index>
     # # PR headline
     # # PR link as is
     # - refs/pull/<pr-index>/head
-    pm_utils.add_pending(entity_url, aggregate=aggregate, patch=patch)
+    pm_utils.add_pending(entity_url, aggregate=aggregate, patch=patch, push=push)
 
 
 @cli.command(name="remove")
