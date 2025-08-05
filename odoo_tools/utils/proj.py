@@ -5,8 +5,8 @@ import subprocess
 import venv
 from functools import cache
 
-from ..config import get_conf_key
 from . import ui
+from .config import config
 from .misc import get_template_path
 from .path import build_path, get_root_marker, root_path
 from .yaml import yaml_load
@@ -23,7 +23,7 @@ def get_project_manifest_key(key):
 
 
 def get_current_version(serie_only=False):
-    ver_file = build_path(get_conf_key("version_file_rel_path"))
+    ver_file = build_path(config.version_file_rel_path)
     ver = ver_file.read_text().strip()
     if serie_only:
         ver = ver.split(".")[0]
@@ -39,7 +39,7 @@ def setup_venv(venv_dir, odoo_src_path=None):
         venv.create(venv_dir, with_pip=True)
     pip = venv_dir / "bin/pip"
     if odoo_src_path is None:
-        odoo_src_path = build_path(get_conf_key("odoo_src_rel_path"))
+        odoo_src_path = build_path(config.odoo_src_rel_path)
 
     if not (venv_dir / "bin/odoo").is_file():
         subprocess.run(

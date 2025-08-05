@@ -6,7 +6,7 @@ from unittest import mock
 
 from odoo_tools.cli import release
 from odoo_tools.cli.project import init
-from odoo_tools.config import get_conf_key
+from odoo_tools.utils.config import config
 
 from .common import (
     compare_line_by_line,
@@ -33,7 +33,7 @@ def test_bump():
     with fake_project_root(
         proj_version="14.0.0.1.0", mock_marabunta_file=True
     ) as runner:
-        ver_file = get_conf_key("version_file_rel_path")
+        ver_file = config.version_file_rel_path
         with ver_file.open() as fd:
             assert fd.read() == "14.0.0.1.0"
         # run init to get all files ready (eg: bumpversion)
@@ -131,11 +131,10 @@ def test_bump_update_marabunta_file():
         result = runner.invoke(
             release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
         )
-        with get_conf_key("marabunta_mig_file_rel_path").open() as fd:
-            content = fd.read()
-            # TODO: improve these checks
-            assert "14.0.0.2.0" in content
-            assert "click-odoo-update" in content
+        content = config.marabunta_mig_file_rel_path.read_text()
+        # TODO: improve these checks
+        assert "14.0.0.2.0" in content
+        assert "click-odoo-update" in content
         assert result.output.splitlines() == [
             "Running: bumpversion minor",
             "Running: towncrier build --yes --version=14.0.0.2.0",

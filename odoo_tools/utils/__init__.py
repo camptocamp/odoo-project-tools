@@ -1,5 +1,6 @@
 from . import (
     click,
+    config,
     db,
     docker_compose,
     gh,
@@ -19,6 +20,7 @@ from . import (
 
 __all__ = [
     "click",
+    "config",
     "db",
     "docker_compose",
     "gh",

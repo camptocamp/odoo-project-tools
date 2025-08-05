@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+from functools import cached_property
 from os import PathLike
 from pathlib import Path
 from textwrap import indent
@@ -11,9 +12,9 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from .exceptions import ProjectConfigException
-from .utils.misc import parse_ini_cfg
-from .utils.path import build_path
+from ..exceptions import ProjectConfigException
+from .misc import parse_ini_cfg
+from .path import build_path
 
 # TODO: use this as marker file
 PROJ_CFG_FILE = os.getenv("PROJ_CFG_FILE", ".proj.cfg")
@@ -43,7 +44,7 @@ def validate_config(config: dict[str, Any]) -> ProjectConfig:
         ) from None
 
 
-def load_config(config_path: PathLike = PROJ_CFG_FILE) -> ProjectConfig:
+def load_config(config_path: PathLike) -> ProjectConfig:
     """Loads the configuration file."""
     try:
         content = build_path(config_path, from_root=True).read_text()
@@ -94,16 +95,21 @@ class ProjectConfig(BaseModel):
     """The path to the Marabunta migration file."""
 
 
-def get_conf_key(key):
-    """Get a configuration key.
+class LazyConfig:
+    """Lazy configuration loader"""
 
-    Deprecated: use `load_config() and config.key` instead.
+    def __init__(self, config_path: PathLike):
+        self._config_path = config_path
 
-    .. code-block:: python
+    @cached_property
+    def _config(self) -> ProjectConfig:
+        return load_config(self._config_path)
 
-        conf = load_config()
-        return conf.key
+    def _reload(self):
+        self.__dict__.pop("_config", None)
 
-    """
-    conf = load_config()
-    return getattr(conf, key)
+    def __getattr__(self, name):
+        return getattr(self._config, name)
+
+
+config = LazyConfig(PROJ_CFG_FILE)

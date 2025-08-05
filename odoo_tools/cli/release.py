@@ -1,9 +1,11 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+from pathlib import Path
+
 import click
 
-from ..config import get_conf_key
+from ..utils.config import config
 from ..utils.git import get_current_branch
 from ..utils.marabunta import MarabuntaFileHandler
 from ..utils.misc import get_ini_cfg_key
@@ -42,7 +44,7 @@ def make_towncrier_cmd(version):
 
 
 def update_marabunta_file(version):
-    marabunta_file = build_path(get_conf_key("marabunta_mig_file_rel_path"))
+    marabunta_file = build_path(config.marabunta_mig_file_rel_path)
     handler = MarabuntaFileHandler(marabunta_file)
     handler.update(version)
 
@@ -76,8 +78,7 @@ def bump(rel_type, new_version=None, dry_run=False, commit=False):
         new_version = get_bumpversion_cfg_key(res, "new_version").strip()
         click.echo(f"New version: {new_version}")
         return
-    with get_conf_key("version_file_rel_path").open() as fd:
-        new_version = fd.read().strip()
+    new_version = Path(config.version_file_rel_path).read_text().strip()
 
     cmd = make_towncrier_cmd(new_version)
     click.echo(f"Running: {cmd}")

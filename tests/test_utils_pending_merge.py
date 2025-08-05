@@ -7,9 +7,9 @@ from unittest import mock
 
 import pytest
 
-from odoo_tools.config import get_conf_key
 from odoo_tools.exceptions import Exit, PathNotFound
 from odoo_tools.utils import pending_merge as pm_utils
+from odoo_tools.utils.config import config
 
 from .common import fake_project_root, mock_pending_merge_repo_paths
 
@@ -25,8 +25,8 @@ def compare_dict(a, b, keys=None):
 
 def test_repo_base():
     with fake_project_root():
-        ext_rel_path = get_conf_key("ext_src_rel_path")
-        pending_merge_rel_path = get_conf_key("pending_merge_rel_path")
+        ext_rel_path = config.ext_src_rel_path
+        pending_merge_rel_path = config.pending_merge_rel_path
         cwd = PosixPath(os.getcwd())
         repo = Repo("edi", path_check=False)
         expected = {
