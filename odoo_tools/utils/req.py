@@ -7,8 +7,8 @@ from pathlib import Path
 
 import requirements
 
-from ..config import get_conf_key
 from . import ui
+from .config import config
 from .gh import parse_github_url
 from .path import root_path
 from .pypi import pkg_name_to_odoo_name
@@ -66,7 +66,7 @@ def modname_to_installation_subdirectory(mod_name: str, use_wool: bool):
 def make_requirement_line_for_proj_fork(
     pkg_name, repo_name, branch, upstream=None, use_wool=False
 ):
-    upstream = upstream or get_conf_key("company_git_remote")
+    upstream = upstream or config.company_git_remote
     mod_name = pkg_name_to_odoo_name(pkg_name)
     parts = {
         "upstream": upstream,
@@ -85,7 +85,7 @@ def make_requirement_line_for_editable(
     if pr:
         parts = parse_github_url(pr)
         repo_name = parts["repo_name"]
-    dev_src = dev_src or get_conf_key("ext_src_rel_path")
+    dev_src = dev_src or config.ext_src_rel_path
     mod_name = pkg_name_to_odoo_name(pkg_name)
     subdirectory = modname_to_installation_subdirectory(mod_name, use_wool)
     return f"-e {dev_src}/{repo_name}/{subdirectory}"

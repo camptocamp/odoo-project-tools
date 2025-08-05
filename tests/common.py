@@ -6,8 +6,8 @@ from pathlib import PosixPath
 
 from click.testing import CliRunner
 
-from odoo_tools.config import get_conf_key
 from odoo_tools.utils import pending_merge as pm_utils
+from odoo_tools.utils.config import config
 from odoo_tools.utils.path import get_root_marker
 from odoo_tools.utils.yaml import update_yml_file
 
@@ -87,6 +87,7 @@ def make_fake_project_root(
         for k, v in proj_cfg_data.items():
             content.append(f"{k} = {v}")
         fd.write("\n".join(content))
+    config._reload()
     data = FAKE_MANIFEST_DATA.copy()
     data.update(manifest or {})
     # create empty file
@@ -97,7 +98,7 @@ def make_fake_project_root(
     with open(req_file, "w") as fd:
         fd.write("")
     # Mock proj version file
-    ver_file = get_conf_key("version_file_rel_path")
+    ver_file = config.version_file_rel_path
 
     os.makedirs(ver_file.parent.as_posix(), exist_ok=True)
     with ver_file.open("w") as fd:
@@ -117,7 +118,7 @@ def fake_marabunta_file(source_file_path=None):
     if not os.path.exists("odoo"):
         os.mkdir("odoo")
     with source_file_path.open() as fd_source:
-        with get_conf_key("marabunta_mig_file_rel_path").open("w") as fd_dest:
+        with config.marabunta_mig_file_rel_path.open("w") as fd_dest:
             fd_dest.write(fd_source.read())
 
 

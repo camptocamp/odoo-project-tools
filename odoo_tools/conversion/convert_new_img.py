@@ -27,7 +27,7 @@ except ImportError:
     )
     odoorpc = None
 
-from ..config import get_conf_key
+from ..config import config
 from ..utils.path import root_path
 from ..utils.proj import get_current_version
 from ..utils.pypi import odoo_name_to_pkg_name
@@ -94,7 +94,7 @@ docker build .
 
 
 def main(args=None):
-    if get_conf_key("template_version") == 2:
+    if config.template_version == 2:
         print("Project already migrated")
         return sys.exit(0)
     if args is None:

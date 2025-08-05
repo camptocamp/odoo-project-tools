@@ -8,7 +8,7 @@ from unittest import mock
 import pytest
 
 from odoo_tools.cli.project import checkout_local_odoo, init
-from odoo_tools.config import load_config
+from odoo_tools.utils.config import config
 from odoo_tools.utils.path import build_path
 
 from .common import compare_line_by_line, get_fixture, mock_subprocess_run
@@ -30,6 +30,7 @@ from .common import compare_line_by_line, get_fixture, mock_subprocess_run
 def test_init(project, version):
     # Drop mocked cfg (necessary to make fake_project_root work before)
     os.remove(".proj.cfg")
+    config._reload()
     with mock.patch.dict(os.environ, {"PROJ_TMPL_VER": str(version)}, clear=True):
         result = project.invoke(init, catch_exceptions=False)
     paths = (
@@ -94,7 +95,6 @@ def test_init_custom_version(project):
 @pytest.mark.usefixtures("project")
 @pytest.mark.project_setup(proj_tmpl_ver=2, proj_version="16.0.1.1.0")
 def test_checkout_local_odoo(runner):
-    config = load_config()
     odoo_src_path = build_path(config.odoo_src_rel_path)
     mock_fn = mock_subprocess_run(
         [
@@ -159,7 +159,6 @@ def test_checkout_local_odoo(runner):
 @pytest.mark.usefixtures("project")
 @pytest.mark.project_setup(proj_tmpl_ver=2, proj_version="16.0.1.1.0")
 def test_local_odoo_venv(runner):
-    config = load_config()
     odoo_src_path = build_path(config.odoo_src_rel_path)
     config_file = build_path("odoo.cfg")
 

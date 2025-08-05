@@ -11,10 +11,10 @@ import git_aggregator.repo
 import requests
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
-from ..config import get_conf_key
 from ..exceptions import PathNotFound
 from ..utils.misc import SmartDict, get_docker_image_commit_hashes
 from . import gh, git, ui
+from .config import config
 from .os_exec import run
 from .path import build_path, cd
 from .proj import get_current_version, get_project_manifest_key
@@ -35,11 +35,11 @@ class Repo:
     """Handle checked out repositories and their pending merges."""
 
     def __init__(self, name_or_path, path_check=True):
-        self.template_version = get_conf_key("template_version") or 1
-        self.company_git_remote = get_conf_key("company_git_remote")
-        self.odoo_src_rel_path = get_conf_key("odoo_src_rel_path")
-        self.ext_src_rel_path = get_conf_key("ext_src_rel_path")
-        self.pending_merge_rel_path = get_conf_key("pending_merge_rel_path")
+        self.template_version = config.template_version or 1
+        self.company_git_remote = config.company_git_remote
+        self.odoo_src_rel_path = config.odoo_src_rel_path
+        self.ext_src_rel_path = config.ext_src_rel_path
+        self.pending_merge_rel_path = config.pending_merge_rel_path
         self.pending_merge_abs_path = build_path(self.pending_merge_rel_path)
         self.path = self.make_repo_path(name_or_path)
         self.abs_path = build_path(self.path)
@@ -89,7 +89,7 @@ class Repo:
 
     @classmethod
     def repositories_from_pending_folder(cls, path=None):
-        pending_merge_abs_path = build_path(get_conf_key("pending_merge_rel_path"))
+        pending_merge_abs_path = build_path(config.pending_merge_rel_path)
         path = Path(path or pending_merge_abs_path)
         return [cls(pth.stem) for pth in path.rglob("*.yml")]
 
@@ -717,18 +717,18 @@ def push_branches(version=None, force=False):
 
     # look through all of the files inside PENDING_MERGES_DIR, push everything
     impacted_repos = []
-    company_git_remote = get_conf_key("company_git_remote")
+    company_git_remote = config.company_git_remote
     for repo in Repo.repositories_from_pending_folder():
         if not repo.has_pending_merges():
             continue
-        config = repo.merges_config()
+        merges_config = repo.merges_config()
         impacted_repos.append(repo.path)
         ui.echo(f"Pushing {repo.path}")
         with cd(repo.abs_path):
             try:
                 run(f"git config remote.{company_git_remote}.url")
             except Exception:  # TODO
-                remote_url = config["remotes"][company_git_remote]
+                remote_url = merges_config["remotes"][company_git_remote]
                 run(f"git remote add {company_git_remote} {remote_url}")
             run(f"git push -f -v {company_git_remote} HEAD:refs/heads/{branch_name}")
     if impacted_repos:

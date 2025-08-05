@@ -3,8 +3,8 @@
 
 from unittest import mock
 
-from odoo_tools.config import get_conf_key
 from odoo_tools.utils import proj as proj_utils
+from odoo_tools.utils.config import config
 from odoo_tools.utils.path import build_path
 
 from .common import compare_line_by_line, fake_project_root, mock_subprocess_run
@@ -58,7 +58,7 @@ def test_get_project_manifest_key():
 
 def test_generate_odoo_config_file():
     with fake_project_root(proj_tmpl_ver="2", proj_version="16.0.1.1.0"):
-        odoo_src_path = build_path(get_conf_key("odoo_src_rel_path"))
+        odoo_src_path = build_path(config.odoo_src_rel_path)
         odoo_enterprise_path = str(odoo_src_path / "../enterprise")
         venv_dir = build_path(".venv")
         odoo_exec = venv_dir / "bin/odoo"
@@ -91,7 +91,5 @@ def test_generate_odoo_config_file():
             proj_utils.generate_odoo_config_file(
                 venv_dir, odoo_src_path, odoo_enterprise_path, database_name="testdb"
             )
-        with open(config_file) as fobj:
-            config = fobj.read()
         expected = "db_name=testdb\n\nrunning_env=dev\n"
-        compare_line_by_line(config, expected)
+        compare_line_by_line(config_file.read_text(), expected)

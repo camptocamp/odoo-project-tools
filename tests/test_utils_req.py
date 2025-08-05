@@ -3,8 +3,8 @@
 
 from click.testing import CliRunner
 
-from odoo_tools.config import get_conf_key
 from odoo_tools.utils import req as req_utils
+from odoo_tools.utils.config import config
 
 from .common import fake_project_root, get_fixture_path
 
@@ -69,7 +69,7 @@ def test_make_requirement_line_for_pr_editable():
         mod_name = "edi_record_metadata_oca"
         pkg_name = f"odoo14-addon-{mod_name}"
         pr = "https://github.com/OCA/edi-framework/pull/3"
-        path = get_conf_key("ext_src_rel_path")
+        path = config.ext_src_rel_path
         expected = f"-e {path}/edi-framework/setup/edi_record_metadata_oca"
         assert make(pkg_name, pr) == expected
 
@@ -110,7 +110,7 @@ def test_add_requirement_pr_editable():
         req_utils.add_requirement(
             pkg_name, pr=pr, req_filepath=req_path, editable=True, use_wool=False
         )
-        path = get_conf_key("ext_src_rel_path")
+        path = config.ext_src_rel_path
         expected = f"-e {path}/edi-framework/setup/{mod_name}"
         with open(req_path) as fd:
             assert fd.read() == expected

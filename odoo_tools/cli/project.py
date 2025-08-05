@@ -5,8 +5,8 @@ import os
 
 import click
 
-from ..config import PROJ_CFG_FILE, load_config
 from ..utils import git, ui
+from ..utils.config import PROJ_CFG_FILE, config
 from ..utils.misc import (
     SmartDict,
     copy_file,
@@ -32,7 +32,6 @@ def get_proj_tmpl_ver():
 def get_bumpversion_vars(opts):
     version = opts.version or get_current_version()
     odoo_major, odoo_minor, __ = version.split(".", 2)
-    config = load_config()
     res = {
         "rel_path_local_addons": config.local_src_rel_path.as_posix(),
         "rel_path_version_file": config.version_file_rel_path.as_posix(),
@@ -176,7 +175,6 @@ def checkout_local_odoo(
     locally (you will still need docker to get the correct versions of the source code, unless you pass the hashes
     on the command line).
     """
-    config = load_config()
     if config.template_version == 1:
         ui.exit_msg("This command is not support on this project version;")
     version = get_current_version(serie_only=True)
