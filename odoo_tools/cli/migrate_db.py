@@ -434,7 +434,7 @@ def migrate_c2c_external(ctx):
     db_name = ctx.obj["db_name"]
     log_file = ctx.obj["store_path"].joinpath(f"{db_name}_c2c_external.log")
     try:
-        if not _db_exists(db_name) or ctx.params["restart_c2c"]:
+        if not _db_exists(db_name) or ctx.params["restart_c2c_external"]:
             db_previous = ctx.obj["db_c2c_core"]
             _run_docker_compose_cmd(f"run --rm odoo dropdb --if-exists {db_name}")
             _run_docker_compose_cmd(
@@ -464,7 +464,7 @@ def migrate_c2c_local(ctx):
     db_name = ctx.obj["db_name"]
     log_file = ctx.obj["store_path"].joinpath(f"{db_name}_c2c_local.log")
     try:
-        if not _db_exists(db_name) or ctx.params["restart_c2c"]:
+        if not _db_exists(db_name) or ctx.params["restart_c2c_local"]:
             db_previous = ctx.obj["db_c2c_external"]
             _run_docker_compose_cmd(f"run --rm odoo dropdb --if-exists {db_name}")
             _run_docker_compose_cmd(
@@ -494,7 +494,7 @@ def migrate_c2c_cleanup(ctx):
     db_name = ctx.obj["db_name"]
     log_file = ctx.obj["store_path"].joinpath(f"{db_name}_c2c_cleanup.log")
     try:
-        if not _db_exists(db_name) or ctx.params["restart_c2c"]:
+        if not _db_exists(db_name) or ctx.params["restart_c2c_cleanup"]:
             db_previous = ctx.obj["db_c2c_local"]
             _run_docker_compose_cmd(f"run --rm odoo dropdb --if-exists {db_name}")
             _run_docker_compose_cmd(
