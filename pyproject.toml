@@ -17,7 +17,7 @@ classifiers = [
 ]
 dependencies = [
     "invoke==2.2.0",
-    "requests==2.32.4",
+    "requests==2.32.5",
     "git-aggregator>=4.1",
     "git-autoshare",
     "passlib",
