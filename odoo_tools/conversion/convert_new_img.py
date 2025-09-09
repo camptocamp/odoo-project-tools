@@ -16,7 +16,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..config import config
+from ..utils.config import config
 from ..utils.path import root_path
 from ..utils.proj import get_current_version
 from ..utils.pypi import odoo_name_to_pkg_name
