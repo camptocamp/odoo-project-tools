@@ -16,17 +16,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-try:
-    import odoorpc
-except ImportError:
-    print(
-        "WARNING: odoorpc is not available, you will not be able to fetch "
-        "the list of installed modules from a running instance. "
-        "To fix this, run `pip install odoorpc`.",
-        file=sys.stderr,
-    )
-    odoorpc = None
-
 from ..config import config
 from ..utils.path import root_path
 from ..utils.proj import get_current_version
