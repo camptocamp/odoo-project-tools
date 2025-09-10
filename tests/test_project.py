@@ -75,6 +75,44 @@ def test_init_proj_conf_already_existing(project):
     assert result.exit_code == 0
 
 
+@pytest.mark.project_setup(
+    proj_tmpl_ver=1,
+    extra_files={"HISTORY.rst": get_fixture("fake-deprecated-history.rst")},
+)
+def test_init_history_file_already_existing(project):
+    result = project.invoke(init, catch_exceptions=False)
+    assert (
+        build_path("changes.d/BS-31.feat").read_text()
+        == "Install the ``module_a`` and ``module_b`` modules\n"
+    )
+    assert (
+        build_path("changes.d/BS-32.feat").read_text()
+        == "Install the ``module_c`` module\n"
+    )
+    assert build_path("changes.d/BS-42.bug").read_text() == "Uninstall ``module_d``\n"
+    assert not build_path("changes.d/BS-12.feat").exists()
+    assert build_path("HISTORY.rst").read_text() == get_fixture(
+        "fake-converted-history.rst"
+    )
+    assert result.exit_code == 0
+
+
+@pytest.mark.project_setup(
+    proj_tmpl_ver=1,
+    extra_files={"HISTORY.rst": get_fixture("fake-converted-history.rst")},
+)
+def test_init_history_file_already_existing_but_already_converted(project):
+    result = project.invoke(init, catch_exceptions=False)
+    assert not build_path("changes.d/BS-31.feat").exists()
+    assert not build_path("changes.d/BS-32.feat").exists()
+    assert not build_path("changes.d/BS-42.bug").exists()
+    assert not build_path("changes.d/BS-12.feat").exists()
+    assert build_path("HISTORY.rst").read_text() == get_fixture(
+        "fake-converted-history.rst"
+    )
+    assert result.exit_code == 0
+
+
 @pytest.mark.project_setup(proj_tmpl_ver=2)
 def test_init_custom_version(project):
     result = project.invoke(
