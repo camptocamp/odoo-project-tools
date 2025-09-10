@@ -175,25 +175,19 @@ Create a new checkout of the project you are working on, with the submodules up-
 
 Go to the root of your project and follow the steps below:
 
-1. Make a copy of your local docker-compose.override.yml file:
-
-    ```
-    mv docker-compose.override.yml docker-compose.override.yml.bak
-    ```
-
-2. Run sync from odoo-template using the `core_image` version.
+1. Run sync from odoo-template using the `core_image` version.
 
     ```
     invoke project.sync --version core_image
     ```
 
-3. Initialize the project at v1
+1. Initialize the project at v1
 
     ```
     PROJ_TMPL_VER=1 otools-project init
     ```
 
-4. Stage new files and commit
+1. Stage new files and commit
 
     ```
     git add .
@@ -204,7 +198,7 @@ Go to the root of your project and follow the steps below:
     ;) (don't forget to update the project submodules again, as they will
     certainly have been reset)
 
-5. Run the conversion script
+1. Run the conversion script
 
     ```
     otools-conversion
@@ -218,7 +212,7 @@ Go to the root of your project and follow the steps below:
     Be careful, if you need to redo these steps, the submodules will have
     been removed by the script, you will need to run `git submodule update -i` again.
 
-6.  Install pre-commit and run it on all files
+1.  Install pre-commit and run it on all files
 
     ```
     pre-commit install
@@ -226,11 +220,11 @@ Go to the root of your project and follow the steps below:
     ```
     Manually fix the issues that pre-commit is unable to fix by itself
 
-7.  Stage all changes and commit
+1.  Stage all changes and commit
 
     ```
     git add .
     git commit -m "Convert to proj v2"
     ```
 
-8.  Follow the steps in the generated `V2_MIG_NEXT_STEPS.todo` file
+1.  Follow the steps in the generated `V2_MIG_NEXT_STEPS.todo` file
