@@ -30,15 +30,19 @@ def get_venv():
     return env
 
 
-def run(cmd, drop_trailing_spaces=True, check=False):
+def run(cmd, drop_trailing_spaces=True, check=False, with_env=None):
     """Execute system commands and return output.
 
     :param cmd: the command to execute, as a string or a preparsed list
     :param drop_trailing_eol: remove trailing end-of-line chars or other wrapping spaces.
+    :param with_env: a dictionary of environment variables to set, or None.
     """
     if isinstance(cmd, str):
         cmd = shlex.split(cmd)
-    res = subprocess.run(cmd, capture_output=True, env=get_venv(), check=check)
+    env = get_venv()
+    if with_env:
+        env.update(with_env)
+    res = subprocess.run(cmd, capture_output=True, env=env, check=check)
     if res.stdout is None:
         output = ""
     else:
