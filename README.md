@@ -171,10 +171,7 @@ otools-cloud dump upload --from-db odoodb --env labs.my-lab
 
 ## Project conversion
 
-Create a new checkout of the project you are working on, with the submodules
-up-to-date (you will need to start an instance later in the process to get the
-installed addons, and at that stage of the conversion, the project will not be
-runnable yet).
+Create a new checkout of the project you are working on, with the submodules up-to-date.
 
 Go to the root of your project and follow the steps below:
 
@@ -184,10 +181,10 @@ Go to the root of your project and follow the steps below:
     mv docker-compose.override.yml docker-compose.override.yml.bak
     ```
 
-2. Run sync from Vincent's fork of odoo-template
+2. Run sync from odoo-template using the `core_image` version.
 
     ```
-    invoke project.sync --version core-image
+    invoke project.sync --version core_image
     ```
 
 3. Initialize the project at v1
@@ -207,19 +204,7 @@ Go to the root of your project and follow the steps below:
     ;) (don't forget to update the project submodules again, as they will
     certainly have been reset)
 
-5. Install conversion tools
-
-    ```
-    pip install "odoo-tools[convert] @ git+https://github.com/camptocamp/odoo-project-tools.git"
-    ```
-
-    or, if you're using pipx:
-
-    ```
-    pipx inject odoo-tools "odoo-tools[convert] @ git+https://github.com/camptocamp/odoo-project-tools.git"
-    ```
-
-6. Run the conversion script
+5. Run the conversion script
 
     ```
     otools-conversion
@@ -233,7 +218,7 @@ Go to the root of your project and follow the steps below:
     Be careful, if you need to redo these steps, the submodules will have
     been removed by the script, you will need to run `git submodule update -i` again.
 
-7.  Install pre-commit and run it on all files
+6.  Install pre-commit and run it on all files
 
     ```
     pre-commit install
@@ -241,11 +226,11 @@ Go to the root of your project and follow the steps below:
     ```
     Manually fix the issues that pre-commit is unable to fix by itself
 
-8.  Stage all changes and commit
+7.  Stage all changes and commit
 
     ```
     git add .
     git commit -m "Convert to proj v2"
     ```
 
-9.  Follow the steps in the generated `V2_MIG_NEXT_STEPS.todo` file
+8.  Follow the steps in the generated `V2_MIG_NEXT_STEPS.todo` file
