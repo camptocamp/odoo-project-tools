@@ -2,6 +2,8 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import os
+import re
+import uuid
 
 import click
 
@@ -45,6 +47,98 @@ def get_bumpversion_vars(opts):
     return res
 
 
+def convert_history_to_towncrier(history_path):
+    """Converts the history file from the deprecated format to the new towncrier format
+
+    Essentially, it just removes the latests (unreleased) section, and moves each line
+    to a new fragment file.
+    """
+    content = history_path.read_text()
+    content_lines = content.splitlines()
+
+    if ".. towncrier release notes start" in content_lines:  # pragma: no cover
+        return  # Already converted
+
+    ui.echo("Converting history file to towncrier format..")
+
+    def find_section(content_lines, title) -> tuple[int, int]:
+        """Finds the section in the content and returns the start and end line numbers"""
+        start = None
+        end = None
+        max_idx = len(content_lines) - 1
+        for i in range(len(content_lines)):
+            # Identify the start of the section
+            if (
+                start is None
+                and content_lines[i].strip() == title
+                and i + 1 < max_idx
+                and content_lines[i + 1].strip() == "+" * len(title)
+            ):
+                start = i
+            # Identify the end of the section
+            elif (
+                start is not None
+                and content_lines[i].strip()
+                and content_lines[i + 1].strip() == "+" * len(content_lines[i].strip())
+            ):
+                end = i - 1
+                break
+        # Handle case where end is simply the end of the file
+        if start is not None and end is None:
+            end = max_idx
+        return start, end
+
+    start, end = find_section(content_lines, "latest (unreleased)")
+    if start is None:
+        ui.echo(
+            "No latest (unreleased) section found in history file. Skipping conversion.\n"
+            "You will need to manually convert the history file to the towncrier format "
+            "and create all the unreleased fragments in the changes.d directory.",
+            fg="red",
+        )
+        return
+
+    # Process each unreleased line and create a news fragment file for it
+    section_map = {
+        "Features and Improvements": "feat",
+        "Bugfixes": "bug",
+        "Documentation": "doc",
+        "Build": "build",
+    }
+    section = None
+    for line in content_lines[start + 2 : end]:
+        # Identify current section header
+        if match := re.match(r"\*\*(.*?)\*\*", line.strip()):
+            section = match.group(1)
+        # If the line is an item, move to a news fragment file
+        elif match := re.match(
+            r"\* (?:(?P<name>[A-Z][A-Z\d]+-[1-9]\d*): )?(?P<description>.*)",
+            line.strip(),
+        ):
+            fragment_type = section_map.get(section, "misc")
+            fragment_name = match.group("name") or str(uuid.uuid4()).split("-")[0]
+            fragment_description = match.group("description") or ""
+            fragment_path = build_path(f"./changes.d/{fragment_name}.{fragment_type}")
+            fragment_path.parent.mkdir(parents=True, exist_ok=True)
+            fragment_path.write_text(fragment_description + "\n")
+            ui.echo(f"- Created fragment: {fragment_name}.{fragment_type}")
+
+    # Remove the section and replace with the new lines
+    template_content = get_template_path("HISTORY.tmpl.rst").read_text()
+    template_content_lines = template_content.splitlines()
+
+    # Replace everything up until the end of the last unreleased section with the new
+    # lines coming from the template.
+    new_content = (
+        template_content_lines + [""] + content_lines[end + 1 :]
+        if end + 1 < len(content_lines)
+        else template_content_lines
+    )
+
+    # Write the new content
+    history_path.write_text("\n".join(new_content) + "\n")
+
+
 def get_init_template_files():
     return (
         {
@@ -72,6 +166,10 @@ def get_init_template_files():
         {
             "source": "HISTORY.tmpl.rst",
             "destination": build_path("./HISTORY.rst"),
+            "check": lambda source_path, dest_path: not dest_path.exists(),
+            "fallback": lambda source_path, dest_path: convert_history_to_towncrier(
+                dest_path
+            ),
         },
     )
 
@@ -90,6 +188,8 @@ def bootstrap_files(opts):
         dest = item["destination"]
         check = item.get("check", lambda *p: True)
         if not check(source, dest):
+            if "fallback" in item:
+                item["fallback"](source, dest)
             continue
         var_getter = item.get("variables_getter")
         if var_getter:
