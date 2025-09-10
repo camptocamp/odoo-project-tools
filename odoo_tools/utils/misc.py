@@ -3,9 +3,10 @@
 
 import configparser
 import shutil
-import subprocess
 from importlib.resources import files
 from pathlib import Path
+
+from . import docker_compose, os_exec
 
 PKG_NAME = "odoo_tools"
 
@@ -52,29 +53,9 @@ def get_ini_cfg_key(cfg_content, header, key):
 
 def get_docker_image_commit_hashes():
     """Retrieve the odoo core and odoo enterprise commit hashes used in the project image"""
-    with Path("Dockerfile").open() as fobj:
-        for line in fobj:
-            if line.startswith("FROM ghcr.io/camptocamp/odoo-enterprise"):
-                image = line.strip().split()[1]
-                break
-    process = subprocess.run(
-        [
-            "docker",
-            "run",
-            "--quiet",
-            "--rm",
-            "--pull",
-            "always",
-            "--entrypoint",
-            "printenv",
-            image,
-        ],
-        check=True,
-        stdout=subprocess.PIPE,
-        text=True,
-    )
+    output = os_exec.run(docker_compose.run("odoo", ["printenv"]))
     variables = {}
-    for line in process.stdout.splitlines():
+    for line in output.splitlines():
         try:
             name, value = line.strip().split("=", maxsplit=1)
         except ValueError:
