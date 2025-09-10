@@ -1,0 +1,1 @@
+init: don't backup if nothing changes

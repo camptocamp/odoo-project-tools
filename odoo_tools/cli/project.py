@@ -192,21 +192,21 @@ def bootstrap_files(opts):
             if "fallback" in item:
                 item["fallback"](source, dest)
             continue
-        var_getter = item.get("variables_getter")
-        if var_getter:
+        if var_getter := item.get("variables_getter"):
             content = source.read_text()
             # TODO: use better variable tmpl?
             for k, v in var_getter(opts).items():
                 content = content.replace(f"${k}", v)
                 # avoid errors from end-of-file-fixer in pre-commit
                 content = content.rstrip("\n") + "\n"
-            if opts.backup and item.get("backup", True) and dest.exists():
-                _backup(dest)
-            dest.write_text(content)
         else:
-            if opts.backup and item.get("backup", True) and dest.exists():
-                _backup(dest)
-            copy_file(source, dest)
+            content = source.read_text()
+        # Write the file, except if the target already matches the expected content
+        if dest.exists() and dest.read_text() == content:
+            continue
+        elif opts.backup and item.get("backup", True) and dest.exists():
+            _backup(dest)
+        dest.write_text(content)
 
     # towncrier stuff TODO: move to odoo-template?
     path = build_path("./changes.d/.gitkeep")
