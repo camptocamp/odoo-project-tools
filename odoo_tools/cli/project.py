@@ -154,6 +154,7 @@ def get_init_template_files():
             "source": ".bumpversion.tmpl.cfg",
             "destination": build_path("./.bumpversion.cfg"),
             "variables_getter": get_bumpversion_vars,
+            "backup": False,
         },
         {
             "source": "towncrier.tmpl.toml",
@@ -199,11 +200,11 @@ def bootstrap_files(opts):
                 content = content.replace(f"${k}", v)
                 # avoid errors from end-of-file-fixer in pre-commit
                 content = content.rstrip("\n") + "\n"
-            if opts.backup and dest.exists():
+            if opts.backup and item.get("backup", True) and dest.exists():
                 _backup(dest)
             dest.write_text(content)
         else:
-            if opts.backup and dest.exists():
+            if opts.backup and item.get("backup", True) and dest.exists():
                 _backup(dest)
             copy_file(source, dest)
 
