@@ -31,19 +31,21 @@ def test_get_docker_image_commit_hashes():
     mock_fn = mock_subprocess_run(
         [
             {
+                "args": ["docker", "compose", "version", "--short"],
+                "stdout": b"2.36.2",
+            },
+            {
                 "args": [
                     "docker",
+                    "compose",
                     "run",
-                    "--quiet",
                     "--rm",
-                    "--pull",
-                    "always",
-                    "--entrypoint",
+                    "--quiet",
+                    "odoo",
                     "printenv",
-                    "ghcr.io/camptocamp/odoo-enterprise:15.0-latest",
                 ],
-                "stdout": "Starting with UID : 1043\nRunning without demo data\nPATH=/bin,/usr/bin\nCORE_HASH=12345\nENTERPRISE_HASH=56789\n",
-            }
+                "stdout": b"Starting with UID : 1043\nRunning without demo data\nPATH=/bin,/usr/bin\nCORE_HASH=12345\nENTERPRISE_HASH=56789\n",
+            },
         ]
     )
     with patch("subprocess.run", mock_fn):
