@@ -8,11 +8,13 @@
 
 This repository contains helper tasks for working with Camptocamp Odoo projects.
 
+Install with [uv](https://docs.astral.sh/uv/) (recommended):
+
+    uv tool install git+https://github.com/camptocamp/odoo-project-tools
+
 Install with [pipx](https://pypa.github.io/pipx/):
 
-
     pipx install git+https://github.com/camptocamp/odoo-project-tools
-
 
 You may need to have some build dependencies installed:
 
@@ -55,9 +57,7 @@ Use the `init` command to initialize a new project to use these tools.
 
 Example:
 
-    ```
     PROJ_TMPL_VER=1 otools-project init
-    ```
 
 This will create all configuration files that must be added to the project.
 
@@ -105,9 +105,7 @@ It allows to add requiments and test requirements on the fly to an existing req 
 
 Example:
 
-    ```
     otools-addon add-req edi_oca -v 18 -p $pr_ref -f test-requirements.txt
-    ```
 
 This will add the test dependency in the right way to the given file.
 
