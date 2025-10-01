@@ -277,10 +277,10 @@ def pre_migrate_dump_prod(ctx):
         is_done = True
         return is_done
     container_dump_path = _get_db_prod_fixed_dump_path(in_container=True)
-    mount_opts = f"-v {ctx.obj['store_path']}:/{ctx.obj['container_store_path']}"
+    run_opts = f"-v {ctx.obj['store_path']}:/{ctx.obj['container_store_path']}"
     try:
         _run_docker_compose_cmd(
-            f"run {mount_opts} --rm odoo pg_dump -b -Fc -d {db_name} "
+            f"run {run_opts} --rm odoo pg_dump -b -Fc -d {db_name} "
             f"-f {container_dump_path}"
         )
     except subprocess.CalledProcessError:
@@ -344,12 +344,16 @@ def restore_odoo_migrated(ctx):
     container_dump_sql_path = ctx.obj["container_store_path"].joinpath(
         "upgraded", "dump.sql"
     )
-    mount_opts = f"-v {ctx.obj['store_path']}:/{ctx.obj['container_store_path']}"
+    run_opts = (
+        f"-v {ctx.obj['store_path']}:/{ctx.obj['container_store_path']} "
+        # Increase PostgreSQL performance on restore
+        f"-e PGOPTIONS='-c full_page_writes=off -c autovacuum=off'"
+    )
     try:
         _run_docker_compose_cmd(f"run --rm odoo dropdb --if-exists {db_name}")
         _run_docker_compose_cmd(f"run --rm odoo createdb {db_name}")
         _run_docker_compose_cmd(
-            f"run {mount_opts} -T --rm odoo psql -d {db_name} "
+            f"run {run_opts} -T --rm odoo psql -d {db_name} "
             f"-f {container_dump_sql_path}",
             # Errors regarding owner or extensions for instance could exists
             # in raw SQL file, they have to be ignored.
@@ -374,10 +378,10 @@ def dump_odoo_migrated(ctx):
         return False
     db_name = ctx.obj["db_odoo_migrated"]
     container_odoo_migrated_path = _get_db_odoo_migrated_dump_path(in_container=True)
-    mount_opts = f"-v {ctx.obj['store_path']}:/{ctx.obj['container_store_path']}"
+    run_opts = f"-v {ctx.obj['store_path']}:/{ctx.obj['container_store_path']}"
     try:
         _run_docker_compose_cmd(
-            f"run {mount_opts} --rm odoo pg_dump -b -Fc -d {db_name} "
+            f"run {run_opts} --rm odoo pg_dump -b -Fc -d {db_name} "
             f"-f {container_odoo_migrated_path}"
         )
     except subprocess.CalledProcessError:
@@ -521,10 +525,10 @@ def dump_c2c_migrated(ctx):
     db_cleanup = ctx.obj["db_c2c_cleanup"]
     assert _db_exists(db_cleanup)
     container_c2c_migrated_path = _get_db_c2c_migrated_dump_path(in_container=True)
-    mount_opts = f"-v {ctx.obj['store_path']}:/{ctx.obj['container_store_path']}"
+    run_opts = f"-v {ctx.obj['store_path']}:/{ctx.obj['container_store_path']}"
     try:
         _run_docker_compose_cmd(
-            f"run {mount_opts} --rm odoo pg_dump -b -Fc -d {db_cleanup} "
+            f"run {run_opts} --rm odoo pg_dump -b -Fc -d {db_cleanup} "
             f"-f {container_c2c_migrated_path}"
         )
     except subprocess.CalledProcessError:
