@@ -506,7 +506,11 @@ def dump_c2c_migrated(ctx):
     if c2c_migrated_path.exists() and not ctx.params["restart_c2c"]:
         print("ℹ️  (skipped: C2C migrated dump already exists)", end="")
         return False
-    db_cleanup = ctx.obj["db_c2c_cleanup"]
+    db_cleanup = (
+        ctx.obj["db_name"]
+        if ctx.params["no_db_snapshot"]
+        else ctx.obj["db_c2c_cleanup"]
+    )
     assert _db_exists(db_cleanup)
     container_c2c_migrated_path = _get_db_c2c_migrated_dump_path(in_container=True)
     mount_opts = f"-v {ctx.obj['store_path']}:/{ctx.obj['container_store_path']}"
