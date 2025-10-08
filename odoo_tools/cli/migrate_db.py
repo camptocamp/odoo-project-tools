@@ -191,9 +191,9 @@ def pre_migrate_restore_prod(ctx):
     db_path = ctx.obj["input_db_path"]
     db_name = ctx.obj["db_prod"]
     if not _db_exists(db_name):
+        _dropdb(db_name)
+        _createdb(db_name)
         try:
-            _run_docker_compose_cmd(f"run --rm odoo dropdb --if-exists {db_name}")
-            _run_docker_compose_cmd(f"run --rm odoo createdb {db_name}")
             _run_docker_compose_cmd(
                 f"run -T --rm odoo pg_restore -x -O -d {db_name} < {db_path}"
             )
@@ -231,13 +231,9 @@ def pre_migrate_fix_prod_data(ctx):
     if script_path.exists():
         if not _db_exists(db_prod_fixed) or ctx.params["restart"]:
             # Fixed prod db doesn't exist or restart enabled => create it
+            _dropdb(db_prod_fixed)
+            _createdb(db_prod_fixed, db_template=db_prod)
             try:
-                _run_docker_compose_cmd(
-                    f"run --rm odoo dropdb --if-exists {db_prod_fixed}"
-                )
-                _run_docker_compose_cmd(
-                    f"run --rm odoo createdb {db_prod_fixed} -T {db_prod}"
-                )
                 _run_docker_compose_cmd(
                     f"run -T --rm odoo psql -d {db_prod_fixed} "
                     f"-f {container_script_path}"
@@ -344,10 +340,10 @@ def restore_odoo_migrated(ctx):
     container_dump_sql_path = ctx.obj["container_store_path"].joinpath(
         "upgraded", "dump.sql"
     )
+    _dropdb(db_name)
+    _createdb(db_name)
     mount_opts = f"-v {ctx.obj['store_path']}:/{ctx.obj['container_store_path']}"
     try:
-        _run_docker_compose_cmd(f"run --rm odoo dropdb --if-exists {db_name}")
-        _run_docker_compose_cmd(f"run --rm odoo createdb {db_name}")
         _run_docker_compose_cmd(
             f"run {mount_opts} -T --rm odoo psql -d {db_name} "
             f"-f {container_dump_sql_path}",
@@ -404,12 +400,10 @@ def migrate_c2c_core(ctx):
     db_odoo_migrated = ctx.obj["db_odoo_migrated"]
     db_name = ctx.obj["db_name"]
     log_file = ctx.obj["store_path"].joinpath(f"{db_name}_c2c_core.log")
+    if not _db_exists(db_name) or ctx.params["restart_c2c"]:
+        _dropdb(db_name)
+        _createdb(db_name, db_template=db_odoo_migrated)
     try:
-        if not _db_exists(db_name) or ctx.params["restart_c2c"]:
-            _run_docker_compose_cmd(f"run --rm odoo dropdb --if-exists {db_name}")
-            _run_docker_compose_cmd(
-                f"run --rm odoo createdb {db_name} -T {db_odoo_migrated}"
-            )
         make_db_snapshot = 0 if ctx.params["no_db_snapshot"] else 1
         _run_docker_compose_cmd(
             f"run --rm -e DB_NAME={db_name} -e MAKE_DB_SNAPSHOT={make_db_snapshot} "
@@ -433,13 +427,11 @@ def migrate_c2c_external(ctx):
         return False
     db_name = ctx.obj["db_name"]
     log_file = ctx.obj["store_path"].joinpath(f"{db_name}_c2c_external.log")
+    if not _db_exists(db_name) or ctx.params["restart_c2c_external"]:
+        db_previous = ctx.obj["db_c2c_core"]
+        _dropdb(db_name)
+        _createdb(db_name, db_template=db_previous)
     try:
-        if not _db_exists(db_name) or ctx.params["restart_c2c_external"]:
-            db_previous = ctx.obj["db_c2c_core"]
-            _run_docker_compose_cmd(f"run --rm odoo dropdb --if-exists {db_name}")
-            _run_docker_compose_cmd(
-                f"run --rm odoo createdb {db_name} -T {db_previous}"
-            )
         make_db_snapshot = 0 if ctx.params["no_db_snapshot"] else 1
         _run_docker_compose_cmd(
             f"run --rm -e DB_NAME={db_name} -e MAKE_DB_SNAPSHOT={make_db_snapshot} "
@@ -463,13 +455,11 @@ def migrate_c2c_local(ctx):
         return False
     db_name = ctx.obj["db_name"]
     log_file = ctx.obj["store_path"].joinpath(f"{db_name}_c2c_local.log")
+    if not _db_exists(db_name) or ctx.params["restart_c2c_local"]:
+        db_previous = ctx.obj["db_c2c_external"]
+        _dropdb(db_name)
+        _createdb(db_name, db_template=db_previous)
     try:
-        if not _db_exists(db_name) or ctx.params["restart_c2c_local"]:
-            db_previous = ctx.obj["db_c2c_external"]
-            _run_docker_compose_cmd(f"run --rm odoo dropdb --if-exists {db_name}")
-            _run_docker_compose_cmd(
-                f"run --rm odoo createdb {db_name} -T {db_previous}"
-            )
         make_db_snapshot = 0 if ctx.params["no_db_snapshot"] else 1
         _run_docker_compose_cmd(
             f"run --rm -e DB_NAME={db_name} -e MAKE_DB_SNAPSHOT={make_db_snapshot} "
@@ -493,13 +483,11 @@ def migrate_c2c_cleanup(ctx):
         return False
     db_name = ctx.obj["db_name"]
     log_file = ctx.obj["store_path"].joinpath(f"{db_name}_c2c_cleanup.log")
+    if not _db_exists(db_name) or ctx.params["restart_c2c_cleanup"]:
+        db_previous = ctx.obj["db_c2c_local"]
+        _dropdb(db_name)
+        _createdb(db_name, db_template=db_previous)
     try:
-        if not _db_exists(db_name) or ctx.params["restart_c2c_cleanup"]:
-            db_previous = ctx.obj["db_c2c_local"]
-            _run_docker_compose_cmd(f"run --rm odoo dropdb --if-exists {db_name}")
-            _run_docker_compose_cmd(
-                f"run --rm odoo createdb {db_name} -T {db_previous}"
-            )
         make_db_snapshot = 0 if ctx.params["no_db_snapshot"] else 1
         _run_docker_compose_cmd(
             f"run --rm -e DB_NAME={db_name} -e MAKE_DB_SNAPSHOT={make_db_snapshot} "
@@ -559,6 +547,35 @@ def _run_docker_compose_cmd(ctx, cmd, raise_on_error=True, capture_output=True):
 @click.pass_context
 def _ensure_db_container_is_up(ctx):
     return _run_docker_compose_cmd("up -d db")
+
+
+@click.pass_context
+def _dropdb(ctx, db_name):
+    cmd = f"run --rm odoo dropdb --if-exists {db_name}"
+    try:
+        return _run_docker_compose_cmd(cmd)
+    except subprocess.CalledProcessError:
+        print(f"💥  Unable to drop DB {db_name}")
+        raise SystemExit(f"=> Is there an open connection on {db_name}?") from None
+
+
+@click.pass_context
+def _createdb(ctx, db_name, db_template=None):
+    cmd = f"run --rm odoo createdb {db_name}"
+    if db_template:
+        cmd += f" -T {db_template}"
+    try:
+        return _run_docker_compose_cmd(cmd)
+    except subprocess.CalledProcessError:
+        msg = f"💥  Unable to create DB {db_name}"
+        if db_template:
+            msg += f" from {db_template}"
+        print(msg)
+        if db_template:
+            raise SystemExit(
+                f"=> Is there an open connection on {db_template}?"
+            ) from None
+        raise SystemExit() from None
 
 
 @click.pass_context
