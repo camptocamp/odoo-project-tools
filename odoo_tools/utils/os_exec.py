@@ -42,7 +42,12 @@ def run(cmd, drop_trailing_spaces=True, check=False, with_env=None):
     env = get_venv()
     if with_env:
         env.update(with_env)
-    res = subprocess.run(cmd, capture_output=True, env=env, check=check)
+    try:
+        res = subprocess.run(cmd, capture_output=True, env=env, check=check)
+    except subprocess.CalledProcessError as e:
+        if e.stderr:
+            print(e.stderr.decode(), file=sys.stderr)
+        raise e
     if res.stdout is None:
         output = ""
     else:

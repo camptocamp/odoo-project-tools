@@ -48,6 +48,8 @@ The package brings the following commands.
 
 `otools-cloud`: tools to interact with the cloud platform
 
+`otools-i18n`: tools to manage internationalization (i18n)
+
 Use `--help` to get the list of subcommands.
 
 
@@ -228,3 +230,26 @@ Go to the root of your project and follow the steps below:
     ```
 
 1.  Follow the steps in the generated `V2_MIG_NEXT_STEPS.todo` file
+
+### otools-i18n
+
+Tools to manage internationalization (i18n).
+
+```
+Usage: otools-i18n [OPTIONS] COMMAND [ARGS]...
+
+  Internationalization (i18n) commands.
+
+Options:
+  --help  Show this message and exit.
+```
+
+#### Export translation files
+
+```
+otools-i18n export odoo/addons/module1 odoo/addons/module2 --languages fr_FR,de_DE
+```
+
+This will export the translation files for the given modules and languages.
+
+The `--export-pot` option can be used to also export the pot file for the given modules.
