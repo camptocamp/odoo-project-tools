@@ -61,6 +61,7 @@ otools-pr = "odoo_tools.cli.pr:cli"
 otools-migrate-db = "odoo_tools.cli.migrate_db:cli"
 otools-db = "odoo_tools.cli.db:cli"
 otools-cloud = "odoo_tools.cli.cloud:cli"
+otools-i18n = "odoo_tools.cli.i18n:cli"
 
 
 [project.optional-dependencies]
