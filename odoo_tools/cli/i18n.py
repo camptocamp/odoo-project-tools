@@ -29,8 +29,9 @@ def cli(**kwargs):
 @click.option(
     "--languages",
     type=str,
-    default="en_US",
-    help="Comma separated list of languages to export",
+    required=False,
+    default=None,
+    help="Comma separated list of languages to export. Defaults to all project languages.",
 )
 @click.option(
     "--clean-db/--no-clean-db",
@@ -50,16 +51,25 @@ def export(module_paths, languages, clean_db, init_db, export_pot):
     module_names = [
         module_path.name
         for module_path in (Path(path) for path in module_paths)
-        if module_path.is_dir() and (module_path / "__manifest__.py").exists()
+        if utils.path.is_odoo_module(module_path)
     ]
     if not module_names:
         raise click.ClickException(
             "No modules found to export. Please specify at least one module path."
         )
     # Identify languages to export
-    export_languages = tuple[str](
-        lang for lang in languages.split(",") if lang != "en_US"
-    )
+    # If it's specified, parse the csv. Otherwise use the project languages.
+    if languages:
+        languages = languages.split(",")
+    else:
+        languages = []
+        if main_lang := utils.proj.get_project_manifest_key("odoo_main_lang"):
+            languages.append(main_lang)
+        if aux_langs := utils.proj.get_project_manifest_key("odoo_aux_langs"):
+            languages.extend(aux_langs.split(","))
+    # Prepare the languages for export. We ignore en_US because it requires no
+    # translations, and we add None for the pot files, if needed.
+    export_languages = tuple[str](lang for lang in languages if lang != "en_US")
     if export_pot:
         export_languages = (None, *export_languages)
     if not export_languages:
@@ -87,7 +97,7 @@ def export(module_paths, languages, clean_db, init_db, export_pot):
                         "--log-level=warn",
                         "--workers=0",
                         "--database=tmp_generate_pot",
-                        f"--load-language={languages}",
+                        f"--load-language={','.join(languages)}",
                         "--stop-after-init",
                         f"--init={','.join(module_names)}",
                     ],
