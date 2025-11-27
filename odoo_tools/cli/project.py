@@ -6,6 +6,7 @@ import re
 import uuid
 
 import click
+from git import Repo as GitRepo
 
 from ..utils import git, ui
 from ..utils.config import PROJ_CFG_FILE, config
@@ -301,6 +302,19 @@ def checkout_local_odoo(
         )
     else:
         ui.exit_msg("Unable to find the commit hash of odoo enterprise")
+
+    # Apply odoo/enterprise patches
+    # This matches the behavior of the `001_apply_patches` script in the odoo-template
+    # https://github.com/camptocamp/odoo-template/blob/99931bbc/%7B%7Bcookiecutter.repo_name%7D%7D/build.d/001_apply_patches
+    patches_dir = build_path("./patches")
+    if patches_dir.is_dir():
+        for patch in patches_dir.glob("**/*.patch"):
+            patch_target = (
+                config.odoo_src_rel_path / patch.relative_to(patches_dir).parent
+            )
+            ui.echo(f"Applying patch {patch.name} to {patch_target}")
+            target_repo = GitRepo(build_path(patch_target))
+            target_repo.git.am("--3way", patch)
 
     if venv:
         setup_venv(venv_path)
