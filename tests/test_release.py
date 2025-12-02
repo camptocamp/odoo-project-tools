@@ -134,7 +134,6 @@ def test_bump_update_marabunta_file():
         content = config.marabunta_mig_file_rel_path.read_text()
         # TODO: improve these checks
         assert "14.0.0.2.0" in content
-        assert "click-odoo-update" in content
         assert result.output.splitlines() == [
             "Running: bumpversion minor",
             "Running: towncrier build --yes --version=14.0.0.2.0",

@@ -10,7 +10,7 @@ class MarabuntaFileHandler:
     def load(self):
         return yaml.yaml_load(self.path_obj.open())
 
-    def update(self, version, run_click_hook="post"):
+    def update(self, version):
         data = self.load()
         versions = data["migration"]["versions"]
         version_item = [x for x in versions if x["version"] == version]
@@ -19,16 +19,7 @@ class MarabuntaFileHandler:
         else:
             version_item = {"version": version}
             versions.append(version_item)
-        if not version_item.get("operations"):
-            version_item["operations"] = {}
-        operations = version_item["operations"]
-        cmd = self._make_click_odoo_update_cmd()
-        if cmd not in operations.get(run_click_hook, []):
-            operations.setdefault(run_click_hook, []).append(cmd)
         yaml.update_yml_file(self.path_obj, data)
-
-    def _make_click_odoo_update_cmd(self):
-        return "click-odoo-update"
 
     def get_migration_file_modules(self):
         """Read the migration.yml and get module list."""
