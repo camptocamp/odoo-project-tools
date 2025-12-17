@@ -283,8 +283,6 @@ def checkout_local_odoo(
     """
     if config.template_version == 1:
         ui.exit_msg("This command is not support on this project version;")
-    version = get_current_version(serie_only=True)
-    branch = f"{version}.0"
     odoo_src_dest = config.odoo_src_rel_path / "odoo"
     enterprise_src_dest = config.odoo_src_rel_path / "enterprise"
     if odoo_hash is None or enterprise_hash is None:
@@ -292,14 +290,12 @@ def checkout_local_odoo(
         odoo_hash = odoo_hash or image_odoo_hash
         enterprise_hash = enterprise_hash or image_enterprise_hash
     if odoo_hash:
-        git.get_odoo_core(odoo_hash, dest=odoo_src_dest, branch=branch)
+        git.get_odoo_core(odoo_hash, dest=odoo_src_dest)
     else:
         ui.exit_msg("Unable to find the commit hash of odoo core")
 
     if enterprise_hash:
-        git.get_odoo_enterprise(
-            enterprise_hash, dest=enterprise_src_dest, branch=branch
-        )
+        git.get_odoo_enterprise(enterprise_hash, dest=enterprise_src_dest)
     else:
         ui.exit_msg("Unable to find the commit hash of odoo enterprise")
 

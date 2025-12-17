@@ -23,47 +23,43 @@ class SubmoduleInfo(NamedTuple):
     cloned: bool
 
 
-def get_odoo_core(hash, dest="src/odoo", org="odoo", branch=None):
-    dest = str(build_path(dest))
-    _clone_or_fetch_repo(org, "odoo", branch, dest)
-    ui.echo(f"Checking out {hash}")
-    subprocess.run(["git", "-C", dest, "checkout", "--force", hash], check=True)
+def get_odoo_core(hash, dest="src/odoo", org="odoo"):
+    _checkout_repo(org, "odoo", build_path(dest), hash)
 
 
-def get_odoo_enterprise(hash, dest="src/enterprise", org="odoo", branch=None):
-    dest = str(build_path(dest))
-    _clone_or_fetch_repo(org, "enterprise", branch, dest)
-    ui.echo(f"Checking out {hash}")
-    subprocess.run(["git", "-C", dest, "checkout", "--force", hash], check=False)
+def get_odoo_enterprise(hash, dest="src/enterprise", org="odoo"):
+    _checkout_repo(org, "enterprise", build_path(dest), hash)
 
 
-def _clone_or_fetch_repo(org, repo, branch, dest):
+def _checkout_repo(org, repo, dest, ref, depth=None):
     repo_url = f"git@github.com:{org}/{repo}"
     __, autoshare_repo = find_autoshare_repository([repo_url])
     dest = Path(dest)
-    if (dest / ".git").is_dir():
-        ui.echo(f"Fetching {org}/{repo} {branch}")
-        subprocess.run(
-            ["git", "-C", str(dest), "fetch", "--quiet", "--all"], check=True
-        )
-    else:
+    # If the repository doesn't exist, clone it (without checkout)
+    if not (dest / ".git").is_dir():
+        ui.echo(f"Cloning {org}/{repo} on {ref}, be patient..")
         if autoshare_repo:
             command = "autoshare-clone"
         else:
             command = "clone"
-        ui.echo(f"Cloning {org}/{repo} on branch {branch}, be patient")
-        subprocess.run(
-            [
-                "git",
-                command,
-                "--quiet",
-                "--branch",
-                branch,
-                repo_url,
-                str(dest),
-            ],
-            check=True,
-        )
+        args = [
+            "--quiet",
+            "--no-checkout",
+        ]
+        if depth:
+            args.extend(["--depth", str(depth)])
+        args.extend([repo_url, str(dest)])
+        subprocess.run(["git", command, *args], check=True)
+    # Fetch the ref to checkout
+    ui.echo(f"Fetching {org}/{repo} {ref}")
+    args = ["--quiet"]
+    if depth:
+        args.extend(["--depth", str(depth)])
+    args.extend(["origin", ref])
+    subprocess.run(["git", "-C", str(dest), "fetch", *args], check=True)
+    # Checkout
+    ui.echo(f"Checking out {org}/{repo} {ref}..")
+    subprocess.run(["git", "-C", str(dest), "checkout", "--force", ref], check=True)
 
 
 def _get_gitmodules():
