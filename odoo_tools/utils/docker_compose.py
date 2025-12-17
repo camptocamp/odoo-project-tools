@@ -134,3 +134,17 @@ def run_restore_db(database_name, db_dump):
             restore_db(database_name), stdin=fdump, bufsize=1024**3
         )
         popen.communicate()
+
+
+def run_printenv(service="odoo") -> dict[str, str]:
+    """Returns the environment variables of a given service container"""
+    output = os_exec.run(run(service, ["printenv"]))
+    variables = {}
+    for line in output.splitlines():
+        try:
+            name, value = line.strip().split("=", maxsplit=1)
+        except ValueError:
+            # not formatted as an environment variable, we can ignore
+            continue
+        variables[name] = value
+    return variables
