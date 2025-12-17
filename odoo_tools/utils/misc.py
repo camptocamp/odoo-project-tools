@@ -6,7 +6,7 @@ import shutil
 from importlib.resources import files
 from pathlib import Path
 
-from . import docker_compose, os_exec
+from . import docker_compose
 
 PKG_NAME = "odoo_tools"
 
@@ -53,15 +53,7 @@ def get_ini_cfg_key(cfg_content, header, key):
 
 def get_docker_image_commit_hashes():
     """Retrieve the odoo core and odoo enterprise commit hashes used in the project image"""
-    output = os_exec.run(docker_compose.run("odoo", ["printenv"]))
-    variables = {}
-    for line in output.splitlines():
-        try:
-            name, value = line.strip().split("=", maxsplit=1)
-        except ValueError:
-            # not formatted as an environment variable, we can ignore
-            continue
-        variables[name] = value
+    variables = docker_compose.run_printenv("odoo")
     odoo_hash = variables.get("CORE_HASH")
     enterprise_hash = variables.get("ENTERPRISE_HASH")
     return odoo_hash, enterprise_hash
