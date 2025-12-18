@@ -59,7 +59,13 @@ def _checkout_repo(org, repo, dest, ref, depth=None):
     subprocess.run(["git", "-C", str(dest), "fetch", *args], check=True)
     # Checkout
     ui.echo(f"Checking out {org}/{repo} {ref}..")
-    subprocess.run(["git", "-C", str(dest), "checkout", "--force", ref], check=True)
+    git_args = [
+        "-C",
+        str(dest),
+        "-c",
+        "advice.detachedHead=false",
+    ]
+    subprocess.run(["git", *git_args, "checkout", "--force", ref], check=True)
 
 
 def _get_gitmodules():
