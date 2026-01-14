@@ -143,6 +143,25 @@ def test_bump_update_marabunta_file():
         assert result.exit_code == 0
 
 
+def test_bump_update_without_marabunta_file():
+    with fake_project_root(
+        proj_version="14.0.0.1.0",
+        proj_cfg=dict(marabunta_mig_file_rel_path=None),
+        mock_marabunta_file=False,
+    ) as runner:
+        # run init to get all files ready (eg: bumpversion)
+        runner.invoke(init, catch_exceptions=False)
+        result = runner.invoke(
+            release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
+        )
+        assert result.output.splitlines() == [
+            "Running: bumpversion --list minor",
+            "Running: towncrier build --yes --version=14.0.0.2.0",
+            "Push local branches? [y/N]: ",
+        ]
+        assert result.exit_code == 0
+
+
 def test_bump_push_no_repo():
     with fake_project_root(
         proj_version="14.0.0.1.0", mock_marabunta_file=True

@@ -8,9 +8,9 @@ from functools import cached_property
 from os import PathLike
 from pathlib import Path
 from textwrap import indent
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, BeforeValidator, ConfigDict, ValidationError
 
 from ..exceptions import ProjectConfigException
 from .misc import parse_ini_cfg
@@ -59,6 +59,15 @@ def load_config(config_path: PathLike) -> ProjectConfig:
         ) from None
 
 
+def falsy_to_none(v: Any) -> Any | None:
+    if not v:
+        return None
+    return v
+
+
+OptionalPath = Annotated[Path | None, BeforeValidator(falsy_to_none)]
+
+
 class ProjectConfig(BaseModel):
     model_config = ConfigDict(
         frozen=True,
@@ -91,7 +100,7 @@ class ProjectConfig(BaseModel):
     version_file_rel_path: Path
     """The path to the version file."""
 
-    marabunta_mig_file_rel_path: Path
+    marabunta_mig_file_rel_path: OptionalPath = None
     """The path to the Marabunta migration file."""
 
 

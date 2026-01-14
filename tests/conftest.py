@@ -4,6 +4,7 @@
 import pytest
 from click.testing import CliRunner
 
+from odoo_tools.utils.config import config
 from odoo_tools.utils.proj import get_project_manifest
 
 from .common import make_fake_project_root
@@ -37,6 +38,7 @@ def project(request, runner):
     for marker in reversed(list(request.node.iter_markers("project_setup"))):
         kwargs.update(marker.kwargs)
     make_fake_project_root(**kwargs)
+    config._reload()
     return runner
 
 

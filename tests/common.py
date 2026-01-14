@@ -81,7 +81,12 @@ def make_fake_project_root(
     if marker_file is None:
         marker_file = get_root_marker()
     proj_cfg_data = FAKE_PROJ_CFG_BY_VER[str(proj_tmpl_ver)].copy()
-    proj_cfg_data.update(proj_cfg or {})
+    if proj_cfg is not None:
+        to_update = {k: v for k, v in proj_cfg.items() if v is not None}
+        to_delete = {k for k, v in proj_cfg.items() if v is None}
+        proj_cfg_data.update(to_update)
+        for k in to_delete:
+            proj_cfg_data.pop(k, None)
     with open(".proj.cfg", "w") as fd:
         content = ["[conf]"]
         for k, v in proj_cfg_data.items():
