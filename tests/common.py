@@ -140,7 +140,7 @@ def compare_line_by_line(content, expected, sort=False):
         content_lines = sorted(content_lines)
         expected_lines = sorted(expected_lines)
     # Compare line by line to ease debug in case of error
-    for content_line, expected_line in zip(content_lines, expected_lines):
+    for content_line, expected_line in zip(content_lines, expected_lines, strict=False):
         assert content_line == expected_line, f"{content_line} != {expected_line}"
 
 
