@@ -5,7 +5,7 @@ import subprocess
 from collections.abc import Iterator
 from os import PathLike
 from pathlib import Path
-from typing import NamedTuple, Optional, Union
+from typing import NamedTuple
 
 from git.config import GitConfigParser
 from git_autoshare.core import find_autoshare_repository
@@ -18,7 +18,7 @@ from .path import build_path, cd, root_path
 class SubmoduleInfo(NamedTuple):
     path: str
     url: str
-    branch: Optional[str]
+    branch: str | None
     exists: bool
     cloned: bool
 
@@ -73,7 +73,7 @@ def _get_gitmodules():
 
 
 def iter_gitmodules(
-    filter_path: Optional[Union[str, PathLike]] = None,
+    filter_path: str | PathLike | None = None,
 ) -> Iterator[SubmoduleInfo]:
     """Yields the submodules from `.gitmodules`
 
@@ -113,7 +113,7 @@ def submodule_add(submodule: SubmoduleInfo) -> None:
     subprocess.run(cmd + args, check=True)
 
 
-def submodule_sync(path: Union[str, PathLike]):
+def submodule_sync(path: str | PathLike):
     """Submodule sync"""
     sync_cmd = ["git", "submodule", "sync"]
     if path:
@@ -121,7 +121,7 @@ def submodule_sync(path: Union[str, PathLike]):
     run(sync_cmd, check=True)
 
 
-def submodule_update(path: Union[str, PathLike]):
+def submodule_update(path: str | PathLike):
     """Submodule update"""
     cmd = ["git", "submodule", "update", "--init"]
     args = []
