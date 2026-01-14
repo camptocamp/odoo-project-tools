@@ -5,6 +5,7 @@ from pathlib import Path
 
 import click
 
+from ..exceptions import ProjectConfigException
 from ..utils.config import config
 from ..utils.git import get_current_branch
 from ..utils.marabunta import MarabuntaFileHandler
@@ -44,6 +45,10 @@ def make_towncrier_cmd(version):
 
 
 def update_marabunta_file(version):
+    if config.marabunta_mig_file_rel_path is None:
+        raise ProjectConfigException(
+            "Configure the marabunta_mig_file_rel_path in the project configuration file."
+        )
     marabunta_file = build_path(config.marabunta_mig_file_rel_path)
     handler = MarabuntaFileHandler(marabunta_file)
     handler.update(version)
@@ -83,8 +88,10 @@ def bump(rel_type, new_version=None, dry_run=False, commit=False):
     cmd = make_towncrier_cmd(new_version)
     click.echo(f"Running: {cmd}")
     run(cmd)
-    click.echo("Updating marabunta migration file")
-    update_marabunta_file(new_version)
+
+    if config.marabunta_mig_file_rel_path:
+        click.echo("Updating marabunta migration file")
+        update_marabunta_file(new_version)
 
     if click.confirm("Push local branches?"):
         push_branches(version=new_version)
