@@ -8,6 +8,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import click
+
 
 def get_venv():
     """Return an environment that includes the virtualenv in the PATH
@@ -30,15 +32,18 @@ def get_venv():
     return env
 
 
-def run(cmd, drop_trailing_spaces=True, check=False, with_env=None):
+def run(cmd, drop_trailing_spaces=True, check=False, with_env=None, verbose=False):
     """Execute system commands and return output.
 
     :param cmd: the command to execute, as a string or a preparsed list
     :param drop_trailing_eol: remove trailing end-of-line chars or other wrapping spaces.
     :param with_env: a dictionary of environment variables to set, or None.
+    :param verbose: if True, print the command before running it.
     """
     if isinstance(cmd, str):
         cmd = shlex.split(cmd)
+    if verbose:
+        click.echo(f"Running: {shlex.join(cmd)}")
     env = get_venv()
     if with_env:
         env.update(with_env)

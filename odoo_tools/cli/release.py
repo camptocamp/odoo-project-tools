@@ -77,8 +77,7 @@ def cli():
 def bump(rel_type, new_version=None, dry_run=False, commit=False):
     """Prepare a new release"""
     cmd = make_bumpversion_cmd(rel_type, new_version=new_version, dry_run=dry_run)
-    click.echo(f"Running: {cmd}")
-    res = run(cmd)
+    res = run(cmd, verbose=True)
     if dry_run:
         new_version = get_bumpversion_cfg_key(res, "new_version").strip()
         click.echo(f"New version: {new_version}")
@@ -86,8 +85,7 @@ def bump(rel_type, new_version=None, dry_run=False, commit=False):
     new_version = Path(config.version_file_rel_path).read_text().strip()
 
     cmd = make_towncrier_cmd(new_version)
-    click.echo(f"Running: {cmd}")
-    run(cmd)
+    run(cmd, verbose=True)
 
     if config.marabunta_mig_file_rel_path:
         click.echo("Updating marabunta migration file")
