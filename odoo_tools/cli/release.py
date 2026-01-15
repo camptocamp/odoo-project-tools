@@ -1,8 +1,6 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-from pathlib import Path
-
 import click
 
 from ..exceptions import ProjectConfigException
@@ -31,11 +29,11 @@ def get_bumpversion_cfg_key(cfg_content, key):
 
 
 def make_bumpversion_cmd(rel_type, new_version=None, dry_run=False):
-    cmd = ["bumpversion"]
+    cmd = ["bumpversion", "--list"]
     if new_version:
         cmd.append(f"--new-version {new_version}")
     if dry_run:
-        cmd.append("--dry-run --list")
+        cmd.append("--dry-run")
     cmd.append(rel_type)
     return " ".join(cmd)
 
@@ -78,11 +76,11 @@ def bump(rel_type, new_version=None, dry_run=False, commit=False):
     """Prepare a new release"""
     cmd = make_bumpversion_cmd(rel_type, new_version=new_version, dry_run=dry_run)
     res = run(cmd, verbose=True)
+    new_version = get_bumpversion_cfg_key(res, "new_version").strip()
+
     if dry_run:
-        new_version = get_bumpversion_cfg_key(res, "new_version").strip()
         click.echo(f"New version: {new_version}")
         return
-    new_version = Path(config.version_file_rel_path).read_text().strip()
 
     cmd = make_towncrier_cmd(new_version)
     run(cmd, verbose=True)
