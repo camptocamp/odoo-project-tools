@@ -127,7 +127,7 @@ def sync_remote(submodule_path=None, repo=None, force_remote=False):
             f"Submodule {repo.name} has no pending merges. Update it to {odoo_version}?"
         ):
             with path.cd(repo.abs_path):
-                git.checkout(target_branch=odoo_version)
+                git.checkout(branch_name=odoo_version)
 
 
 if __name__ == "__main__":
