@@ -66,8 +66,8 @@ otools-i18n = "odoo_tools.cli.i18n:cli"
 
 [project.optional-dependencies]
 test = [
-  "coverage",
   "pytest",
+  "pytest-cov",
   "pytest-ty",
   "responses",
 ]
@@ -81,8 +81,21 @@ find = {}
 
 [tool.setuptools_scm]
 
+[tool.coverage.run]
+source = ["odoo_tools"]
+
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+]
+
 [tool.pytest.ini_options]
-addopts = "--ty"
+addopts = [
+    "--ty",
+    "--cov=odoo_tools",
+    "--cov-report=term-missing:skip-covered",
+    "--cov-fail-under=65",  # TODO: increase this
+]
 markers = [
     "project_setup",
 ]

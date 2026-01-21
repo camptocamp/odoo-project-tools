@@ -16,11 +16,12 @@ jobs:
           - "3.13"
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - name: Install uv and set the Python version
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          pip install .[test]
+          enable-cache: true
+      - name: Install the project
+        run: uv sync --dev --all-extras
       - name: Run tests
-        run: coverage run --source=odoo_tools -m pytest -v tests && coverage report -m
+        run: uv run pytest --verbose
