@@ -2,13 +2,14 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 import os
 from contextlib import contextmanager
-from pathlib import PosixPath
+from pathlib import Path, PosixPath
 
 from click.testing import CliRunner
 
 from odoo_tools.utils import pending_merge as pm_utils
 from odoo_tools.utils.config import config
 from odoo_tools.utils.path import get_root_marker
+from odoo_tools.utils.proj import get_project_manifest
 from odoo_tools.utils.yaml import update_yml_file
 
 Repo = pm_utils.Repo
@@ -34,7 +35,7 @@ def mock_pypi_version_cache(pkg_name, version):
 
 FAKE_MANIFEST_DATA = dict(
     customer_name="ACME Inc.",
-    odoo_version="14.0",
+    odoo_version=None,  # Automatically set from the proj_version
     customer_shortname="acme",
     repo_name="acme_odoo",
     project_id="1234",
@@ -93,22 +94,23 @@ def make_fake_project_root(
             content.append(f"{k} = {v}")
         fd.write("\n".join(content))
     config._reload()
+    # Generate the project manifest
     data = FAKE_MANIFEST_DATA.copy()
     data.update(manifest or {})
-    # create empty file
-    with open(marker_file, "w") as fd:
-        fd.write("")
-    # write YAML
+    if not data.get("odoo_version"):
+        data["odoo_version"] = ".".join(proj_version.split(".")[:2])
+    Path(marker_file).parent.mkdir(parents=True, exist_ok=True)
+    Path(marker_file).touch()
     update_yml_file(marker_file, data)
-    with open(req_file, "w") as fd:
-        fd.write("")
+    get_project_manifest.cache_clear()
+    # Create the requirements.txt file
+    Path(req_file).parent.mkdir(parents=True, exist_ok=True)
+    Path(req_file).touch()
     # Mock proj version file
-    ver_file = config.version_file_rel_path
-
-    os.makedirs(ver_file.parent.as_posix(), exist_ok=True)
-    with ver_file.open("w") as fd:
-        fd.write(proj_version)
-
+    if ver_file := config.version_file_rel_path:
+        ver_file.parent.mkdir(parents=True, exist_ok=True)
+        ver_file.write_text(proj_version)
+    # Mock marabunta migration file
     if mock_marabunta_file:
         fake_marabunta_file()
     # Write the extra files

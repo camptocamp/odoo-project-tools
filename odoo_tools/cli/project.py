@@ -6,6 +6,7 @@ import re
 import uuid
 
 import click
+import jinja2
 from git import Repo as GitRepo
 
 from ..utils import git, ui
@@ -37,7 +38,11 @@ def get_bumpversion_vars(opts):
     odoo_major, odoo_minor, __ = version.split(".", 2)
     res = {
         "rel_path_local_addons": config.local_src_rel_path.as_posix(),
-        "rel_path_version_file": config.version_file_rel_path.as_posix(),
+        "rel_path_version_file": (
+            config.version_file_rel_path.as_posix()
+            if config.version_file_rel_path
+            else None
+        ),
         "bundle_addon_name": "{}_bundle".format(
             get_project_manifest_key("customer_shortname")
         ),
@@ -194,12 +199,11 @@ def bootstrap_files(opts):
                 item["fallback"](source, dest)
             continue
         if var_getter := item.get("variables_getter"):
-            content = source.read_text()
-            # TODO: use better variable tmpl?
-            for k, v in var_getter(opts).items():
-                content = content.replace(f"${k}", v)
-                # avoid errors from end-of-file-fixer in pre-commit
-                content = content.rstrip("\n") + "\n"
+            jinja_env = jinja2.Environment(
+                loader=jinja2.PackageLoader("odoo_tools"),
+            )
+            jinja_template = jinja_env.get_template(source.name)
+            content = jinja_template.render(var_getter(opts))
         else:
             content = source.read_text()
         # Write the file, except if the target already matches the expected content
