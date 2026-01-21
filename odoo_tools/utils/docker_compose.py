@@ -6,6 +6,7 @@ command line options found in different versions of docker compose.
 """
 
 import subprocess
+from os import PathLike
 from pathlib import Path
 
 from . import os_exec
@@ -128,7 +129,7 @@ def restore_db_from_template(database_name, template_name):
     return command
 
 
-def run_restore_db(database_name, db_dump):
+def run_restore_db(database_name, db_dump: PathLike | str):
     with Path(db_dump).open("rb") as fdump:
         popen = subprocess.Popen(
             restore_db(database_name), stdin=fdump, bufsize=1024**3

@@ -17,8 +17,8 @@ from . import docker_compose, os_exec, proj, ui
 
 def create_db_from_db_dump(
     db_name: str,
-    db_dump: str,
-    template_db_name: str = None,
+    db_dump: PathLike | str,
+    template_db_name: str | None = None,
 ):
     """Restores a DB dump, optionally creates a DB template
 
