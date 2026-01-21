@@ -116,7 +116,7 @@ def replace_requirement(
     req_filepath = req_filepath or get_project_req()
     if use_wool is None:
         # assume a project on Odoo 17 is using wool
-        use_wool = version >= "17"
+        use_wool = version and version >= "17"
     if pr:
         handler = make_requirement_line_for_pr
         if editable:
