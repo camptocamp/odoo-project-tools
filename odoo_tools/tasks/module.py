@@ -17,7 +17,7 @@ def get_addons_path():
         odoo_dir / "local-src",
     ]
     ext_path = odoo_dir / "external-src"
-    addons_path.extend(dir_pth for dir_pth in ext_path.iter() if dir_pth.is_dir())
+    addons_path.extend(dir_pth for dir_pth in ext_path.iterdir() if dir_pth.is_dir())
     return addons_path
 
 
