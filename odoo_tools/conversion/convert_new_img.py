@@ -155,7 +155,7 @@ def collect_submodules():
     for section in parser:
         if section.startswith("submodule"):
             print(section)
-            name = re.match(r"""submodule ['"]([\w/_-]+)['"]""", section).groups(1)[0]
+            name = re.match(r"""submodule ['"]([\w/_-]+)['"]""", section).group(1)
             submodule = Submodule(name=name)
             submodules[section] = submodule
             for fieldname, value in parser[section].items():
