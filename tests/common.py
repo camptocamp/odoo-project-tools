@@ -191,13 +191,16 @@ class MockCompletedProcess:
         self.stdout = stdout
 
 
-def mock_subprocess_run(mock_spec=None):
-    """Return a function that you can pass to unittest.mock.patch:
+class MockSubprocessRun:
+    """A mock for subprocess.run that can be used with unittest.mock.patch.
 
-    with patch("subprocess.run", mock_subprocess_run(spec)):
-        do your test
+    Usage:
+        mock_runner = MockSubprocessRun(spec)
+        with patch("subprocess.run", mock_runner):
+            do your test
+        mock_runner.assert_completed_calls()
 
-    mock_speck is a list of dictionaries. The entries are used to match
+    mock_spec is a list of dictionaries. The entries are used to match
     subsequent calls to subprocess.run(), in order.
 
     Each directory has the following keys:
@@ -216,11 +219,14 @@ def mock_subprocess_run(mock_spec=None):
     The mock returns a MockCompletedProcess object. If stdout is not None, the string or bytes object
     passed is is the `stdout` attribute of that object.
     """
-    if mock_spec is None:
-        mock_spec = []
 
-    def mock_run(args, stdout=None, **kwargs):
-        call_spec = mock_spec.pop(0)
+    def __init__(self, mock_spec=None):
+        if mock_spec is None:
+            mock_spec = []
+        self.mock_spec = mock_spec
+
+    def __call__(self, args, stdout=None, **kwargs):
+        call_spec = self.mock_spec.pop(0)
         if call_spec["args"] is not None:
             if callable(call_spec["args"]):
                 assert call_spec["args"](
@@ -238,9 +244,13 @@ def mock_subprocess_run(mock_spec=None):
             )
         return MockCompletedProcess(args, stdout=call_spec.get("stdout"))
 
-    def assert_completed_calls():
-        assert not mock_spec, f"{len(mock_spec)} calls missing: {mock_spec}"
+    def assert_completed_calls(self):
+        assert (
+            not self.mock_spec
+        ), f"{len(self.mock_spec)} calls missing: {self.mock_spec}"
 
-    mock_run.assert_completed_calls = assert_completed_calls
 
-    return mock_run
+def mock_subprocess_run(mock_spec=None):
+    """Return a MockSubprocessRun instance for backward compatibility."""
+    # TODO: deprecate this and use MockSubprocessRun directly
+    return MockSubprocessRun(mock_spec)
