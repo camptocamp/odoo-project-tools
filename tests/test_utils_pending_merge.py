@@ -466,7 +466,7 @@ def test_remove_pending_patch_v1():
 
 @pytest.mark.usefixtures("project")
 @pytest.mark.project_setup(proj_tmpl_ver=1)
-def add_pending_pull_request_patch():
+def test_add_pending_pull_request_patch():
     name = "edi"
     tmpl = """
     ../{ext_src_rel_path}/{repo_name}:
@@ -481,15 +481,16 @@ def add_pending_pull_request_patch():
     """
     mock_pending_merge_repo_paths(name, tmpl=tmpl)
     repo = Repo(name, path_check=False)
-    repo.add_pending_pull_request_patch(
-        "OCA", "https://github.com/OCA/edi/pull/1470.patch"
+    pm_utils.add_pending(
+        "https://github.com/OCA/edi/pull/1470.patch",
+        aggregate=False,
     )
-    repo.add_pending_pull_request_patch(
-        "OCA", "https://github.com/OCA/edi/pull/1471", patch=True
+    pm_utils.add_pending(
+        "https://github.com/OCA/edi/pull/1471",
+        patch=True,
+        aggregate=False,
     )
     shell_command_after = repo.merges_config().get("shell_command_after", [])
-    line_tmpl = (
-        "curl -sSL {} | git am -3 --keep-non-patch --exclude '*requirements.txt'"
-    )
+    line_tmpl = "curl -sSL https://github.com/OCA/edi/pull/{}.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'"
     for pid in (1470, 1471):
-        assert line_tmpl.format(pid) in shell_command_after
+        assert line_tmpl.format(pid) in shell_command_after, shell_command_after
