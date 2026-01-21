@@ -98,8 +98,8 @@ class ProjectConfig(BaseModel):
 class LazyConfig:
     """Lazy configuration loader"""
 
-    def __init__(self, config_path: PathLike):
-        self._config_path = config_path
+    def __init__(self, config_path: PathLike | str):
+        self._config_path = Path(config_path)
 
     @cached_property
     def _config(self) -> ProjectConfig:
