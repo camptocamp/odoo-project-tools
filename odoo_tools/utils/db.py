@@ -44,7 +44,7 @@ def create_db_from_db_template(db_name: str, db_template: str):
 
 def create_db_from_local_files(
     db_name: str,
-    template_db_name: str = None,
+    template_db_name: str | None = None,
 ):
     """Checks current directory for ``.pg`` files and tries to restore one of them
 
@@ -69,7 +69,9 @@ def create_db_from_local_files(
         ui.exit_msg("No database dump found")
 
 
-def dump_db(db_name: str, output_path: PathLike = ".", format: Literal["c", "p"] = "c"):
+def dump_db(
+    db_name: str, output_path: PathLike | str = ".", format: Literal["c", "p"] = "c"
+):
     """Dump a database to a file"""
     output_path = Path(output_path)
     # If output_path is a directory, generate a filename
