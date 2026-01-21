@@ -198,6 +198,62 @@ def test_bump_without_version_file(project):
     assert result.exit_code == 0
 
 
+@pytest.mark.project_setup(
+    proj_version="18.0.1.2.0",
+    mock_marabunta_file=True,
+    mock_bundle_addon=True,
+)
+def test_bump_bundle_addon_manifest_version(project):
+    # make sure the bundle addon is created
+    bundle_addon_path = config.local_src_rel_path / "acme_bundle"
+    assert bundle_addon_path.is_dir()
+    assert (bundle_addon_path / "__manifest__.py").is_file()
+    # run init to get all files ready (eg: bumpversion)
+    project.invoke(init, catch_exceptions=False)
+    # bump the version
+    result = project.invoke(
+        release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
+    )
+    assert result.output.splitlines() == [
+        "Running: bumpversion --list minor",
+        "Running: towncrier build --yes --version=18.0.1.3.0",
+        "Updating marabunta migration file",
+        "Push local branches? [y/N]: ",
+    ]
+    assert result.exit_code == 0
+    # make sure the bundle addon version is updated in both files
+    assert "18.0.1.3.0" in (bundle_addon_path / "__manifest__.py").read_text()
+    assert "18.0.1.3.0" == (config.version_file_rel_path).read_text()
+
+
+@pytest.mark.project_setup(
+    proj_version="18.0.1.2.0",
+    proj_cfg={"version_file_rel_path": None},
+    mock_marabunta_file=True,
+    mock_bundle_addon=True,
+)
+def test_bump_bundle_addon_manifest_version_without_version_file(project):
+    # make sure the bundle addon is created
+    bundle_addon_path = config.local_src_rel_path / "acme_bundle"
+    assert bundle_addon_path.is_dir()
+    assert (bundle_addon_path / "__manifest__.py").is_file()
+    # run init to get all files ready (eg: bumpversion)
+    project.invoke(init, catch_exceptions=False)
+    # bump the version
+    result = project.invoke(
+        release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
+    )
+    assert result.output.splitlines() == [
+        "Running: bumpversion --list minor",
+        "Running: towncrier build --yes --version=18.0.1.3.0",
+        "Updating marabunta migration file",
+        "Push local branches? [y/N]: ",
+    ]
+    assert result.exit_code == 0
+    # make sure the bundle addon version is updated in both files
+    assert "18.0.1.3.0" in (bundle_addon_path / "__manifest__.py").read_text()
+
+
 def test_bump_push_no_repo():
     with fake_project_root(
         proj_version="14.0.0.1.0", mock_marabunta_file=True

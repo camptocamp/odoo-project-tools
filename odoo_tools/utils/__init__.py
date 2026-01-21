@@ -1,4 +1,5 @@
 from . import (
+    addon,
     click,
     config,
     db,
@@ -19,6 +20,7 @@ from . import (
 )
 
 __all__ = [
+    "addon",
     "click",
     "config",
     "db",

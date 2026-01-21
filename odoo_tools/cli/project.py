@@ -21,7 +21,7 @@ from ..utils.path import build_path
 from ..utils.proj import (
     generate_odoo_config_file,
     get_current_version,
-    get_project_manifest_key,
+    get_project_bundle_addon_name,
     setup_venv,
 )
 
@@ -36,6 +36,9 @@ def get_proj_tmpl_ver():
 def get_bumpversion_vars(opts):
     version = opts.version or get_current_version()
     odoo_major, odoo_minor, __ = version.split(".", 2)
+    bundle_addon_manifest_rel_path = (
+        config.local_src_rel_path / get_project_bundle_addon_name() / "__manifest__.py"
+    )
     res = {
         "rel_path_local_addons": config.local_src_rel_path.as_posix(),
         "rel_path_version_file": (
@@ -43,8 +46,10 @@ def get_bumpversion_vars(opts):
             if config.version_file_rel_path
             else None
         ),
-        "bundle_addon_name": "{}_bundle".format(
-            get_project_manifest_key("customer_shortname")
+        "rel_path_bundle_addon_manifest": (
+            bundle_addon_manifest_rel_path.as_posix()
+            if build_path(bundle_addon_manifest_rel_path).is_file()
+            else None
         ),
         "current_version": version,
         "odoo_major": odoo_major,
