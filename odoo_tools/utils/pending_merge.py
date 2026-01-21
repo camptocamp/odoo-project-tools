@@ -23,14 +23,6 @@ from .yaml import yaml_dump, yaml_load
 git_aggregator.main.setup_logger()
 
 
-try:
-    input = raw_input
-except NameError:
-    pass
-
-git_aggregator.main.setup_logger()
-
-
 class Repo:
     """Handle checked out repositories and their pending merges."""
 
@@ -738,7 +730,7 @@ def push_branches(version=None, force=False):
         ui.echo("No repo to push")
 
 
-def get_new_remote_url(repo=None, force_remote=False):
+def get_new_remote_url(repo: Repo, force_remote: str | bool = False):
     if repo.has_pending_merges():
         with repo.abs_merges_path.open() as pending_merges:
             # read everything we can reach
