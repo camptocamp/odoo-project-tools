@@ -5,7 +5,7 @@ import subprocess
 import venv
 from functools import cache
 
-from . import ui
+from . import addon, ui
 from .config import config
 from .misc import get_ini_cfg_key, get_template_path
 from .path import build_path, get_root_marker, root_path
@@ -22,6 +22,10 @@ def get_project_manifest_key(key):
     return get_project_manifest()[key]
 
 
+def get_project_bundle_addon_name():
+    return "{}_bundle".format(get_project_manifest_key("customer_shortname"))
+
+
 def get_odoo_version():
     return get_project_manifest_key("odoo_version")
 
@@ -36,13 +40,16 @@ def get_current_version():
     Historically, we stored the version in the VERSION file.
 
     However, since we started using bumpversion it became sort of redundant with the
-    bumpversion config file's `current_version` key. Moreover, projects generated with
-    the `odoosh-template` do not have a VERSION file.
+    bumpversion config file's `current_version` key.
+
+    Moreover, projects generated with the `odoosh-template` do not have a VERSION file,
+    they simply use the bundle addon manifest's version.
 
     This method will then try to identify the current version like so:
 
-    - Read the bumpversion config file's `current_version` key
-    - Fallback to the VERSION file, if it exists
+    - Read the bumpversion config file's `current_version` key.
+    - Fallback to the VERSION file, if it's configured in the project config.
+    - Fallback to the bundle addon manifest's version, if it exists.
     - Generate a new blank version on-the-fly "$ODOO_VERSION.0.0.0" otherwise
     """
     # Attempt to read from the bumpversion config file
@@ -57,8 +64,13 @@ def get_current_version():
     # Fallback to the VERSION file, if it exists
     if config.version_file_rel_path is not None:
         version_file_path = build_path(config.version_file_rel_path)
-        if version_file_path.is_file():
-            return version_file_path.read_text().strip()
+        return version_file_path.read_text().strip()
+    # Fallback to the bundle addon manifest's version, if it exists
+    local_src_path = build_path(config.local_src_rel_path)
+    bundle_addon_name = get_project_bundle_addon_name()
+    bundle_addon_path = local_src_path / bundle_addon_name
+    if bundle_addon_path.is_dir():
+        return addon.get_version(bundle_addon_path)
     # Generate a blank version on-the-fly: this is likely the case of new projects
     odoo_version = get_project_manifest_key("odoo_version")
     return f"{odoo_version}.0.0.0"

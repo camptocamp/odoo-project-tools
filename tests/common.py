@@ -1,15 +1,17 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 import os
+import shutil
 from contextlib import contextmanager
 from pathlib import Path, PosixPath
 
+import jinja2
 from click.testing import CliRunner
 
 from odoo_tools.utils import pending_merge as pm_utils
 from odoo_tools.utils.config import config
-from odoo_tools.utils.path import get_root_marker
-from odoo_tools.utils.proj import get_project_manifest
+from odoo_tools.utils.path import build_path, get_root_marker
+from odoo_tools.utils.proj import get_project_bundle_addon_name, get_project_manifest
 from odoo_tools.utils.yaml import update_yml_file
 
 Repo = pm_utils.Repo
@@ -77,6 +79,7 @@ def make_fake_project_root(
     req_file="requirements.txt",
     proj_version="14.0.0.1.0",
     mock_marabunta_file=False,
+    mock_bundle_addon=False,
     extra_files=None,
 ):
     if marker_file is None:
@@ -113,6 +116,9 @@ def make_fake_project_root(
     # Mock marabunta migration file
     if mock_marabunta_file:
         fake_marabunta_file()
+    # Mock bundle addon
+    if mock_bundle_addon:
+        fake_bundle_addon(version=proj_version)
     # Write the extra files
     if extra_files:
         for path, content in extra_files.items():
@@ -127,6 +133,25 @@ def fake_marabunta_file(source_file_path=None):
     with source_file_path.open() as fd_source:
         with config.marabunta_mig_file_rel_path.open("w") as fd_dest:
             fd_dest.write(fd_source.read())
+
+
+def fake_bundle_addon(source_template_path=None, **kwargs):
+    source_template_path = source_template_path or get_fixture_path("addon_bundle")
+    assert source_template_path.is_dir()
+    # Create the local-src directory if needed
+    config.local_src_rel_path.mkdir(parents=True, exist_ok=True)
+    # Copy the bundle addon template
+    bundle_addon_rel_path = build_path(
+        config.local_src_rel_path / get_project_bundle_addon_name()
+    )
+    shutil.copytree(source_template_path, bundle_addon_rel_path)
+    # Evaluate the templates
+    for file in bundle_addon_rel_path.glob("**/*.jinja"):
+        template = jinja2.Template(file.read_text())
+        content = template.render(**kwargs)
+        file.write_text(content)
+        # Remove the .jinja suffix
+        file.rename(file.with_suffix(""))
 
 
 @contextmanager
