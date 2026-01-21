@@ -69,7 +69,7 @@ def export(module_paths, languages, clean_db, init_db, export_pot):
             languages.extend(aux_langs.split(","))
     # Prepare the languages for export. We ignore en_US because it requires no
     # translations, and we add None for the pot files, if needed.
-    export_languages = tuple[str](lang for lang in languages if lang != "en_US")
+    export_languages = tuple(lang for lang in languages if lang != "en_US")
     if export_pot:
         export_languages = (None, *export_languages)
     if not export_languages:
