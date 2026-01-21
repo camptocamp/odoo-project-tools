@@ -17,7 +17,7 @@ from pathlib import Path
 from ..utils.config import config
 from ..utils.os_exec import run
 from ..utils.path import root_path
-from ..utils.proj import get_current_version
+from ..utils.proj import get_odoo_serie
 from ..utils.pypi import odoo_name_to_pkg_name
 from ..utils.req import make_requirement_line_for_proj_fork
 
@@ -112,7 +112,7 @@ class Submodule:
 
         The block has 1 line per module which is in the repository
         """
-        odoo_serie = get_current_version(serie_only=True)
+        odoo_serie = get_odoo_serie()
         if self.name in ("odoo/src", "odoo/external-src/enterprise"):
             return ""
         manifest_paths = Path(self.path).glob("*/__manifest__.py")

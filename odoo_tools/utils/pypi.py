@@ -7,7 +7,7 @@ import re
 import requests
 from packaging.version import Version
 
-from .proj import get_current_version
+from .proj import get_odoo_serie
 
 TMP_CACHE = {}
 
@@ -18,7 +18,7 @@ def get_last_pypi_version(pkg_name, odoo=True):
     # NOTE: this resp might be very big.
     # If it gets slow or burns too much mem try to find another way.
     if odoo:
-        odoo_serie = get_current_version(serie_only=True)
+        odoo_serie = get_odoo_serie()
         pkg_name = odoo_name_to_pkg_name(pkg_name, odoo_serie=odoo_serie)
     if pkg_name in TMP_CACHE:
         return TMP_CACHE[pkg_name]

@@ -10,7 +10,7 @@ from ..utils import ui
 from ..utils.misc import SmartDict
 from ..utils.os_exec import run
 from ..utils.pkg import Package
-from ..utils.proj import get_current_version
+from ..utils.proj import get_odoo_serie
 from ..utils.pypi import odoo_name_to_pkg_name
 
 
@@ -201,8 +201,7 @@ def add_requirement(name, **kw):
     """
     opts = SmartDict(kw)
 
-    odoo_serie = get_current_version(serie_only=True)
-    pkg_name = odoo_name_to_pkg_name(name, odoo_serie=odoo_serie)
+    pkg_name = odoo_name_to_pkg_name(name, odoo_serie=get_odoo_serie())
 
     if opts.file:
         req_utils.add_requirement(

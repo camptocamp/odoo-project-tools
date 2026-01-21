@@ -97,7 +97,7 @@ class ProjectConfig(BaseModel):
     pending_merge_rel_path: Path
     """The path to the pending merges files."""
 
-    version_file_rel_path: Path
+    version_file_rel_path: OptionalPath = None
     """The path to the version file."""
 
     marabunta_mig_file_rel_path: OptionalPath = None

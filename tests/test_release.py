@@ -4,6 +4,8 @@
 import datetime
 from unittest import mock
 
+import pytest
+
 from odoo_tools.cli import release
 from odoo_tools.cli.project import init
 from odoo_tools.utils.config import config
@@ -160,6 +162,40 @@ def test_bump_update_without_marabunta_file():
             "Push local branches? [y/N]: ",
         ]
         assert result.exit_code == 0
+
+
+@pytest.mark.project_setup(
+    proj_version="18.0.0.0.0",
+    proj_cfg={"version_file_rel_path": None},
+    mock_marabunta_file=True,
+)
+def test_bump_without_version_file(project):
+    # run init to get all files ready (eg: bumpversion)
+    project.invoke(init, catch_exceptions=False)
+    # check that the version file is not present
+    assert config.version_file_rel_path is None
+    # bump the first time
+    result = project.invoke(
+        release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
+    )
+    assert result.output.splitlines() == [
+        "Running: bumpversion --list minor",
+        "Running: towncrier build --yes --version=18.0.0.1.0",
+        "Updating marabunta migration file",
+        "Push local branches? [y/N]: ",
+    ]
+    assert result.exit_code == 0
+    # bump a second time
+    result = project.invoke(
+        release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
+    )
+    assert result.output.splitlines() == [
+        "Running: bumpversion --list minor",
+        "Running: towncrier build --yes --version=18.0.0.2.0",
+        "Updating marabunta migration file",
+        "Push local branches? [y/N]: ",
+    ]
+    assert result.exit_code == 0
 
 
 def test_bump_push_no_repo():
