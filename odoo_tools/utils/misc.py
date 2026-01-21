@@ -10,6 +10,17 @@ from . import docker_compose
 
 PKG_NAME = "odoo_tools"
 
+__all__ = [
+    "SmartDict",
+    "get_file_path",
+    "get_template_path",
+    "get_cache_path",
+    "copy_file",
+    "parse_ini_cfg",
+    "get_ini_cfg_key",
+    "get_docker_image_commit_hashes",
+]
+
 
 def get_file_path(filepath):
     return files(PKG_NAME) / filepath

@@ -30,6 +30,10 @@ class Package:
     def pinned_version(self):
         return self.req.specs if self.req else None
 
+    @property
+    def uri(self):
+        return self.req.uri if self.req else None
+
     def allowed_version(self, version):
         if not self.pinned_version:
             return True
