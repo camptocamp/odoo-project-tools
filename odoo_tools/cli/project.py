@@ -62,7 +62,7 @@ def convert_history_to_towncrier(history_path):
 
     ui.echo("Converting history file to towncrier format..")
 
-    def find_section(content_lines, title) -> tuple[int, int]:
+    def find_section(content_lines, title) -> tuple[int | None, int | None]:
         """Finds the section in the content and returns the start and end line numbers"""
         start = None
         end = None
@@ -90,7 +90,7 @@ def convert_history_to_towncrier(history_path):
         return start, end
 
     start, end = find_section(content_lines, "latest (unreleased)")
-    if start is None:
+    if start is None or end is None:
         ui.echo(
             "No latest (unreleased) section found in history file. Skipping conversion.\n"
             "You will need to manually convert the history file to the towncrier format "
