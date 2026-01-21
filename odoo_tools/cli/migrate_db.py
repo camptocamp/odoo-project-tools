@@ -174,14 +174,14 @@ def _prepare_parameters(ctx):
         "odoo/songs/migration_db/odoo_upgrade_env_file"
     )
     ctx.obj["db_name"] = prod_dump_path.stem
-    ctx.obj["db_prod"] = ctx.obj["db_name"] + "_prod"
-    ctx.obj["db_prod_fixed"] = ctx.obj["db_name"] + "_prod_fixed"
-    ctx.obj["db_odoo_migrated"] = ctx.obj["db_name"] + "_odoo_migrated"
-    ctx.obj["db_c2c_core"] = ctx.obj["db_name"] + "_core"
-    ctx.obj["db_c2c_external"] = ctx.obj["db_name"] + "_external"
-    ctx.obj["db_c2c_local"] = ctx.obj["db_name"] + "_local"
-    ctx.obj["db_c2c_cleanup"] = ctx.obj["db_name"] + "_cleanup"
-    ctx.obj["db_c2c_migrated"] = ctx.obj["db_name"] + "_c2c_migrated"
+    ctx.obj["db_prod"] = ctx.obj["db_name"] + "_1_prod"
+    ctx.obj["db_prod_fixed"] = ctx.obj["db_name"] + "_2_prod_fixed"
+    ctx.obj["db_odoo_migrated"] = ctx.obj["db_name"] + "_3_odoo_migrated"
+    ctx.obj["db_c2c_core"] = ctx.obj["db_name"] + "_4_core"
+    ctx.obj["db_c2c_external"] = ctx.obj["db_name"] + "_5_external"
+    ctx.obj["db_c2c_local"] = ctx.obj["db_name"] + "_6_local"
+    ctx.obj["db_c2c_cleanup"] = ctx.obj["db_name"] + "_7_cleanup"
+    ctx.obj["db_c2c_migrated"] = ctx.obj["db_name"] + "_8_c2c_migrated"
     ctx.obj["contract_number"] = ctx.params["contract_number"]
 
 
