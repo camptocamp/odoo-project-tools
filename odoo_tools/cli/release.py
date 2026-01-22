@@ -1,6 +1,9 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+import re
+from pathlib import Path
+
 import click
 
 from ..exceptions import ProjectConfigException
@@ -29,7 +32,6 @@ def get_new_version_from_output(output):
     
     Parses output like "New version will be '2.0.0'" from verbose mode.
     """
-    import re
     match = re.search(r"New version will be '([^']+)'", output)
     if match:
         return match.group(1)
