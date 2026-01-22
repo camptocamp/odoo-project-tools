@@ -204,10 +204,7 @@ def bootstrap_files(opts):
                 item["fallback"](source, dest)
             continue
         if var_getter := item.get("variables_getter"):
-            jinja_env = jinja2.Environment(
-                loader=jinja2.PackageLoader("odoo_tools"),
-            )
-            jinja_template = jinja_env.get_template(source.name)
+            jinja_template = jinja2.Template(source.read_text(), trim_blocks=True)
             content = jinja_template.render(var_getter(opts))
         else:
             content = source.read_text()
