@@ -165,15 +165,18 @@ def get_init_template_files():
             "source": ".bumpversion.tmpl.cfg",
             "destination": build_path("./.bumpversion.cfg"),
             "variables_getter": get_bumpversion_vars,
+            "check": lambda source_path, dest_path: not dest_path.exists(),
             "backup": False,
         },
         {
             "source": "towncrier.tmpl.toml",
             "destination": build_path("./towncrier.toml"),
+            "check": lambda source_path, dest_path: not dest_path.exists(),
         },
         {
             "source": ".towncrier-template.tmpl.rst",
             "destination": build_path(".towncrier-template.rst"),
+            "check": lambda source_path, dest_path: not dest_path.exists(),
         },
         {
             "source": "HISTORY.tmpl.rst",
