@@ -2,7 +2,6 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import re
-from pathlib import Path
 
 import click
 
@@ -29,7 +28,7 @@ END_TIPS = [
 
 def get_new_version_from_output(output):
     """Extract new version from bump-my-version output.
-    
+
     Parses output like "New version will be '2.0.0'" from verbose mode.
     """
     match = re.search(r"New version will be '([^']+)'", output)
@@ -94,10 +93,7 @@ def bump(rel_type, new_version=None, dry_run=False, commit=False):
     new_version = get_bumpversion_cfg_key(res, "new_version").strip()
 
     if dry_run:
-<<<<<<< HEAD
-=======
         new_version = get_new_version_from_output(res).strip()
->>>>>>> fc91b9e (Replace deprecated bump2version with bump-my-version)
         click.echo(f"New version: {new_version}")
         return
 
