@@ -128,12 +128,16 @@ def submodule_update(path: str | PathLike):
     # Use git-autoshare if available
     submodule = next(iter_gitmodules(filter_path=path), None)
     if submodule:
+        ui.echo(f"Updating submodule {submodule.path}")
         __, autoshare_repo = find_autoshare_repository([submodule.url])
         if autoshare_repo:
-            ui.echo(f"Auto-share conf found for {autoshare_repo.repo_dir}")
             if not Path(autoshare_repo.repo_dir).exists():
                 autoshare_repo.prefetch(True)
             args += ["--reference", autoshare_repo.repo_dir]
+        else:
+            ui.echo(
+                f"Auto-share conf not found for {submodule.url}. You may want to check your auto-share configuration."
+            )
     args.append(str(path))
     run(cmd + args, check=True)
 
