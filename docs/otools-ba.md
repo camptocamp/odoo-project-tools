@@ -91,13 +91,17 @@ The simplest way to use it is to pass the version number on the command line. So
 
 This will download a docker image for the specified version (depending on the speed of your connection, this can take a few minutes the first time), and then start the instance, and when the instance is ready, launch a web browser connected to the instance.
 
-When you are done, you can shut down the instance by typing `Ctrl-c` in the terminal from which you started `otools-ba`.  This will terminate the Odoo. The database is kept on your laptop. If you restart the same version, you will get the data you configured back again.
+When you are done, you can shut down the instance by typing `Ctrl-c` in the terminal from which you started `otools-ba`.  This will terminate the Odoo. The database is kept on your laptop.
 
-If you want to start with a fresh empty database, you can pass the `--empty-db` option:
+If you restart the same version, the existing database will be detected. By default, you will be asked if you want to drop it and start with a fresh empty one.
 
-    otools-ba run --empty-db 18.0
+You can skip this prompt by using the `--empty-db` option (accepted values: `yes`, `no`, `ask` (default)):
 
-This will drop any previously existing database for 18.0 and create a new one.
+    # This will drop the previously existing database for 18.0 and create a new one
+    otools-ba run --empty-db yes 18.0
+
+    # This will reuse the previously existing database for 18.0
+    otools-ba run --empty-db no 18.0
 
 If you want to work on two versions in parallel, to compare them, you will need to use a custom port on one of the instances. The default port is `8080`, but you can set a different one with the `--port` option, like this:
 
