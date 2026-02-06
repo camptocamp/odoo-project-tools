@@ -34,9 +34,10 @@ def cli():
     nargs=1,
 )
 @click.option(
-    "--empty-db/--no-empty-db",
-    default=True,
-    help="force recreation of an empty database. Otherwise a previously created database for that version can be reused.",
+    "--empty-db",
+    default="ask",
+    type=click.Choice(["yes", "no", "ask"]),
+    help="Force recreation of an empty database. 'ask' (default) checks for existing DB and prompts user.",
 )
 @click.option(
     "-p",
@@ -98,7 +99,31 @@ def run(empty_db, port, force_image_pull, version):
             subprocess.run(
                 docker_compose.down()
             )  # avoid error with another Odoo running in the same port
-            if empty_db:
+
+            # Determine if we should drop the `odoodb` database
+            drop_db = False
+            if empty_db == "yes":
+                drop_db = True
+            elif empty_db == "ask":
+                result = subprocess.run(
+                    # Check if odoodb exists.
+                    # psql -lqt: --list dbs, --quiet mode, --tuples-only (no headers)
+                    # grep -qw: --quiet search for exact --word-regexp match of "odoodb"
+                    docker_compose.run(
+                        "odoo",
+                        ["sh", "-c", "psql -lqt | grep -qw odoodb"],
+                        environment=run_environment,
+                    ),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                # exit code 0 = found (db exists)
+                # exit code 1 = not found (db does not exist)
+                if result.returncode == 0:
+                    drop_db = ui.ask_confirmation(
+                        "Existing database found. Do you want to drop it and start with an empty one?"
+                    )
+            if drop_db:
                 ui.echo("Remove previous database")
                 subprocess.run(
                     docker_compose.run(
