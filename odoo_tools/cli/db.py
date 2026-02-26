@@ -83,13 +83,22 @@ def list_versions():
 )
 @utils.click.handle_exceptions()
 def restore(dump_path, db_name=None, create_template=False):
-    """Restore a PostgreSQL dump to a database."""
+    """Restore an odoo backup locally (sql, dump or zip archive)
+
+    If it's a zip archive, and if it contains a filestore, it will also be restored.
+    """
     # Use filename without extension as db name by default
     if not db_name:
         db_name = Path(dump_path).stem
     # Create database
     template_db_name = create_template and f"{db_name}-template" or None
-    utils.db.create_db_from_db_dump(db_name, dump_path, template_db_name)
+    # If .zip, we're dealing with an Odoo archive format
+    if Path(dump_path).suffix == ".zip":
+        return utils.db.create_db_from_odoo_archive(
+            db_name, dump_path, template_db_name
+        )
+    # Otherwise we handle as a dump file
+    return utils.db.create_db_from_db_dump(db_name, dump_path, template_db_name)
 
 
 @cli.command()

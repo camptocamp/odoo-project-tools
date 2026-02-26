@@ -5,11 +5,17 @@ Helper functions to get docker compose commands to run, handling the different
 command line options found in different versions of docker compose.
 """
 
+from __future__ import annotations
+
 import subprocess
 from os import PathLike
 from pathlib import Path
+from typing import TYPE_CHECKING, Literal
 
-from . import os_exec
+from . import misc, os_exec
+
+if TYPE_CHECKING:
+    from configparser import ConfigParser
 
 
 def get_version():
@@ -129,11 +135,16 @@ def restore_db_from_template(database_name, template_name):
     return command
 
 
-def run_restore_db(database_name, db_dump: PathLike | str):
+def run_restore_db(
+    database_name, db_dump: PathLike | str, format: Literal["sql", "dump"] = "dump"
+):
     with Path(db_dump).open("rb") as fdump:
-        popen = subprocess.Popen(
-            restore_db(database_name), stdin=fdump, bufsize=1024**3
-        )
+        if format == "sql":
+            command = run("odoo", ["psql", "-d", database_name], tty=True, quiet=True)
+        else:
+            command = restore_db(database_name)
+        # Execute
+        popen = subprocess.Popen(command, stdin=fdump, bufsize=1024**3)
         popen.communicate()
 
 
@@ -149,3 +160,13 @@ def run_printenv(service="odoo") -> dict[str, str]:
             continue
         variables[name] = value
     return variables
+
+
+def read_odoo_cfg(service="odoo") -> ConfigParser:
+    """Returns a parsed odoo.cfg file read from the given service container"""
+    marker = "========== odoo.cfg =========="
+    content = os_exec.run(
+        run(service, ["sh", "-c", f"echo '{marker}' && cat $ODOO_RC"])
+    )
+    content = content.split(marker)[1]
+    return misc.parse_ini_cfg(content, "options")
