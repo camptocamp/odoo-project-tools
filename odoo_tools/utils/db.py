@@ -4,6 +4,7 @@
 import atexit
 import getpass
 import tempfile
+import zipfile
 from contextlib import contextmanager
 from datetime import datetime
 from os import PathLike
@@ -27,9 +28,12 @@ def create_db_from_db_dump(
     :param str template_db_name: if set, a new template DB of the given name is created
     """
     if template_db_name:
-        _handle_database_template(template_db_name, db_dump)
+        ui.echo(f"🥡 Creating template {template_db_name} from dump {db_dump}")
+        _load_database(template_db_name, db_dump)
+        ui.echo(f"🥡 Restore database {db_name} from template {template_db_name}")
         _restore_database_from_template(db_name, template_db_name)
     else:
+        ui.echo(f"🥡 Restore database {db_name} from dump {db_dump}")
         _load_database(db_name, db_dump)
 
 
@@ -40,6 +44,33 @@ def create_db_from_db_template(db_name: str, db_template: str):
     :param str db_template: the name of the template DB to use
     """
     _restore_database_from_template(db_name, db_template)
+
+
+def create_db_from_odoo_archive(
+    db_name: str,
+    backup_path: PathLike | str,
+    template_db_name: str | None = None,
+):
+    """Restores a DB from an Odoo archive
+
+    :param str db_name: name of the DB to create
+    :param str backup_path: path to the Odoo archive to restore
+    :param str template_db_name: if set, a new template DB of the given name is created
+    """
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_dir_path = Path(tmp_dir)
+        with zipfile.ZipFile(backup_path) as backup:
+            backup.extractall(path=tmp_dir_path)
+        # Restore the database
+        dump_sql_path = tmp_dir_path / "dump.sql"
+        if not dump_sql_path.is_file():
+            ui.exit_msg(f"No dump.sql found in {backup_path}")
+        create_db_from_db_dump(db_name, dump_sql_path, template_db_name)
+        # Restore the filestore (optional, may be missing)
+        filestore_path = tmp_dir_path / "filestore"
+        if filestore_path.is_dir():
+            ui.echo(f"🥡 Restoring filestore from {filestore_path}..")
+            _load_filestore(db_name, filestore_path)
 
 
 def create_db_from_local_files(
@@ -110,20 +141,7 @@ def dump_db(
     return output_path
 
 
-def _handle_database_template(template_db_name, database_dump):
-    # at this point we should have the database loaded under proper name
-    os_exec.run(docker_compose.drop_db(template_db_name))
-    os_exec.run(docker_compose.create_db(template_db_name))
-    try:
-        ui.echo(f"🥡 Creating template {template_db_name} from dump {database_dump}")
-        docker_compose.run_restore_db(template_db_name, database_dump)
-    except Exception:
-        # to ignore warnings on db restore
-        pass
-
-
 def _restore_database_from_template(db_name, template):
-    ui.echo(f"🥡 Restore database {db_name} from template {template}")
     os_exec.run(docker_compose.drop_db(db_name))
     os_exec.run(docker_compose.restore_db_from_template(db_name, template))
 
@@ -133,15 +151,48 @@ def _load_database(db_name, fname):
     os_exec.run(docker_compose.create_db(db_name))
 
     if Path(fname).is_file():
+        format = "sql" if Path(fname).suffix == ".sql" else "dump"
         try:
-            ui.echo(f"🥡 Restoring database {db_name} from dump {fname}")
-            docker_compose.run_restore_db(db_name, fname)
+            docker_compose.run_restore_db(db_name, fname, format=format)
         except Exception:
+            # to ignore warnings on db restore
             pass
     else:
         msg = f"❌ ** Database file {fname} for restore was not found**"
         return ui.exit_msg(msg)
     return fname
+
+
+def _load_filestore(db_name: str, filestore_path: PathLike | str):
+    """Load the filestore into the container"""
+    # First, read the container odoo.cfg to know where the filestore is located
+    cfg = docker_compose.read_odoo_cfg()
+    options_data_dir = cfg.get("options", "data_dir")
+    if not options_data_dir:
+        raise ui.exit_msg("No data_dir found in odoo.cfg")
+    container_filestore_path = Path(options_data_dir) / "filestore" / db_name
+    # Remove the existing filestore, if any
+    os_exec.run(
+        docker_compose.run(
+            "odoo",
+            ["rm", "-rf", str(container_filestore_path)],
+            remove=False,  # Don't remove the container, we need it for the copy
+        ),
+        verbose=True,
+        check=True,
+    )
+    # Copy the filestore to the container
+    os_exec.run(
+        [
+            "docker",
+            "compose",
+            "cp",
+            f"{filestore_path}/.",
+            f"odoo:{container_filestore_path}",
+        ],
+        verbose=True,
+        check=True,
+    )
 
 
 @contextmanager

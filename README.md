@@ -128,7 +128,7 @@ Commands:
   dump           Create a PostgreSQL dump of the specified database.
   list           List all databases in the container.
   list-versions  Print a table of DBs with Marabunta version and install...
-  restore        Restore a PostgreSQL dump to a database.
+  restore        Restore an odoo backup locally (sql, dump or zip archive)
 ```
 
 ### otools-cloud
