@@ -6,6 +6,8 @@ from pathlib import Path
 
 from invoke import task
 
+from ..utils import db, ui
+
 
 def get_addons_path():
     """Reconstruct addons_path based on known odoo module locations"""
@@ -58,8 +60,26 @@ class Module:
             manifest_path = openerp_path
         return literal_eval(manifest_path.read_text()).get("depends", [])
 
+    @classmethod
+    def get_installed_addons(cls, dbname="odoodb"):
+        query = "SELECT name FROM ir_module_module WHERE state = 'installed';"
+        result = db.execute_db_request(dbname, query)
+        return [mod_name for [mod_name] in result]
+
 
 @task
 def where_is(ctx, module_name):
     """Locate a module"""
     print(Module(module_name).path)
+
+
+@task
+def installed(ctx, db_name="odoodb"):
+    """List installed addons."""
+    db_list = db.get_db_list()
+    if db_name not in db_list:
+        ui.exit_msg(
+            f"Database {db_name} does not exist.\nAvailable: {', '.join(db_list)}"
+        )
+    res = Module.get_installed_addons(dbname=db_name)
+    print("\n".join(sorted(res)))
