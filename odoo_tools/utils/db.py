@@ -167,10 +167,10 @@ def _load_filestore(db_name: str, filestore_path: PathLike | str):
     """Load the filestore into the container"""
     # First, read the container odoo.cfg to know where the filestore is located
     cfg = docker_compose.read_odoo_cfg()
-    container_data_dir_path = Path(cfg.get("options", "data_dir"))
-    if not container_data_dir_path:
+    options_data_dir = cfg.get("options", "data_dir")
+    if not options_data_dir:
         raise ui.exit_msg("No data_dir found in odoo.cfg")
-    container_filestore_path = container_data_dir_path / "filestore" / db_name
+    container_filestore_path = Path(options_data_dir) / "filestore" / db_name
     # Remove the existing filestore, if any
     os_exec.run(
         docker_compose.run(
@@ -187,8 +187,8 @@ def _load_filestore(db_name: str, filestore_path: PathLike | str):
             "docker",
             "compose",
             "cp",
-            f"{str(filestore_path)}/.",
-            f"odoo:{str(container_filestore_path)}",
+            f"{filestore_path}/.",
+            f"odoo:{container_filestore_path}",
         ],
         verbose=True,
         check=True,
