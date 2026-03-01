@@ -1,6 +1,8 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+import re
+
 import click
 
 from ..exceptions import ProjectConfigException
@@ -24,16 +26,28 @@ END_TIPS = [
 ]
 
 
+def get_new_version_from_output(output):
+    """Extract new version from bump-my-version output.
+
+    Parses output like "New version will be '2.0.0'" from verbose mode.
+    """
+    match = re.search(r"New version will be '([^']+)'", output)
+    if match:
+        return match.group(1)
+    # Fallback to old format for backwards compatibility
+    return get_bumpversion_cfg_key(output, "new_version")
+
+
 def get_bumpversion_cfg_key(cfg_content, key):
     return get_ini_cfg_key(cfg_content, "bumpversion", key)
 
 
 def make_bumpversion_cmd(rel_type, new_version=None, dry_run=False):
-    cmd = ["bumpversion", "--list"]
+    cmd = ["bump-my-version", "bump"]
     if new_version:
         cmd.append(f"--new-version {new_version}")
     if dry_run:
-        cmd.append("--dry-run")
+        cmd.append("--dry-run --verbose")
     cmd.append(rel_type)
     return " ".join(cmd)
 
@@ -79,6 +93,7 @@ def bump(rel_type, new_version=None, dry_run=False, commit=False):
     new_version = get_bumpversion_cfg_key(res, "new_version").strip()
 
     if dry_run:
+        new_version = get_new_version_from_output(res).strip()
         click.echo(f"New version: {new_version}")
         return
 

@@ -36,7 +36,7 @@ dependencies = [
     "click>=8.1",
     "rich",
     "towncrier",
-    "bump2version",
+    "bump-my-version",
     "requirements-parser>=0.8.0",
     "Jinja2",
     ]
