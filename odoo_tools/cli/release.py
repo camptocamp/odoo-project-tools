@@ -20,7 +20,7 @@ END_TIPS = [
     '\tgit commit -m "Release {version}"',
     "\tgit tag -a {version}  # optionally -s to sign the tag",
     "\t# copy-paste the content of the release from HISTORY.rst in the annotation of the tag",
-    "\tgit push origin {branch} --tags",
+    "\tgit push --tags && git push origin {branch}",
 ]
 
 
