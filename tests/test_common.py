@@ -1,7 +1,7 @@
 # Copyright 2024 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
-import os
 import subprocess
+from pathlib import Path
 from unittest.mock import patch
 
 from .common import fake_project_root, mock_subprocess_run
@@ -27,19 +27,20 @@ def test_mock_subprocess_run_side_effect():
     with fake_project_root():
 
         def sim_touch(fname):
-            open(fname, "w").close()
+            Path(fname).touch()
 
+        temp_file = Path("foo")
         mock_fn = mock_subprocess_run(
             [
                 {
-                    "args": ["touch", "foo"],
+                    "args": ["touch", temp_file.name],
                     "sim_call": sim_touch,
-                    "sim_call_args": ["foo"],
+                    "sim_call_args": [temp_file.name],
                 }
             ]
         )
         with patch("subprocess.run", mock_fn):
-            res = subprocess.run(["touch", "foo"], check=False)
+            res = subprocess.run(["touch", str(temp_file)], check=False)
             assert res.returncode == 0
-            assert os.path.isfile("foo")
-        os.unlink("foo")
+            assert temp_file.is_file()
+        temp_file.unlink()

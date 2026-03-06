@@ -1,6 +1,7 @@
 # Copyright 2025 Camptocamp SA (https://www.camptocamp.com).
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
+from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -233,8 +234,7 @@ def test_dump_upload_from_file(project):
         mock.patch("subprocess.run", mock_fn),
     ):
         # Create a temporary file
-        with open("test_dump.sql", "w") as f:
-            f.write("test content")
+        Path("test_dump.sql").write_text("test content")
 
         result = project.invoke(
             cloud_cli,

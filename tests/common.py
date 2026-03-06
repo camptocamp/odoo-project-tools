@@ -1,9 +1,8 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
-import os
 import shutil
 from contextlib import contextmanager
-from pathlib import Path, PosixPath
+from pathlib import Path
 
 import jinja2
 from click.testing import CliRunner
@@ -16,7 +15,7 @@ from odoo_tools.utils.yaml import update_yml_file
 
 Repo = pm_utils.Repo
 
-FIXTURES_PATH = PosixPath(__file__).parent / "fixtures"
+FIXTURES_PATH = Path(__file__).parent / "fixtures"
 
 
 def get_fixture_path(fname):
@@ -24,8 +23,7 @@ def get_fixture_path(fname):
 
 
 def get_fixture(fname):
-    with open(get_fixture_path(fname)) as fd:
-        return fd.read()
+    return get_fixture_path(fname).read_text()
 
 
 def mock_pypi_version_cache(pkg_name, version):
@@ -91,11 +89,10 @@ def make_fake_project_root(
         proj_cfg_data.update(to_update)
         for k in to_delete:
             proj_cfg_data.pop(k, None)
-    with open(".proj.cfg", "w") as fd:
-        content = ["[conf]"]
-        for k, v in proj_cfg_data.items():
-            content.append(f"{k} = {v}")
-        fd.write("\n".join(content))
+    content = ["[conf]"]
+    for k, v in proj_cfg_data.items():
+        content.append(f"{k} = {v}")
+    Path(".proj.cfg").write_text("\n".join(content))
     config._reload()
     # Generate the project manifest
     data = FAKE_MANIFEST_DATA.copy()
@@ -122,17 +119,13 @@ def make_fake_project_root(
     # Write the extra files
     if extra_files:
         for path, content in extra_files.items():
-            with open(path, "w") as fd:
-                fd.write(content)
+            Path(path).write_text(content)
 
 
 def fake_marabunta_file(source_file_path=None):
     source_file_path = source_file_path or get_fixture_path("fake-marabunta.yml")
-    if not os.path.exists("odoo"):
-        os.mkdir("odoo")
-    with source_file_path.open() as fd_source:
-        with config.marabunta_mig_file_rel_path.open("w") as fd_dest:
-            fd_dest.write(fd_source.read())
+    Path("odoo").mkdir(exist_ok=True)
+    config.marabunta_mig_file_rel_path.write_text(source_file_path.read_text())
 
 
 def fake_bundle_addon(source_template_path=None, **kwargs):
@@ -199,20 +192,19 @@ def mock_pending_merge_repo_paths(
     path = None
     if src:
         path = repo.abs_path / ".git"
-        os.makedirs(path, exist_ok=True)
+        path.mkdir(parents=True, exist_ok=True)
 
     if pending:
         path = repo.abs_merges_path
-        os.makedirs(path.parent, exist_ok=True)
-        with open(path, "w") as fd:
-            fd.write(
-                tmpl.format(
-                    ext_src_rel_path=repo.ext_src_rel_path,
-                    repo_name=repo_name,
-                    org_name=org_name,
-                    pid="1234",
-                )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            tmpl.format(
+                ext_src_rel_path=repo.ext_src_rel_path,
+                repo_name=repo_name,
+                org_name=org_name,
+                pid="1234",
             )
+        )
     return path
 
 

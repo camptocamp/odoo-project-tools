@@ -66,8 +66,7 @@ def test_generate_odoo_config_file():
         config_file = build_path("odoo.cfg")
 
         def create_config():
-            with open(config_file, "w") as fobj:
-                fobj.write("db_name=testdb\n")
+            config_file.write_text("db_name=testdb\n")
 
         mock_fn = mock_subprocess_run(
             [

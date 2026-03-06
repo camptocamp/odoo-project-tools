@@ -1,8 +1,7 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-import os
-from pathlib import PosixPath
+from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -27,15 +26,15 @@ def test_repo_base():
     with fake_project_root():
         ext_rel_path = config.ext_src_rel_path
         pending_merge_rel_path = config.pending_merge_rel_path
-        cwd = PosixPath(os.getcwd())
+        cwd = Path().resolve()
         repo = Repo("edi", path_check=False)
         expected = {
             "name": "edi",
             "company_git_remote": "camptocamp",
-            "path": PosixPath(f"{ext_rel_path}/edi"),
-            "abs_path": cwd / f"{ext_rel_path}/edi",
-            "merges_path": PosixPath(f"{pending_merge_rel_path}/edi.yml"),
-            "abs_merges_path": cwd / f"{pending_merge_rel_path}/edi.yml",
+            "path": Path(ext_rel_path) / "edi",
+            "abs_path": cwd / ext_rel_path / "edi",
+            "merges_path": Path(pending_merge_rel_path) / "edi.yml",
+            "abs_merges_path": cwd / pending_merge_rel_path / "edi.yml",
         }
         for k, v in expected.items():
             assert getattr(repo, k) == v, f"{k} does not match"
