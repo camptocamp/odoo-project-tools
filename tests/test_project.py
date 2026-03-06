@@ -316,24 +316,32 @@ def test_local_odoo_venv(runner):
                 # "sim_call_args": ["foo"],
             },
             {
-                "args": lambda a: Path(a[0]).name.startswith("python")
-                and a[2] == "ensurepip",
+                "args": lambda a: (
+                    Path(a[0]).name.startswith("python") and a[2] == "ensurepip"
+                ),
             },
             {
-                "args": lambda a: str(a[0]).endswith("pip")
-                and str(a[3]).endswith(f"{odoo_src_path}/requirements.txt"),
+                "args": lambda a: (
+                    str(a[0]).endswith("pip")
+                    and str(a[3]).endswith(f"{odoo_src_path}/requirements.txt")
+                ),
             },
             {
-                "args": lambda a: str(a[0]).endswith("pip")
-                and a[1:] == ["install", "-r", "local-requirements.txt"]
+                "args": lambda a: (
+                    str(a[0]).endswith("pip")
+                    and a[1:] == ["install", "-r", "local-requirements.txt"]
+                )
             },
             {
-                "args": lambda a: str(a[0]).endswith("pip")
-                and str(a[3]).endswith("/requirements.txt")
+                "args": lambda a: (
+                    str(a[0]).endswith("pip")
+                    and str(a[3]).endswith("/requirements.txt")
+                )
             },
             {
-                "args": lambda a: str(a[0]).endswith("pip")
-                and a[1:] == ["install", "-e", "."]
+                "args": lambda a: (
+                    str(a[0]).endswith("pip") and a[1:] == ["install", "-e", "."]
+                )
             },
             {
                 "args": None,

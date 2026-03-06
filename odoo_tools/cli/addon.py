@@ -148,7 +148,7 @@ def add_pending(pr_url, addons=None, editable=True, aggregate=True, use_wool=Non
 
     addons = [x.strip() for x in addons.split(",") if x.strip()] if addons else []
     if not addons:
-        ui.exit_msg("No addon specifified. Please update dev requirements manually.")
+        ui.exit_msg("No addon specified. Please update dev requirements manually.")
 
     ui.echo(f"Adding: {', '.join(addons)} from {pr_url}")
 

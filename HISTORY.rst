@@ -230,7 +230,7 @@
 * Setup bumpversion
 * Setup towncrier
 * Add otools-release
-* Make test mock_pending_merge_repo_paths re-usable
+* Make test mock_pending_merge_repo_paths reusable
 * Make root project cfg configurable
 * utils.misc: add generic parse_ini_cfg
 * utils.proj: add get_current_version

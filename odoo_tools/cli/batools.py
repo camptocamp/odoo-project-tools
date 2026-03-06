@@ -84,7 +84,7 @@ def run(empty_db, port, force_image_pull, version):
         Path("docker-compose.yml").write_text(dkr_compose)
         with Path("docker_logs.txt").open("wb") as logfile:
             ui.echo(
-                f"Pulling docker image (this can be long). Logs are in {run_dir/'docker_logs.txt'}"
+                f"Pulling docker image (this can be long). Logs are in {run_dir / 'docker_logs.txt'}"
             )
             subprocess.run(
                 docker_compose.pull(

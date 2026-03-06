@@ -87,9 +87,7 @@ def test_bump_changelog():
             "---------------\n\n"
             ".. towncrier release notes start\n\n"
         )
-        hist_part_2 = (
-            "14.0.0.1.0 (2011-10-09)\n" "+++++++++++++++++++++++\n\n" "* Blah\n"
-        )
+        hist_part_2 = "14.0.0.1.0 (2011-10-09)\n+++++++++++++++++++++++\n\n* Blah\n"
         changes = (
             ("Fixed a thing!", "./changes.d/1234.bug"),
             ("Added a thing!", "./changes.d/2345.feat"),

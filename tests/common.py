@@ -261,13 +261,13 @@ class MockSubprocessRun:
         call_spec = self.mock_spec.pop(0)
         if call_spec["args"] is not None:
             if callable(call_spec["args"]):
-                assert call_spec["args"](
-                    args
-                ), f"subprocess.call({args}): problem with the arguments"
+                assert call_spec["args"](args), (
+                    f"subprocess.call({args}): problem with the arguments"
+                )
             else:
-                assert (
-                    args == call_spec["args"]
-                ), f"Wrong args {args}, expecting {call_spec['args']}"
+                assert args == call_spec["args"], (
+                    f"Wrong args {args}, expecting {call_spec['args']}"
+                )
         if "sim_call" in call_spec:
             call_spec["sim_call"](
                 *call_spec.get(
@@ -277,9 +277,9 @@ class MockSubprocessRun:
         return MockCompletedProcess(args, stdout=call_spec.get("stdout"))
 
     def assert_completed_calls(self):
-        assert (
-            not self.mock_spec
-        ), f"{len(self.mock_spec)} calls missing: {self.mock_spec}"
+        assert not self.mock_spec, (
+            f"{len(self.mock_spec)} calls missing: {self.mock_spec}"
+        )
 
 
 def mock_subprocess_run(mock_spec=None):

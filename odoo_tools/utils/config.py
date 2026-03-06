@@ -39,8 +39,7 @@ def validate_config(config: dict[str, Any]) -> ProjectConfig:
         return ProjectConfig(**config)
     except ValidationError as e:
         raise ProjectConfigException(
-            "The configuration is malformed.\n\n"
-            f"{format_pydantic_validation_error(e)}"
+            f"The configuration is malformed.\n\n{format_pydantic_validation_error(e)}"
         ) from None
 
 
