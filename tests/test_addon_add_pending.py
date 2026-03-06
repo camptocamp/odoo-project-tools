@@ -34,7 +34,7 @@ def test_add_new_pending_no_addons(project):
             [pr, "--no-aggregate"],
         )
     expected = [
-        "No addon specifified. Please update dev requirements manually.",
+        "No addon specified. Please update dev requirements manually.",
     ]
     assert result.output.splitlines() == expected
     assert repo.has_pending_merges()

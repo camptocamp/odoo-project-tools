@@ -329,20 +329,16 @@ def checkout_local_odoo(
         ui.echo(
             "\nYou can add the following lines to docker-compose.override.yml, in the odoo service section:"
         )
-        ui.echo(
-            """
+        ui.echo("""
     volumes:
       - "./src/odoo:/odoo/src/odoo"
       - "./src/enterprise:/odoo/src/enterprise"
-      """
-        )
-        ui.echo(
-            """
+      """)
+        ui.echo("""
 Then run:
 
 docker compose run --rm odoo pip install --user -e /odoo/src/odoo
-"""
-        )
+""")
 
 
 if __name__ == "__main__":
