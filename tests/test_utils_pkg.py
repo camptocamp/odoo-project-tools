@@ -1,7 +1,7 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-import os
+from pathlib import Path
 
 from odoo_tools.utils import pkg as pkg_utils
 
@@ -26,9 +26,8 @@ def test_pkg_class_has_pending_merge():
     with fake_project_root():
         pkg = pkg_utils.Package(addon_name)
         old_req = f"{pkg.pypi_name} @ git+https://github.com/OCA/repo@refs/pull/3/head#subdirectory=setup/{pkg.name}"
-        with open("./requirements.txt", "w") as fd:
-            fd.write(old_req)
-        req_path = os.getcwd() + "/requirements.txt"
+        (Path() / "requirements.txt").write_text(old_req)
+        req_path = Path().resolve() / "requirements.txt"
         pkg = pkg_utils.Package(addon_name, req_filepath=req_path)
         assert pkg.has_pending_merge()
 
@@ -39,8 +38,7 @@ def test_pkg_class_is_editable():
     with fake_project_root():
         pkg = pkg_utils.Package(addon_name)
         old_req = f"-e path/to/module/setup/{addon_name}"
-        with open("./requirements.txt", "w") as fd:
-            fd.write(old_req)
-        req_path = os.getcwd() + "/requirements.txt"
+        (Path() / "requirements.txt").write_text(old_req)
+        req_path = Path().resolve() / "requirements.txt"
         pkg = pkg_utils.Package(addon_name, req_filepath=req_path)
         assert pkg.is_editable()

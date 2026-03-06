@@ -2,6 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import datetime
+from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -36,32 +37,27 @@ def test_bump():
         proj_version="14.0.0.1.0", mock_marabunta_file=True
     ) as runner:
         ver_file = config.version_file_rel_path
-        with ver_file.open() as fd:
-            assert fd.read() == "14.0.0.1.0"
+        assert ver_file.read_text() == "14.0.0.1.0"
         # run init to get all files ready (eg: bumpversion)
         runner.invoke(init, catch_exceptions=False)
         result = runner.invoke(
             release.bump, ["--type", "patch"], catch_exceptions=False
         )
-        with ver_file.open() as fd:
-            assert fd.read() == "14.0.0.1.1"
+        assert ver_file.read_text() == "14.0.0.1.1"
         result = runner.invoke(
             release.bump, ["--type", "minor"], catch_exceptions=False
         )
-        with ver_file.open() as fd:
-            assert fd.read() == "14.0.0.2.0"
+        assert ver_file.read_text() == "14.0.0.2.0"
         result = runner.invoke(
             release.bump, ["--type", "major"], catch_exceptions=False
         )
-        with ver_file.open() as fd:
-            assert fd.read() == "14.0.1.0.0"
+        assert ver_file.read_text() == "14.0.1.0.0"
         result = runner.invoke(
             release.bump,
             ["--type", "major", "--new-version", "15.0.0.0.1"],
             catch_exceptions=False,
         )
-        with ver_file.open() as fd:
-            assert fd.read() == "15.0.0.0.1"
+        assert ver_file.read_text() == "15.0.0.0.1"
         result = runner.invoke(
             release.bump, ["--type", "major", "--dry-run"], catch_exceptions=False
         )
@@ -69,8 +65,7 @@ def test_bump():
             "Running: bumpversion --list --dry-run major",
             "New version: 15.0.1.0.0",
         ]
-        with ver_file.open() as fd:
-            assert fd.read() == "15.0.0.0.1"
+        assert ver_file.read_text() == "15.0.0.0.1"
         assert result.exit_code == 0
 
 
@@ -88,15 +83,10 @@ def test_bump_changelog():
             ".. towncrier release notes start\n\n"
         )
         hist_part_2 = "14.0.0.1.0 (2011-10-09)\n+++++++++++++++++++++++\n\n* Blah\n"
-        changes = (
-            ("Fixed a thing!", "./changes.d/1234.bug"),
-            ("Added a thing!", "./changes.d/2345.feat"),
-        )
-        for change, path in changes:
-            with open(path, "w") as fd:
-                fd.write(change)
-        with open("HISTORY.rst", "w") as fd:
-            fd.write(hist_part_1 + hist_part_2)
+        cwd = Path()
+        (cwd / "changes.d/1234.bug").write_text("Fixed a thing!")
+        (cwd / "changes.d/2345.feat").write_text("Added a thing!")
+        (cwd / "HISTORY.rst").write_text(hist_part_1 + hist_part_2)
         result = runner.invoke(
             release.bump, ["--type", "minor"], catch_exceptions=False, input="n"
         )
@@ -110,9 +100,10 @@ def test_bump_changelog():
             "* 1234: Fixed a thing!\n\n\n"
         )
 
-        expected = hist_part_1 + new_part + hist_part_2
-        with open("HISTORY.rst") as fd:
-            compare_line_by_line(fd.read(), expected)
+        compare_line_by_line(
+            (cwd / "HISTORY.rst").read_text(),
+            hist_part_1 + new_part + hist_part_2,
+        )
         assert result.output.splitlines() == [
             "Running: bumpversion --list minor",
             "Running: towncrier build --yes --version=14.0.0.2.0",

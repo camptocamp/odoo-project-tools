@@ -123,10 +123,6 @@ ignore = [
   "E501",     # line too long (if black is happy, we're happy)
 ]
 
-[tool.ruff.lint.per-file-ignores]
-# Refactor tests later
-"tests/**py" = ["PTH"]
-
 [tool.ruff.lint.mccabe]
 max-complexity = 16
 

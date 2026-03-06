@@ -29,7 +29,7 @@ from .common import compare_line_by_line, get_fixture, mock_subprocess_run
 )
 def test_init(project, version):
     # Drop mocked cfg (necessary to make fake_project_root work before)
-    os.remove(".proj.cfg")
+    Path(".proj.cfg").unlink()
     config._reload()
     with mock.patch.dict(os.environ, {"PROJ_TMPL_VER": str(version)}, clear=True):
         result = project.invoke(init, catch_exceptions=False)
@@ -42,16 +42,17 @@ def test_init(project, version):
         "HISTORY.rst",
     )
     for path in paths:
-        assert os.path.exists(path), f"`{path}` missing"
-    with open(".bumpversion.cfg") as fd:
-        content = fd.read()
-        expected = get_fixture(f"expected.bumpversion.v{version}.cfg")
-        compare_line_by_line(content, expected)
-    with open(".proj.cfg") as fd:
-        content = fd.read()
-        expected = get_fixture(f"expected.proj.v{version}.cfg")
-        compare_line_by_line(content, expected)
+        assert Path(path).exists(), f"`{path}` missing"
+
+    content = Path(".bumpversion.cfg").read_text()
+    expected = get_fixture(f"expected.bumpversion.v{version}.cfg")
+    compare_line_by_line(content, expected)
+
+    content = Path(".proj.cfg").read_text()
+    expected = get_fixture(f"expected.proj.v{version}.cfg")
+    compare_line_by_line(content, expected)
     assert result.exit_code == 0
+
     autoshare_cache_dir = Path("./.cache/git-autoshare").absolute()
     autoshare_config_dir = Path("./.config/git-autoshare").absolute()
     os.environ["GIT_AUTOSHARE_CACHE_DIR"] = str(autoshare_cache_dir)
@@ -62,15 +63,14 @@ def test_init(project, version):
 def test_init_proj_conf_already_existing(project):
     orig_content = get_fixture("expected.proj.v1.cfg")
     expected = orig_content + "\nfoo = baz"
-    with open(".proj.cfg", "w") as fd:
-        fd.write(expected)
-    with open("docker-compose.override.yml", "w") as fd:
-        fd.write("version: '9.7'\nservices:\n  odoo:\n    image: odoo:16.0\n")
+    Path(".proj.cfg").write_text(expected)
+    Path("docker-compose.override.yml").write_text(
+        "version: '9.7'\nservices:\n  odoo:\n    image: odoo:16.0\n"
+    )
     result = project.invoke(init, catch_exceptions=False)
-    with open(".proj.cfg") as fd:
-        content = fd.read()
-        # original cfg has been preserved
-        assert content == expected
+    content = Path(".proj.cfg").read_text()
+    # original cfg has been preserved
+    assert content == expected
     assert build_path("docker-compose.override.yml.bak").exists()
     assert result.exit_code == 0
 
@@ -123,11 +123,10 @@ def test_init_custom_version(project):
         ],
         catch_exceptions=False,
     )
-    assert os.path.exists("docker-compose.override.yml")
-    with open(".bumpversion.cfg") as fd:
-        content = fd.read()
-        expected = get_fixture("expected.bumpversion.v2.cfg")
-        compare_line_by_line(content, expected)
+    assert Path("docker-compose.override.yml").exists()
+    content = Path(".bumpversion.cfg").read_text()
+    expected = get_fixture("expected.bumpversion.v2.cfg")
+    compare_line_by_line(content, expected)
     assert result.exit_code == 0
 
 
@@ -232,8 +231,7 @@ def test_local_odoo_venv(runner):
     config_file = build_path("odoo.cfg")
 
     def create_config():
-        with open(config_file, "w") as fobj:
-            fobj.write("db_name=testdb\n")
+        config_file.write_text("db_name=testdb\n")
 
     mock_fn = mock_subprocess_run(
         [

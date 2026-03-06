@@ -1,6 +1,8 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+from pathlib import Path
+
 from click.testing import CliRunner
 
 from odoo_tools.utils import req as req_utils
@@ -8,12 +10,13 @@ from odoo_tools.utils.config import config
 
 from .common import fake_project_root, get_fixture_path
 
-fake_req = get_fixture_path("fake-requirements.txt")
+TMP_REQ_PATH = Path() / "tmp-requirements.txt"
+FAKE_REQ_PATH = get_fixture_path("fake-requirements.txt")
 
 
 def test_get_requirements():
     # with runner.isolated_filesystem():
-    reqs = req_utils.get_requirements(fake_req)
+    reqs = req_utils.get_requirements(FAKE_REQ_PATH)
     a1 = reqs["odoo-addon-name1"]
     assert a1.specs == [("==", "1.0.0")]
     a2 = reqs["odoo-addon-name2"]
@@ -45,7 +48,7 @@ def test_get_requirements():
 
 
 def test_get_addon_requirement():
-    a1 = req_utils.get_addon_requirement("odoo-addon-name1", req_filepath=fake_req)
+    a1 = req_utils.get_addon_requirement("odoo-addon-name1", req_filepath=FAKE_REQ_PATH)
     assert a1.specs == [("==", "1.0.0")]
 
 
@@ -77,63 +80,54 @@ def test_make_requirement_line_for_pr_editable():
 def test_add_requirement():
     runner = CliRunner()
     with runner.isolated_filesystem():
-        req_path = "./tmp-requirements.txt"
-        req_utils.add_requirement("foo", version="1.2.3", req_filepath=req_path)
-        with open(req_path) as fd:
-            assert fd.read() == "foo == 1.2.3"
-        req_utils.add_requirement("baz", version="2.2.3", req_filepath=req_path)
-        with open(req_path) as fd:
-            assert fd.read() == "foo == 1.2.3\nbaz == 2.2.3"
+        req_utils.add_requirement("foo", version="1.2.3", req_filepath=TMP_REQ_PATH)
+        assert TMP_REQ_PATH.read_text() == "foo == 1.2.3"
+        req_utils.add_requirement("baz", version="2.2.3", req_filepath=TMP_REQ_PATH)
+        assert TMP_REQ_PATH.read_text() == "foo == 1.2.3\nbaz == 2.2.3"
 
 
 def test_add_requirement_pr():
     runner = CliRunner()
     with runner.isolated_filesystem():
-        req_path = "./tmp-requirements.txt"
         pr = "https://github.com/OCA/edi-framework/pull/3"
         mod_name = "foo"
         pkg_name = f"odoo-addon-{mod_name}"
         req_utils.add_requirement(
-            pkg_name, pr=pr, req_filepath=req_path, use_wool=False
+            pkg_name, pr=pr, req_filepath=TMP_REQ_PATH, use_wool=False
         )
         expected = "odoo-addon-foo @ git+https://github.com/OCA/edi-framework@refs/pull/3/head#subdirectory=setup/foo"
-        with open(req_path) as fd:
-            assert fd.read() == expected
+        assert TMP_REQ_PATH.read_text() == expected
 
 
 def test_add_requirement_pr_editable():
     with fake_project_root():
-        req_path = "./tmp-requirements.txt"
         pr = "https://github.com/OCA/edi-framework/pull/3"
         mod_name = "foo"
         pkg_name = f"odoo-addon-{mod_name}"
         req_utils.add_requirement(
-            pkg_name, pr=pr, req_filepath=req_path, editable=True, use_wool=False
+            pkg_name, pr=pr, req_filepath=TMP_REQ_PATH, editable=True, use_wool=False
         )
         path = config.ext_src_rel_path
         expected = f"-e {path}/edi-framework/setup/{mod_name}"
-        with open(req_path) as fd:
-            assert fd.read() == expected
+        assert TMP_REQ_PATH.read_text() == expected
 
 
 def test_replace_requirement():
     runner = CliRunner()
     with runner.isolated_filesystem():
-        req_path = "./tmp-requirements.txt"
         pr = "https://github.com/OCA/edi-framework/pull/3"
         mod_name = "foo"
         pkg_name = f"odoo-addon-{mod_name}"
-        req_utils.add_requirement(pkg_name, pr=pr, req_filepath=req_path)
+        req_utils.add_requirement(pkg_name, pr=pr, req_filepath=TMP_REQ_PATH)
         req_utils.replace_requirement(
-            pkg_name, version="1.0.0", req_filepath=req_path, use_wool=False
+            pkg_name, version="1.0.0", req_filepath=TMP_REQ_PATH, use_wool=False
         )
         expected = "odoo-addon-foo == 1.0.0\n"
-        with open(req_path) as fd:
-            assert fd.read() == expected
+        assert TMP_REQ_PATH.read_text() == expected
 
 
 def test_allowed_version():
-    a2 = req_utils.get_addon_requirement("odoo-addon-name2", req_filepath=fake_req)
+    a2 = req_utils.get_addon_requirement("odoo-addon-name2", req_filepath=FAKE_REQ_PATH)
     assert req_utils.allowed_version(a2, "1.8.0")
     assert not req_utils.allowed_version(a2, "2.0.1")
     assert not req_utils.allowed_version(a2, "2.1.0")
