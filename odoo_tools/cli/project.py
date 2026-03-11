@@ -26,6 +26,7 @@ from ..utils.proj import (
 )
 
 
+# TODO: proj_tmpl_ver=2 is deprecated
 def get_proj_tmpl_ver():
     ver = os.getenv("PROJ_TMPL_VER")
     if ver:
@@ -153,7 +154,7 @@ def convert_history_to_towncrier(history_path):
 def get_init_template_files():
     return (
         {
-            "source": f".proj.v{get_proj_tmpl_ver()}.cfg",
+            "source": f".proj.v{get_proj_tmpl_ver() or '1'}.cfg",
             "destination": build_path(f"./{PROJ_CFG_FILE}"),
             "check": lambda source_path, dest_path: not dest_path.exists(),
         },
@@ -235,7 +236,7 @@ def cli():
     "-v",
     "--version",
     "version",
-    help="Use 1 for a project using the 'old image' format, and 2 for 'new image'",
+    help="Use 1 for a project using the 'old image' format, and 2 for 'new image' (deprecated)",
 )
 @click.option(
     "-b",
@@ -290,6 +291,7 @@ def checkout_local_odoo(
     locally (you will still need docker to get the correct versions of the source code, unless you pass the hashes
     on the command line).
     """
+    # TODO: proj_tmpl_ver=2 is deprecated (this command is v2-only)
     if config.template_version == 1:
         ui.exit_msg("This command is not support on this project version;")
     odoo_src_dest = config.odoo_src_rel_path / "odoo"

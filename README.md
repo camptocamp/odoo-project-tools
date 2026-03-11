@@ -61,7 +61,7 @@ Use the `init` command to initialize a new project to use these tools.
 
 Example:
 
-    PROJ_TMPL_VER=1 otools-project init
+    otools-project init
 
 This will create all configuration files that must be added to the project.
 
@@ -172,66 +172,6 @@ otools-cloud dump download --env prod --name celebrimbor-database-name.pg.gpg --
 ```
 otools-cloud dump upload --from-db odoodb --env labs.my-lab
 ```
-
-## Project conversion
-
-Create a new checkout of the project you are working on, with the submodules up-to-date.
-
-Go to the root of your project and follow the steps below:
-
-1. Run sync from odoo-template using the `core_image` version.
-
-    ```
-    invoke project.sync --version core_image
-    ```
-
-1. Initialize the project at v1
-
-    ```
-    PROJ_TMPL_VER=1 otools-project init
-    ```
-
-1. Stage new files and commit
-
-    ```
-    git add .
-    git commit -m "Initialize project v1"
-    ```
-
-    You can always reset hard to this commit when trying the conversion to v2
-    ;) (don't forget to update the project submodules again, as they will
-    certainly have been reset)
-
-1. Run the conversion script
-
-    ```
-    otools-conversion
-    ```
-
-    The script will move things around, remove some of the submodules (odoo/src,
-    odoo/external-src/enterprise and odoo/external-src/odoo-cloud-platform), and
-    when done display a message about what further manual steps are required, and
-    what you need to check for. These steps will also be saved to a file (see step 9 below).
-
-    Be careful, if you need to redo these steps, the submodules will have
-    been removed by the script, you will need to run `git submodule update -i` again.
-
-1.  Install pre-commit and run it on all files
-
-    ```
-    pre-commit install
-    pre-commit run --all-files
-    ```
-    Manually fix the issues that pre-commit is unable to fix by itself
-
-1.  Stage all changes and commit
-
-    ```
-    git add .
-    git commit -m "Convert to proj v2"
-    ```
-
-1.  Follow the steps in the generated `V2_MIG_NEXT_STEPS.todo` file
 
 ### otools-i18n
 

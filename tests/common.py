@@ -58,6 +58,7 @@ FAKE_PROJ_CFG_V1 = dict(
     version_file_rel_path="odoo/VERSION",
     marabunta_mig_file_rel_path="odoo/migration.yml",
 )
+# TODO: proj_tmpl_ver=2 is deprecated
 FAKE_PROJ_CFG_V2 = dict(
     template_version="2",
     company_git_remote="camptocamp",

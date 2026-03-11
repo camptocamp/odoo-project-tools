@@ -73,6 +73,7 @@ class ProjectConfig(BaseModel):
         use_attribute_docstrings=True,
     )
 
+    # TODO: proj_tmpl_ver=2 is deprecated
     template_version: int = 1
     """The project template version."""
 
@@ -83,8 +84,8 @@ class ProjectConfig(BaseModel):
     """The path to the Odoo source code.
 
     For v1 projects, this is the path to the odoo/odoo submodule.
-    For v2 projects, this is the path where both odoo/odoo and odoo/enterprise
-    are located.
+    For v2 projects (deprecated), this is the path where both odoo/odoo and
+    odoo/enterprise are located.
     """
 
     ext_src_rel_path: Path

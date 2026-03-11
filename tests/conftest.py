@@ -45,6 +45,7 @@ def project(request, runner):
 @pytest.fixture(
     params=[
         pytest.param(1, marks=pytest.mark.project_setup(proj_tmpl_ver=1)),
+        # TODO: proj_tmpl_ver=2 is deprecated
         pytest.param(2, marks=pytest.mark.project_setup(proj_tmpl_ver=2)),
     ],
     ids=[
