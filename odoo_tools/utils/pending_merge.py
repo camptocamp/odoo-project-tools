@@ -61,6 +61,7 @@ class Repo:
         submodule_name = self._safe_repo_name(name_or_path)
         if self.template_version == 1 and submodule_name in ("odoo", "ocb", "src"):
             return self.odoo_src_rel_path
+        # TODO: proj_tmpl_ver=2 is deprecated
         elif self.template_version == 2 and submodule_name in ("odoo", "enterprise"):
             return self.odoo_src_rel_path / submodule_name
         return self.ext_src_rel_path / submodule_name
@@ -72,6 +73,7 @@ class Repo:
         as it is known at Github
         """
         repo_name = self._safe_repo_name(name_or_path)
+        # TODO: proj_tmpl_ver=2 is deprecated (v1 has special handling below)
         if self.template_version == 1 and repo_name.lower() in ("odoo", "ocb"):
             repo_name = "src"
         base_path = self.pending_merge_abs_path
@@ -132,6 +134,7 @@ class Repo:
         self.pending_merge_abs_path.mkdir(parents=True, exist_ok=True)
 
         oca_ocb_remote = False
+        # TODO: proj_tmpl_ver=2 is deprecated (v1 has OCA/OCB handling below)
         if (
             self.template_version == 1
             and upstream.lower() == "odoo"
@@ -166,6 +169,7 @@ class Repo:
         if self.template_version == 1:
             if oca_ocb_remote:
                 base_merge = "{} {}".format("oca", odoo_version)
+        # TODO: proj_tmpl_ver=2 is deprecated
         elif self.template_version == 2:
             if self.name.lower() in ("odoo", "enterprise"):
                 odoo_hash, enterprise_hash = get_docker_image_commit_hashes()
@@ -177,6 +181,7 @@ class Repo:
 
     def update_pending_merges_file_base_merge(self, skip_questions: bool = False):
         """Checks that the base merge for an odoo/enterprise repository us up-to-date"""
+        # TODO: proj_tmpl_ver=2 is deprecated (this method is v2-only)
         if self.template_version == 1:
             return
         if self.name.lower() not in ("odoo", "enterprise"):
@@ -206,6 +211,7 @@ class Repo:
         self.update_merges_config(config)
 
     def add_pending_pull_request(self, upstream, pull_id):
+        # TODO: proj_tmpl_ver=2 is deprecated
         if self.template_version == 2 and self.name.lower() in ("odoo", "enterprise"):
             ui.exit_msg(
                 "Sorry, adding a pending Pull Request to Odoo repositories is not "
@@ -279,7 +285,7 @@ class Repo:
                 f"git fetch {upstream} {commit_sha}",
                 f'git am "$(git format-patch -1 {commit_sha} -o ../patches)"',
             ]
-        # self.template_version == 2
+        # TODO: proj_tmpl_ver=2 is deprecated
         if self.name.lower() in ("odoo", "enterprise"):
             # For Odoo repositories, we store the patch in a subdirectory
             # This patch will be applied when the image is built.
@@ -635,6 +641,7 @@ def add_pending(entity_url, aggregate=True, patch=False, push=True):
     if not repo.has_pending_merges():
         repo.generate_pending_merges_file_template(upstream)
 
+    # TODO: proj_tmpl_ver=2 is deprecated
     if repo.template_version == 2:
         repo.update_pending_merges_file_base_merge()
 
