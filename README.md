@@ -58,10 +58,11 @@ Use `--help` to get the list of subcommands.
 ### otools-project
 
 Use the `init` command to initialize a new project to use these tools.
+If you have the need. You can specify also the version of the template.
 
 Example:
 
-    otools-project init
+    PROJ_TMPL_VER=1 otools-project init
 
 This will create all configuration files that must be added to the project.
 
