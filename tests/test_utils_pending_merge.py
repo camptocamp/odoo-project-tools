@@ -260,6 +260,34 @@ def test_remove_pending_pr():
     assert merges == expected
 
 
+@pytest.mark.usefixtures("all_template_versions")
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="14.0"), proj_version="14.0.0.1.0"
+)
+def test_remove_pending_last_pr():
+    """Test removing the last pending PR deletes the merges file."""
+    name = "edi"
+    # Template with only one pending PR (besides the base branch)
+    tmpl = """
+../{ext_src_rel_path}/{repo_name}:
+    remotes:
+        camptocamp: git@github.com:camptocamp/{repo_name}.git
+        {org_name}: git@github.com:{org_name}/{repo_name}.git
+    target: camptocamp merge-branch-{pid}-master
+    merges:
+    - {org_name} 14.0
+    - {org_name} refs/pull/774/head
+"""
+    mock_pending_merge_repo_paths(name, tmpl=tmpl)
+    repo = Repo(name, path_check=False)
+    merges = repo.merges_config().get("merges", [])
+    assert merges == ["OCA 14.0", "OCA refs/pull/774/head"]
+    # Remove the only pending PR via the top-level function
+    with mock.patch.object(Repo, "_handle_empty_merges_file") as mock_handle:
+        pm_utils.remove_pending("https://github.com/OCA/edi/pull/774")
+    mock_handle.assert_called_once()
+
+
 # TODO: test all cases
 def __test_add_pending_commit_from_scratch():
     name = "edi"

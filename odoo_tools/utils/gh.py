@@ -59,7 +59,8 @@ def get_current_rebase_branch():
         # directories, in a file named "head-name"
         rebase_dir = run(f"git rev-parse --git-path {rebase_file}")
         rebase_dir = Path(rebase_dir)
-        if rebase_dir.exists():
+        rebase_head_name = rebase_dir / "head-name"
+        if rebase_head_name.exists():
             head_name = (rebase_dir / "head-name").read_text().strip()
             current_branch = head_name.replace("refs/heads/", "")
             break
