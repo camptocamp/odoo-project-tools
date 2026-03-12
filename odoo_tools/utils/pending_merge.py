@@ -686,15 +686,9 @@ def remove_pending(entity_url, aggregate=True):
 
     # check if that file is useless since it has an empty `merges` section
     # if it does - drop it instead of writing a new file version
-    # only the upstream branch is present in `merges`
-    # first item is `- oca 11.0` or similar
-    config = repo.merges_config()
-    pending_merges_present = len(config["merges"]) > 1
-    patches = len(config.get("shell_command_after", {}))
-
-    if not pending_merges_present and not patches:
-        repo.abs_merges_path.unlink()
-    if aggregate:
+    if not repo.has_any_pr_left():
+        repo._handle_empty_merges_file(delete_file=True)
+    elif aggregate:
         aggregator = repo.get_aggregator()
         aggregator.aggregate()
     return repo
