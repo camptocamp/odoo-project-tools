@@ -10,5 +10,5 @@ Run
     git push --tags && git push
     python3 -m build
 
-
-then create a release on https://github.com/camptocamp/odoo-project-tools/releases and upload the wheel you will find in the [dist](dist/) directory to the release.
+Then [create a release](https://github.com/camptocamp/odoo-project-tools/releases)
+and upload the wheel you will find in the [dist](dist/) directory to the release.
