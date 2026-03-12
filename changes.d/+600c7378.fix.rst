@@ -1,0 +1,1 @@
+otools-pending add: update .gitmodules when adding first pending merge

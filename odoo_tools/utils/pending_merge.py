@@ -178,6 +178,7 @@ class Repo:
 
         config.insert(2, "merges", CommentedSeq([base_merge]))
         self.update_merges_config(config)
+        git.submodule_set_url(self.path, remote_company_url)
 
     def update_pending_merges_file_base_merge(self, skip_questions: bool = False):
         """Checks that the base merge for an odoo/enterprise repository us up-to-date"""
