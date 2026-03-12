@@ -5,7 +5,7 @@ import pytest
 
 from odoo_tools.cli import submodule
 
-from .common import get_fixture_path, mock_subprocess_run
+from .common import get_fixture_path, mock_pending_merge_repo_paths, mock_subprocess_run
 
 
 @pytest.mark.project_setup(
@@ -150,6 +150,26 @@ def test_ls(project):
         "odoo/external-src/account-closing",
         "odoo/external-src/account-financial-reporting",
     ]
+
+
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
+)
+def test_push(project):
+    mock_pending_merge_repo_paths("some-repo", src=True, pending=True)
+    with mock.patch.object(
+        submodule.pm_utils.Repo, "push_to_remote"
+    ) as mock_push_to_remote:
+        result = project.invoke(
+            submodule.push,
+            ["some-repo", "--target-branch", "my-target-branch"],
+            catch_exceptions=False,
+        )
+    assert result.exit_code == 0
+    mock_push_to_remote.assert_called_once_with(target_branch="my-target-branch")
+    assert "my-target-branch" in result.output
+    assert "Done." in result.output
 
 
 @pytest.mark.project_setup(

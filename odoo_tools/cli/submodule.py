@@ -130,5 +130,21 @@ def sync_remote(submodule_path=None, repo=None, force_remote=False):
                 git.checkout(branch_name=odoo_version)
 
 
+@cli.command()
+@click.argument("submodule_path")
+@click.option(
+    "--target-branch",
+    default=None,
+    help="Target branch name. If omitted, computed automatically.",
+)
+def push(submodule_path, target_branch=None):
+    """Push the current state of a submodule to the company remote."""
+    repo = pm_utils.Repo(submodule_path)
+    target_branch = target_branch or pm_utils.gh.get_target_branch()
+    ui.echo(f"Pushing {repo.name} to {repo.company_git_remote}/{target_branch}")
+    repo.push_to_remote(target_branch=target_branch)
+    ui.echo("Done.")
+
+
 if __name__ == "__main__":
     cli()

@@ -602,6 +602,13 @@ class Repo:
         ):
             self.abs_merges_path.unlink()
 
+    def push_to_remote(self, target_branch=None):
+        target_branch = target_branch or gh.get_target_branch()
+        aggregator = self.get_aggregator(target_branch=target_branch)
+        with cd(self.abs_path):
+            aggregator._switch_to_branch(target_branch)
+            aggregator.push()
+
     def rebuild_consolidation_branch(self, push=False):
         aggregator = self.get_aggregator()
         aggregator.aggregate()
