@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest import mock
 
 import pytest
+from git.config import GitConfigParser
 
 from odoo_tools.exceptions import Exit, PathNotFound
 from odoo_tools.utils import pending_merge as pm_utils
@@ -110,6 +111,14 @@ def test_add_pending_pr_from_scratch():
     repo_name = "edi-framework"
     mock_pending_merge_repo_paths(repo_name, pending=False)
     repo = Repo(repo_name, path_check=False)
+    # Setup .gitmodules pointing to the upstream (OCA)
+    with Path(".gitmodules").open("w") as f:
+        f.write(
+            f'[submodule "{repo.path}"]\n'
+            f"\tpath = {repo.path}\n"
+            f"\turl = git@github.com:OCA/{repo_name}.git\n"
+            f"\tbranch = 16.0\n"
+        )
     repo.generate_pending_merges_file_template("OCA")
     repo.add_pending_pull_request("OCA", 778)
     expected = {
@@ -121,6 +130,10 @@ def test_add_pending_pr_from_scratch():
         "target": "camptocamp merge-branch-1234-master",
     }
     compare_dict(repo.merges_config(), expected)
+    # .gitmodules should now point to the company fork
+    config = GitConfigParser(".gitmodules", read_only=True)
+    url = config.get(f'submodule "{repo.path}"', "url")
+    assert url == f"git@github.com:camptocamp/{repo_name}.git"
 
 
 # TODO: test all cases
@@ -152,6 +165,14 @@ def test_add_pending_pr():
 @pytest.mark.project_setup(proj_tmpl_ver=1)
 def test_add_pending_odoo_pr_v1():
     repo = Repo("odoo", path_check=False)
+    # Setup .gitmodules pointing to the upstream (odoo)
+    with Path(".gitmodules").open("w") as f:
+        f.write(
+            f'[submodule "{repo.path}"]\n'
+            f"\tpath = {repo.path}\n"
+            f"\turl = git@github.com:odoo/odoo.git\n"
+            f"\tbranch = 14.0\n"
+        )
     # 1: start with no pending merges, generate the pending merges file
     assert not repo.has_pending_merges()
     with mock.patch("odoo_tools.utils.ui.ask_confirmation", return_value=True):
@@ -170,6 +191,10 @@ def test_add_pending_odoo_pr_v1():
             "target": "camptocamp merge-branch-1234-master",
         },
     )
+    # .gitmodules should now point to the company fork
+    config = GitConfigParser(".gitmodules", read_only=True)
+    url = config.get(f'submodule "{repo.path}"', "url")
+    assert url == "git@github.com:camptocamp/odoo.git"
     # 2: add a pending merge
     with mock.patch("odoo_tools.utils.ui.ask_confirmation", return_value=True):
         repo.add_pending_pull_request("odoo", 778)
