@@ -146,5 +146,45 @@ def push(submodule_path, target_branch=None):
     ui.echo("Done.")
 
 
+@click.command()
+@click.argument("submodule_path", required=False, default=None)
+@click.option(
+    "--force-branch", default=None, help="Force checkout of a specific branch"
+)
+def upgrade(submodule_path, force_branch):
+    """Upgrade submodules to their latest remote commit.
+
+    For submodules with pending merges, purge merged PRs first and
+    re-aggregate if needed.
+    """
+    odoo_version = proj.get_project_manifest_key("odoo_version")
+    with path.cd(path.root_path()):
+        for submodule in git.iter_gitmodules(filter_path=submodule_path):
+            repo = pm_utils.Repo(submodule.path, path_check=False)
+            if repo.has_pending_merges():
+                ui.echo(f"Purging merged PRs for {submodule.path}")
+                repo.show_prs(purge="merged", yes_all=True)
+            if repo.has_pending_merges():
+                ui.echo(f"Rebuilding consolidation branch for {submodule.path}")
+                repo.rebuild_consolidation_branch(push=True)
+                continue
+            # No pending merges: upgrade to latest remote
+            branch = force_branch
+            if not branch and submodule.branch and submodule.branch != odoo_version:
+                ui.echo(
+                    f"WARNING: {submodule.path} branch is {submodule.branch}"
+                    f" (expected {odoo_version})"
+                )
+                if not ui.ask_confirmation(f"Upgrade {submodule.path} anyway?"):
+                    continue
+            try:
+                git.submodule_update(submodule.path)
+                git.submodule_upgrade(submodule.path, submodule.url, branch=branch)
+            except Exception as e:
+                ui.echo(f"ERROR upgrading {submodule.path}: {e}", fg="red")
+                ui.echo(f"Rolling back {submodule.path}")
+                git.submodule_update(submodule.path)
+
+
 if __name__ == "__main__":
     cli()

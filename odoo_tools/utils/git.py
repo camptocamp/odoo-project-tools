@@ -176,3 +176,45 @@ def get_current_branch():
 
 def delete_branch(branch_name):
     run(["git", "branch", "-D", branch_name])
+
+
+def get_submodule_commit(path):
+    """Return the current HEAD commit of a submodule, or None on error."""
+    abs_path = str(build_path(path))
+    try:
+        return run(["git", "-C", abs_path, "rev-parse", "HEAD"])
+    except subprocess.CalledProcessError:
+        return None
+
+
+def submodule_upgrade(path, url, branch=None):
+    """Upgrade a submodule to the latest remote commit.
+
+    :param path: submodule path (relative to project root)
+    :param url: submodule remote url
+    :param branch: if set, force checkout of this specific branch
+    :returns: True if the submodule was upgraded, False otherwise
+    """
+    commit_before = get_submodule_commit(path)
+    abs_path = str(build_path(path))
+    if branch:
+        run(["git", "-C", abs_path, "reset", "HEAD", "--hard"], check=True)
+        run(["git", "-C", abs_path, "fetch", url], check=True)
+        run(["git", "-C", abs_path, "checkout", branch], check=True)
+    else:
+        cmd = ["git", "submodule", "update", "-f", "--remote", "--checkout"]
+        # Use git-autoshare if available
+        submodule = next(iter_gitmodules(filter_path=path), None)
+        if submodule:
+            __, autoshare_repo = find_autoshare_repository([submodule.url])
+            if autoshare_repo and Path(autoshare_repo.repo_dir).exists():
+                cmd += ["--reference", autoshare_repo.repo_dir]
+        cmd.append(str(path))
+        run(cmd, check=True)
+    commit_after = get_submodule_commit(path)
+    if commit_before != commit_after:
+        ui.echo(f"UPGRADED {path}: {commit_before} -> {commit_after}")
+        return True
+    else:
+        ui.echo(f"NOT UPGRADED {path}: already up to date ({commit_before})")
+        return False
