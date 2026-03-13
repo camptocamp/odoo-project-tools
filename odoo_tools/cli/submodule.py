@@ -146,7 +146,7 @@ def push(submodule_path, target_branch=None):
     ui.echo("Done.")
 
 
-@click.command()
+@cli.command()
 @click.argument("submodule_path", required=False, default=None)
 @click.option(
     "--force-branch", default=None, help="Force checkout of a specific branch"
