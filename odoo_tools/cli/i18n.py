@@ -8,8 +8,42 @@ import click
 from rich.console import Console
 
 from .. import utils
+from ..utils.proj import get_odoo_serie
 
 console = Console()
+
+
+def _build_odoo_i18n_export_cmd(module_name, language, database, export_path):
+    """Build the odoo command to export i18n files."""
+    # Starting from Odoo 19.0, the --i18n-export flag was replaced by a
+    # dedicated `odoo i18n export` subcommand.
+    odoo_serie = int(get_odoo_serie())
+    if odoo_serie >= 19:
+        odoo_cmd = [
+            "odoo",
+            "i18n",
+            "export",
+            "--database",
+            database,
+            "--languages",
+            language if language is not None else "pot",
+            "--output",
+            str(export_path),
+            module_name,
+        ]
+    else:
+        odoo_cmd = [
+            "odoo",
+            "--log-level=warn",
+            "--workers=0",
+            f"--database={database}",
+            "--stop-after-init",
+            f"--i18n-export={export_path}",
+            f"--modules={module_name}",
+        ]
+        if language is not None:
+            odoo_cmd.append(f"--language={language}")
+    return odoo_cmd
 
 
 @click.group()
@@ -134,17 +168,12 @@ def export(module_paths, languages, clean_db, init_db, export_pot):
                     )
                     i18n_rel_path = Path(module_name) / "i18n" / i18n_filename
                     status.update(f"({progress}) {i18n_rel_path}...")
-                    odoo_cmd = [
-                        "odoo",
-                        "--log-level=warn",
-                        "--workers=0",
-                        "--database=tmp_generate_pot",
-                        "--stop-after-init",
-                        f"--i18n-export={container_volume_path / i18n_filename}",
-                        f"--modules={module_name}",
-                    ]
-                    if language is not None:
-                        odoo_cmd.append(f"--language={language}")
+                    odoo_cmd = _build_odoo_i18n_export_cmd(
+                        module_name=module_name,
+                        language=language,
+                        database="tmp_generate_pot",
+                        export_path=container_volume_path / i18n_filename,
+                    )
                     utils.os_exec.run(
                         utils.docker_compose.run(
                             "odoo",

@@ -1,0 +1,1 @@
+otools-i18n export: compatibility with Odoo 19.0
