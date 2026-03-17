@@ -12,9 +12,7 @@ SHARED_C2C_FOLDER_PREFIX = "Shared-C2C-Odoo-External/"
 LastpassEntry = namedtuple("LastpassEntry", "path location name username comment")
 
 
-def make_lastpass_entry(
-    env, project, shortname, name, username="", location="", comment=""
-):
+def make_lastpass_entry(env, project, shortname, username="", location="", comment=""):
     """Create a LastpassEntry namedtuple."""
     name = f"[odoo-{env}] {shortname}"
     return LastpassEntry(

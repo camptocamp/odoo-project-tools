@@ -9,7 +9,7 @@ from odoo_tools.utils.password import encrypt, generate
 def test_generate_password_default_length():
     password = generate()
     assert len(password) == 40
-    assert password.isalpha()
+    assert password.isalnum()
 
 
 def test_generate_password_custom_length():

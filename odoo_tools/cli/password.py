@@ -47,7 +47,7 @@ def generate_admin_password(store_in_lastpass):
             print(line.replace(placeholder, encrypted), end="")
 
     if not found:
-        raise utils.ui.exit_msg(f"Placeholder '{placeholder}' not found in {pre_file}")
+        utils.ui.exit_msg(f"Placeholder '{placeholder}' not found in {pre_file}")
 
     console.print(f"[bold]Admin password:[/bold] {password}")
     console.print(f"[bold]Encrypted admin password:[/bold] {encrypted}")
@@ -80,7 +80,6 @@ def _store_in_lastpass(password, username="admin"):
             env,
             project=project_name,
             shortname=shortname,
-            name=shortname,
             username=username,
             location=location,
             comment=comment,
@@ -88,9 +87,9 @@ def _store_in_lastpass(password, username="admin"):
         try:
             with console.status("Storing password in LastPass..."):
                 lpass_utils.store_password_in_lastpass(entry, password)
-        except Exception as e:
+        except Exception:
             console.print(f"❌ Unable to store Password in LastPass: {entry.location}")
-            raise e
+            raise
         else:
             console.print(f"✅ Password stored in LastPass: {entry.location}")
             console.print(lpass_utils.format_lastpass_entry(entry, password))
