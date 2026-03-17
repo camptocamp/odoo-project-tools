@@ -36,8 +36,6 @@ The package brings the following commands.
 
 `otools-release`: bump releases
 
-`otools-addon`: tools to work with addons and test requirements
-
 `otools-submodule`: manage submodules
 
 `otools-tasks`: access to the "old" invoke tasks, yet to be rewritten
@@ -97,21 +95,6 @@ It takes care of:
 
 Run `otools-release bump --help` to know more about the options.
 
-
-### otools-addon
-
-NOTE: this tool is meant to be used mostly for future project versions
-where we'll have all modules installed via pip.
-
-The most handy feature at the moment is: `otools-addon add-req`.
-
-It allows to add requiments and test requirements on the fly to an existing req file.
-
-Example:
-
-    otools-addon add-req edi_oca -v 18 -p $pr_ref -f test-requirements.txt
-
-This will add the test dependency in the right way to the given file.
 
 ### otools-db
 
