@@ -16,7 +16,6 @@ classifiers = [
     "Natural Language :: English",
 ]
 dependencies = [
-    "invoke==2.2.1",
     "requests==2.32.5",
     "git-aggregator>=4.1",
     "git-autoshare",
@@ -49,7 +48,6 @@ documentation = "https://github.com/camptocamp/odoo-project-tools"
 repository = "https://github.com/camptocamp/odoo-project-tools"
 
 [project.scripts]
-otools-tasks = "odoo_tools.tasks.main:program.run"
 otools-project = "odoo_tools.cli.project:cli"
 otools-addon = "odoo_tools.cli.addon:cli"
 otools-submodule = "odoo_tools.cli.submodule:cli"
