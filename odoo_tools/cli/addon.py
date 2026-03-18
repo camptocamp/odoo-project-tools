@@ -7,8 +7,10 @@ import click
 from ..utils import pending_merge as pm_utils
 from ..utils import req as req_utils
 from ..utils import ui
+from ..utils.config import config
 from ..utils.misc import SmartDict
 from ..utils.os_exec import run
+from ..utils.path import build_path, is_odoo_module
 from ..utils.pkg import Package
 from ..utils.proj import get_odoo_serie
 from ..utils.pypi import odoo_name_to_pkg_name
@@ -227,6 +229,33 @@ def add_requirement(name, **kw):
         ui.echo("")
         ui.echo(line)
         ui.echo("")
+
+
+@cli.command()
+@click.argument("name")
+def where(name):
+    """Locate an addon by name across the project's addon directories."""
+    search_paths = []
+    local_src = build_path(config.local_src_rel_path)
+    ext_src = build_path(config.ext_src_rel_path)
+    odoo_src = build_path(config.odoo_src_rel_path)
+    # local-src: direct children
+    search_paths.append(local_src / name)
+    # external-src: children of subdirectories (each subdir is a repo)
+    if ext_src.is_dir():
+        for repo_dir in sorted(ext_src.iterdir()):
+            if repo_dir.is_dir():
+                search_paths.append(repo_dir / name)
+    # Odoo community addons
+    search_paths.append(odoo_src / "addons" / name)
+    # Odoo base addons
+    search_paths.append(odoo_src / "odoo" / "addons" / name)
+
+    found = [path for path in search_paths if is_odoo_module(path)]
+    if not found:
+        ui.exit_msg(f"Addon '{name}' not found")
+    for path in found:
+        click.echo(path)
 
 
 if __name__ == "__main__":

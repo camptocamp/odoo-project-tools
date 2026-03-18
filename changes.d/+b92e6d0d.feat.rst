@@ -1,0 +1,1 @@
+otools-addon where: finds an addon by name
