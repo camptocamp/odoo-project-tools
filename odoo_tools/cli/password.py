@@ -1,7 +1,6 @@
 # Copyright 2025 Camptocamp SA (https://www.camptocamp.com).
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
-import fileinput
 from datetime import date
 
 import click
@@ -39,14 +38,10 @@ def generate_admin_password(store_in_lastpass):
     # Replace placeholder in pre.py
     placeholder = "__GENERATED_ADMIN_PASSWORD__"
     pre_file = build_path("odoo/songs/install/pre.py")
-    found = False
-    with fileinput.FileInput(pre_file, inplace=True) as file:
-        for line in file:
-            if placeholder in line:
-                found = True
-            print(line.replace(placeholder, encrypted), end="")
-
-    if not found:
+    content = pre_file.read_text()
+    if placeholder in content:
+        pre_file.write_text(content.replace(placeholder, encrypted))
+    else:
         utils.ui.exit_msg(f"Placeholder '{placeholder}' not found in {pre_file}")
 
     console.print(f"[bold]Admin password:[/bold] {password}")
