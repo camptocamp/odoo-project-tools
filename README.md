@@ -125,11 +125,24 @@ Options:
   --help   Show this message and exit.
 
 Commands:
+  addons         Addons management commands.
   dump           Create a PostgreSQL dump of the specified database.
   list           List all databases in the container.
   list-versions  Print a table of DBs with Marabunta version and install...
   restore        Restore an odoo backup locally (sql, dump or zip archive)
 ```
+
+#### otools-db addons list
+
+List installed addons in the database.
+
+```
+otools-db addons list
+otools-db addons list --database mydb
+otools-db addons list --json
+```
+
+By default, it queries the `odoodb` database and displays a rich table with name, title, and version columns. Use `--json` for machine-readable output.
 
 ### otools-cloud
 

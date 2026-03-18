@@ -1,6 +1,7 @@
 # Copyright 2025 Camptocamp SA (https://www.camptocamp.com).
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -122,6 +123,47 @@ def dump(db_name, output_path, format):
     Defaults to the current directory.
     """
     utils.db.dump_db(db_name, output_path, format)
+
+
+@cli.group()
+def addons():
+    """Addons management commands."""
+    pass
+
+
+@addons.command("list")
+@click.option("--database", "-d", default="odoodb", help="Database name to query.")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON.")
+@utils.click.handle_exceptions()
+def addons_list(database, as_json):
+    """List installed addons in the database."""
+    odoo_serie = int(utils.proj.get_odoo_serie())
+    if odoo_serie >= 17:
+        shortdesc_column = "shortdesc->>'en_US'"
+    else:
+        shortdesc_column = "shortdesc"
+    sql = f"""
+        SELECT name, {shortdesc_column} as shortdesc, latest_version
+        FROM ir_module_module
+        WHERE state = 'installed'
+        ORDER BY name
+    """
+    with console.status("Querying installed addons..."):
+        rows = utils.db.execute_db_request(database, sql)
+    if as_json:
+        data = [
+            {"name": name, "title": title, "version": version}
+            for name, title, version in rows
+        ]
+        click.echo(json.dumps(data, indent=2))
+        return
+    elif not rows:
+        click.echo("No installed addons found.")
+        return
+    table = Table("Name", "Title", "Version")
+    for name, title, version in rows:
+        table.add_row(name, title, version)
+    console.print(table)
 
 
 if __name__ == "__main__":
