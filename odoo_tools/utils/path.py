@@ -72,4 +72,6 @@ def make_dir(path_dir):
 
 def is_odoo_module(path: Path) -> bool:
     """Check if a path is a valid Odoo module."""
-    return path.is_dir() and (path / "__manifest__.py").exists()
+    return path.is_dir() and (
+        (path / "__manifest__.py").exists() or (path / "__openerp__.py").exists()
+    )
