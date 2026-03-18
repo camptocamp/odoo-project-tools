@@ -40,8 +40,6 @@ The package brings the following commands.
 
 `otools-submodule`: manage submodules
 
-`otools-tasks`: access to the "old" invoke tasks, yet to be rewritten
-
 `otools-ba`: tools for functional people, see [documentation](docs/otools-ba.md).
 
 `otools-pr`: tools to test pull request on a local odoo running a database dump, see [documentation](docs/otools-pr.md).
