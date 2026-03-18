@@ -120,6 +120,7 @@ def make_fake_project_root(
     # Write the extra files
     if extra_files:
         for path, content in extra_files.items():
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
             Path(path).write_text(content)
 
 

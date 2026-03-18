@@ -52,6 +52,8 @@ The package brings the following commands.
 
 `otools-i18n`: tools to manage internationalization (i18n)
 
+`otools-password`: tools to manage admin passwords and LastPass entries
+
 Use `--help` to get the list of subcommands.
 
 
@@ -195,3 +197,39 @@ otools-i18n export odoo/addons/module1 odoo/addons/module2 --languages fr_FR,de_
 This will export the translation files for the given modules and languages.
 
 The `--export-pot` option can be used to also export the pot file for the given modules.
+
+### otools-password
+
+Tools to manage admin passwords and LastPass entries.
+
+```
+Usage: otools-password [OPTIONS] COMMAND [ARGS]...
+
+  Password management tools.
+
+Options:
+  --debug
+  --help   Show this message and exit.
+
+Commands:
+  generate-admin-password  Generate a random admin password and initialize it into songs.
+```
+
+#### Generate an admin password
+
+```
+otools-password generate-admin-password
+```
+
+This generates a random password, encrypts it with pbkdf2_sha512, and replaces
+the `__GENERATED_ADMIN_PASSWORD__` placeholder in `odoo/songs/install/pre.py`.
+
+#### Generate and store in LastPass
+
+```
+otools-password generate-admin-password --store-in-lastpass
+```
+
+This does the same as above, and additionally creates two entries in LastPass
+(prod and integration) under the `Shared-C2C-Odoo-External/` folder.
+Requires the `lpass` CLI to be installed and authenticated.
