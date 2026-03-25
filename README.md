@@ -100,18 +100,59 @@ Run `otools-release bump --help` to know more about the options.
 
 ### otools-addon
 
-NOTE: this tool is meant to be used mostly for future project versions
-where we'll have all modules installed via pip.
+Tools to work with addons and test requirements.
 
-The most handy feature at the moment is: `otools-addon add-req`.
+```
+Usage: otools-addon [OPTIONS] COMMAND [ARGS]...
 
-It allows to add requiments and test requirements on the fly to an existing req file.
+Options:
+  --help  Show this message and exit.
 
-Example:
+Commands:
+  add-req  Generate a python requirement line.
+  where    Locate an addon by name across the project's addon directories.
+```
 
-    otools-addon add-req edi_oca -v 18 -p $pr_ref -f test-requirements.txt
+#### otools-addon add-req
 
-This will add the test dependency in the right way to the given file.
+```
+Usage: otools-addon add-req [OPTIONS] NAME
+
+  Generate a python requirement line.
+
+  You can simply copy the output and paste it in a requirements.txt file or
+  pass the --file option to append it to a file.
+
+  Example for a simple requirement line:
+
+      otools-addon add-req edi_oca -v 18 -f dev-requirements.txt
+
+  Example for a PR:
+
+      otools-addon add-req edi_oca -v 18 -p $pr_ref -f test-requirements.txt
+
+Options:
+  -v, --version TEXT
+  -p, --pr TEXT
+  -b, --branch TEXT
+  -r, --repo-name TEXT
+  -u, --upstream TEXT
+  -f, --file TEXT       file to add the requirement to
+  --odoo / --no-odoo    use --no-odoo to install a python module which is not
+                        an Odoo addon
+  --help                Show this message and exit.
+```
+
+#### otools-addon where
+
+```
+Usage: otools-addon where [OPTIONS] NAME
+
+  Locate an addon by name across the project's addon directories.
+
+Options:
+  --help  Show this message and exit.
+```
 
 ### otools-db
 
