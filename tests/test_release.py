@@ -20,11 +20,13 @@ from .common import (
 
 def test_make_bumpversion_cmd():
     cmd = release.make_bumpversion_cmd("patch")
-    assert cmd == "bumpversion --list patch"
+    assert cmd == "bump-my-version bump patch"
     cmd = release.make_bumpversion_cmd("patch", new_version="14.0.1.2.0")
-    assert cmd == "bumpversion --list --new-version 14.0.1.2.0 patch"
+    assert cmd == "bump-my-version bump --new-version 14.0.1.2.0 patch"
     cmd = release.make_bumpversion_cmd("patch", new_version="14.0.1.2.0", dry_run=True)
-    assert cmd == "bumpversion --list --new-version 14.0.1.2.0 --dry-run patch"
+    assert (
+        cmd == "bump-my-version bump --new-version 14.0.1.2.0 --dry-run --verbose patch"
+    )
 
 
 def test_make_towncrier_cmd():
@@ -62,7 +64,7 @@ def test_bump():
             release.bump, ["--type", "major", "--dry-run"], catch_exceptions=False
         )
         assert result.output.splitlines() == [
-            "Running: bumpversion --list --dry-run major",
+            "Running: bump-my-version bump --dry-run --verbose major",
             "New version: 15.0.1.0.0",
         ]
         assert ver_file.read_text() == "15.0.0.0.1"
@@ -105,7 +107,7 @@ def test_bump_changelog():
             hist_part_1 + new_part + hist_part_2,
         )
         assert result.output.splitlines() == [
-            "Running: bumpversion --list minor",
+            "Running: bump-my-version bump minor",
             "Running: towncrier build --yes --version=14.0.0.2.0",
             "Updating marabunta migration file",
             "Push local branches? [y/N]: n",
@@ -126,7 +128,7 @@ def test_bump_update_marabunta_file():
         # TODO: improve these checks
         assert "14.0.0.2.0" in content
         assert result.output.splitlines() == [
-            "Running: bumpversion --list minor",
+            "Running: bump-my-version bump minor",
             "Running: towncrier build --yes --version=14.0.0.2.0",
             "Updating marabunta migration file",
             "Push local branches? [y/N]: ",
@@ -253,7 +255,7 @@ def test_bump_push_no_repo():
             release.bump, ["--type", "minor"], catch_exceptions=False, input="y"
         )
         assert result.output.splitlines() == [
-            "Running: bumpversion --list minor",
+            "Running: bump-my-version bump minor",
             "Running: towncrier build --yes --version=14.0.0.2.0",
             "Updating marabunta migration file",
             "Push local branches? [y/N]: y",
@@ -282,7 +284,7 @@ def test_bump_push_repo_with_pending_merge():
             release.bump, ["--type", "minor"], catch_exceptions=False, input="y"
         )
         assert result.output.splitlines() == [
-            "Running: bumpversion --list minor",
+            "Running: bump-my-version bump minor",
             "Running: towncrier build --yes --version=14.0.0.2.0",
             "Updating marabunta migration file",
             "Push local branches? [y/N]: y",
