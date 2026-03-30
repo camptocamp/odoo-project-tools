@@ -1,5 +1,5 @@
 ---
-name: release-management
+name: otools-release-management
 description: Drive package release workflows for odoo-project-tools, including changelog generation, version bumping, tagging, building, and publishing. Use when preparing or executing a software release.
 ---
 
@@ -184,6 +184,6 @@ After GitHub release is published:
 
 ## Related Skills
 
-- [Development Environment Setup](../dev-environment-setup/SKILL.md) - Building and dependencies
+- [Development Environment Setup](../otools-dev-environment-setup/SKILL.md) - Building and dependencies
 - [Testing & Quality Checks](../testing-quality/SKILL.md) - Pre-release validation
-- [Git & Pending Merges](../pending-merges-git/SKILL.md) - Managing branches before release
+- [Git & Pending Merges](../otools-pending-merges-git/SKILL.md) - Managing branches before release

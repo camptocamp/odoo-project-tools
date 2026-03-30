@@ -1,5 +1,5 @@
 ---
-name: project-setup-initialization
+name: otools-project-setup-initialization
 description: Initialize and configure Odoo projects with otools-project and manifest settings. Use when creating a new project or fixing project bootstrap/configuration issues.
 ---
 
@@ -242,13 +242,13 @@ python3 -c "from odoo_tools.utils.config import config; print(config.odoo_versio
 
 ## Next Steps After Initialization
 
-1. [Addon Management](../addon-management/SKILL.md) - Add and manage addon dependencies
+1. [Addon Management](../otools-addon-management/SKILL.md) - Add and manage addon dependencies
 2. [Project Development](../cli-development/SKILL.md) - Develop custom functionality
 3. [Testing](../testing-quality/SKILL.md) - Test your addons
-4. [Release Management](../release-management/SKILL.md) - Release your project
+4. [Release Management](../otools-release-management/SKILL.md) - Release your project
 
 ## Related Skills
 
-- [Addon Management](../addon-management/SKILL.md) - Manage addon dependencies
-- [Release Management](../release-management/SKILL.md) - Release versions
+- [Addon Management](../otools-addon-management/SKILL.md) - Manage addon dependencies
+- [Release Management](../otools-release-management/SKILL.md) - Release versions
 - [Testing & Quality](../testing-quality/SKILL.md) - Test your project

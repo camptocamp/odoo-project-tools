@@ -1,5 +1,5 @@
 ---
-name: database-operations
+name: otools-database-operations
 description: Create, list, backup, restore, and drop local Odoo databases with otools-db. Use when the task requires local database lifecycle management for development or testing.
 ---
 
@@ -329,4 +329,4 @@ ANALYZE my_db;
 ## Related Skills
 
 - [Database Testing with otools-ba](../functional-testing/SKILL.md) - Run Odoo instances
-- [PR Testing](../pr-testing/SKILL.md) - Test with databases
+- [PR Testing](../otools-pr-testing/SKILL.md) - Test with databases

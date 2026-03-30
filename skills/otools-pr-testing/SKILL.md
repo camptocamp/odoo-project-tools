@@ -1,5 +1,5 @@
 ---
-name: pr-testing
+name: otools-pr-testing
 description: Execute and review pull request validation workflows with otools-pr, including addon-targeted tests and result analysis. Use when validating PR changes locally before merge.
 ---
 
@@ -318,6 +318,6 @@ See [docs/otools-pr.md](../docs/otools-pr.md) for detailed PR testing workflow.
 
 ## Related Skills
 
-- [Addon Management](../addon-management/SKILL.md) - Managing addons being tested
-- [Database Operations](../database-operations/SKILL.md) - Database setup/teardown
+- [Addon Management](../otools-addon-management/SKILL.md) - Managing addons being tested
+- [Database Operations](../otools-database-operations/SKILL.md) - Database setup/teardown
 - [Testing & Quality](../testing-quality/SKILL.md) - General testing practices

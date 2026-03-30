@@ -1,5 +1,5 @@
 ---
-name: dev-environment-setup
+name: otools-dev-environment-setup
 description: Set up and validate a working development environment for odoo-project-tools using uv, Python, and project quality tooling. Use when preparing a machine or troubleshooting local setup issues.
 ---
 
@@ -83,6 +83,6 @@ See [tests/conftest.py](tests/conftest.py) and [tests/common.py](tests/common.py
 
 ## Related Skills
 
-- [Release Management](../release-management/SKILL.md) - Building and releasing distributions
+- [Release Management](../otools-release-management/SKILL.md) - Building and releasing distributions
 - [Testing & Quality Checks](../testing-quality/SKILL.md) - Running test suites and pre-commit
 - [CLI Development](../cli-development/SKILL.md) - Building Click-based CLI commands

@@ -1,5 +1,5 @@
 ---
-name: pending-merges-git
+name: otools-pending-merges-git
 description: Track, add, aggregate, and remove pending pull request merges with otools-pending and git workflows. Use when coordinating temporary PR branches before upstream merges.
 ---
 
@@ -337,6 +337,6 @@ rm -rf pending/addon_name/*
 
 ## Related Skills
 
-- [Addon Management](../addon-management/SKILL.md) - Adding addons with pending branches
-- [PR Testing](../pr-testing/SKILL.md) - Testing pending changes with otools-pr
+- [Addon Management](../otools-addon-management/SKILL.md) - Adding addons with pending branches
+- [PR Testing](../otools-pr-testing/SKILL.md) - Testing pending changes with otools-pr
 - [Testing & Quality](../testing-quality/SKILL.md) - Running tests on aggregated branches

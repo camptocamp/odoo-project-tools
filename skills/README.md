@@ -6,7 +6,7 @@ This directory contains reusable skills for agents working with the `odoo-projec
 
 ### 🚀 Getting Started
 
-**[Development Environment Setup](dev-environment-setup/SKILL.md)**
+**[Development Environment Setup](otools-dev-environment-setup/SKILL.md)**
 - Configure development environment with uv
 - Install dependencies and optional extras
 - Verify Python 3.10+ requirements
@@ -15,7 +15,7 @@ This directory contains reusable skills for agents working with the `odoo-projec
 
 ### 🏗️ Project & Architecture
 
-**[Project Setup & Initialization](project-setup-initialization/SKILL.md)**
+**[Project Setup & Initialization](otools-project-setup-initialization/SKILL.md)**
 - Initialize new Odoo projects with `otools-project init`
 - Configure `.odoo_tools/manifest.yml`
 - Understand project structure and folder organization
@@ -24,14 +24,14 @@ This directory contains reusable skills for agents working with the `odoo-projec
 
 ### 📦 Working with Code
 
-**[Addon Management](addon-management/SKILL.md)**
+**[Addon Management](otools-addon-management/SKILL.md)**
 - Add and manage addon dependencies
 - Use `otools-addon list`, `add`, `require`
 - Handle external addons from OCA and others
 - Work with addon manifests and dependencies
 - Manage pending addon branches
 
-**[Git & Pending Merges](pending-merges-git/SKILL.md)**
+**[Git & Pending Merges](otools-pending-merges-git/SKILL.md)**
 - Manage pending pull requests with `otools-pending`
 - Use git aggregation to combine branches
 - Show, add, remove, and aggregate pending merges
@@ -40,7 +40,7 @@ This directory contains reusable skills for agents working with the `odoo-projec
 
 ### 🧪 Quality & Testing
 
-**[Pull Request Testing](pr-testing/SKILL.md)**
+**[Pull Request Testing](otools-pr-testing/SKILL.md)**
 - Test PRs locally with `otools-pr test`
 - Run Odoo instances with PR branches
 - Validate addon installations
@@ -49,21 +49,21 @@ This directory contains reusable skills for agents working with the `odoo-projec
 
 ### 💾 Data & Deployment
 
-**[Database Operations](database-operations/SKILL.md)**
+**[Database Operations](otools-database-operations/SKILL.md)**
 - Manage local databases with `otools-db`
 - Create, backup, restore, and drop databases
 - Configure database credentials
 - Backup/restore workflows
 - PostgreSQL direct access and optimization
 
-**[Cloud Operations](cloud-operations/SKILL.md)**
+**[Cloud Operations](otools-cloud-operations/SKILL.md)**
 - Interact with Camptocamp cloud platform
 - Download production dumps
 - Deploy to environments (dev, staging, production)
 - Manage cloud projects and databases
 - Environment promotion and rollback
 
-**[Release Management](release-management/SKILL.md)**
+**[Release Management](otools-release-management/SKILL.md)**
 - Manage releases with `otools-release`
 - Bump versions automatically
 - Generate changelogs with Towncrier
@@ -73,14 +73,14 @@ This directory contains reusable skills for agents working with the `odoo-projec
 ## Skill Dependency Graph
 
 ```
-dev-environment-setup
-├── pr-testing
-├── release-management
-└── project-setup-initialization
-    ├── addon-management
-    │   └── pending-merges-git
-    └── database-operations
-        └── cloud-operations
+otools-dev-environment-setup
+├── otools-pr-testing
+├── otools-release-management
+└── otools-project-setup-initialization
+    ├── otools-addon-management
+    │   └── otools-pending-merges-git
+    └── otools-database-operations
+        └── otools-cloud-operations
 ```
 
 ## Quick Command Reference
@@ -118,19 +118,19 @@ otools-cloud deploy --environment staging  # Deploy to cloud
 ## Skills by Role
 
 ### Software Developer
-1. [Development Environment Setup](dev-environment-setup/SKILL.md)
-2. [Addon Management](addon-management/SKILL.md)
+1. [Development Environment Setup](otools-dev-environment-setup/SKILL.md)
+2. [Addon Management](otools-addon-management/SKILL.md)
 
 ### DevOps / Release Manager
-1. [Release Management](release-management/SKILL.md)
-2. [Cloud Operations](cloud-operations/SKILL.md)
-3. [Database Operations](database-operations/SKILL.md)
-4. [Git & Pending Merges](pending-merges-git/SKILL.md)
+1. [Release Management](otools-release-management/SKILL.md)
+2. [Cloud Operations](otools-cloud-operations/SKILL.md)
+3. [Database Operations](otools-database-operations/SKILL.md)
+4. [Git & Pending Merges](otools-pending-merges-git/SKILL.md)
 
 ### QA Engineer
-1. [Pull Request Testing](pr-testing/SKILL.md)
-2. [Database Operations](database-operations/SKILL.md)
-3. [Addon Management](addon-management/SKILL.md)
+1. [Pull Request Testing](otools-pr-testing/SKILL.md)
+2. [Database Operations](otools-database-operations/SKILL.md)
+3. [Addon Management](otools-addon-management/SKILL.md)
 
 ### Project Manager / BA
 - See [otools-ba documentation](../docs/otools-ba.md) for functional/non-technical workflows
@@ -163,17 +163,17 @@ otools-cloud deploy --environment staging  # Deploy to cloud
 3. Write tests with `pytest`
 4. Run quality checks: `pre-commit run -a`
 5. Create PR and test with `otools-pr test --pr {id}`
-6. Merge and release (see [Release Management](release-management/SKILL.md))
+6. Merge and release (see [Release Management](otools-release-management/SKILL.md))
 
 ### Testing an Addon Change
-1. Add addon with pending branch (see [Addon Management](addon-management/SKILL.md))
-2. Aggregate pending merges (see [Git & Pending Merges](pending-merges-git/SKILL.md))
+1. Add addon with pending branch (see [Addon Management](otools-addon-management/SKILL.md))
+2. Aggregate pending merges (see [Git & Pending Merges](otools-pending-merges-git/SKILL.md))
 3. Test with `otools-pr test --addon {name}`
 4. Review test results and logs
 5. Merge pending changes to main
 
 ### Deploying to Production
-1. Prepare release (see [Release Management](release-management/SKILL.md))
+1. Prepare release (see [Release Management](otools-release-management/SKILL.md))
 2. Test in staging: `otools-cloud deploy --environment staging`
 3. Verify in staging environment
 4. Deploy to production: `otools-cloud deploy --environment production`

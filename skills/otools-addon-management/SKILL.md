@@ -1,5 +1,5 @@
 ---
-name: addon-management
+name: otools-addon-management
 description: Add, require, and update Odoo addons in project workspaces, including external repositories and pending branches. Use when the task involves addon dependency management or addon setup/testing workflows.
 ---
 
@@ -301,7 +301,7 @@ otools-ba run 16.0
 otools-pr test --addon my_addon
 ```
 
-See [PR Testing](../pr-testing/SKILL.md) for detailed testing workflow.
+See [PR Testing](../otools-pr-testing/SKILL.md) for detailed testing workflow.
 
 ## Troubleshooting
 
@@ -315,7 +315,7 @@ See [PR Testing](../pr-testing/SKILL.md) for detailed testing workflow.
 
 ## Related Skills
 
-- [Project Setup](../project-setup-initialization/SKILL.md) - Initialize project
+- [Project Setup](../otools-project-setup-initialization/SKILL.md) - Initialize project
 - [Testing & Quality](../testing-quality/SKILL.md) - Test addon changes
-- [PR Testing](../pr-testing/SKILL.md) - Test PR changes with otools-pr
-- [Git & Pending Merges](../pending-merges-git/SKILL.md) - Manage pending merges
+- [PR Testing](../otools-pr-testing/SKILL.md) - Test PR changes with otools-pr
+- [Git & Pending Merges](../otools-pending-merges-git/SKILL.md) - Manage pending merges
