@@ -1,3 +1,8 @@
+---
+name: addon-management
+description: Add, require, and update Odoo addons in project workspaces, including external repositories and pending branches. Use when the task involves addon dependency management or addon setup/testing workflows.
+---
+
 # Addon Management Skill
 
 ## Purpose

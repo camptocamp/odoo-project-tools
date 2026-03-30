@@ -1,3 +1,8 @@
+---
+name: database-operations
+description: Create, list, backup, restore, and drop local Odoo databases with otools-db. Use when the task requires local database lifecycle management for development or testing.
+---
+
 # Database Operations Skill
 
 ## Purpose

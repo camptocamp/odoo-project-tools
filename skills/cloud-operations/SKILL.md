@@ -1,3 +1,8 @@
+---
+name: cloud-operations
+description: Operate Odoo cloud environments with otools-cloud, including project inspection, database dump/restore, and environment deployments. Use when the task involves cloud-hosted databases or deployment actions.
+---
+
 # Cloud Operations Skill
 
 ## Purpose

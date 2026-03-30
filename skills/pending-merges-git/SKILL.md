@@ -1,3 +1,8 @@
+---
+name: pending-merges-git
+description: Track, add, aggregate, and remove pending pull request merges with otools-pending and git workflows. Use when coordinating temporary PR branches before upstream merges.
+---
+
 # Git & Pending Merges Skill
 
 ## Purpose

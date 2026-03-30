@@ -1,3 +1,8 @@
+---
+name: project-setup-initialization
+description: Initialize and configure Odoo projects with otools-project and manifest settings. Use when creating a new project or fixing project bootstrap/configuration issues.
+---
+
 # Project Setup & Initialization Skill
 
 ## Purpose

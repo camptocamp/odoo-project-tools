@@ -1,3 +1,8 @@
+---
+name: release-management
+description: Drive package release workflows for odoo-project-tools, including changelog generation, version bumping, tagging, building, and publishing. Use when preparing or executing a software release.
+---
+
 # Release Management Skill
 
 ## Purpose

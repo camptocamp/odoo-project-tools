@@ -1,3 +1,8 @@
+---
+name: pr-testing
+description: Execute and review pull request validation workflows with otools-pr, including addon-targeted tests and result analysis. Use when validating PR changes locally before merge.
+---
+
 # Pull Request Testing Skill
 
 ## Purpose

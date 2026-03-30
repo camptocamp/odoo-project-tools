@@ -1,3 +1,8 @@
+---
+name: dev-environment-setup
+description: Set up and validate a working development environment for odoo-project-tools using uv, Python, and project quality tooling. Use when preparing a machine or troubleshooting local setup issues.
+---
+
 # Development Environment Setup Skill
 
 ## Purpose
