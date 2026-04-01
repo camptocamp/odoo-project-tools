@@ -1,12 +1,10 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 import shutil
-from contextlib import contextmanager
 from pathlib import Path
 
 import git
 import jinja2
-from click.testing import CliRunner
 
 from odoo_tools.utils import pending_merge as pm_utils
 from odoo_tools.utils.config import config
@@ -157,17 +155,6 @@ def fake_bundle_addon(source_template_path=None, **kwargs):
         file.write_text(content)
         # Remove the .jinja suffix
         file.rename(file.with_suffix(""))
-
-
-@contextmanager
-def fake_project_root(make_root=True, **kw):
-    runner = CliRunner()
-    # TODO: do we really need this click util
-    # or tmpfile api is enough?
-    with runner.isolated_filesystem():
-        if make_root:
-            make_fake_project_root(**kw)
-        yield runner
 
 
 def compare_line_by_line(content, expected, sort=False):
