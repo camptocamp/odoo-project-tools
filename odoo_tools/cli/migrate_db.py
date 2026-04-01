@@ -592,10 +592,7 @@ def _execute_db_request(ctx, db_name, sql):
     """Return the execution of given SQL request."""
     result = False
     db_port = _get_db_container_port()
-    dsn = "host=localhost dbname=%s user=odoo password=odoo port=%s" % (
-        db_name,
-        db_port,
-    )
+    dsn = f"host=localhost dbname={db_name} user=odoo password=odoo port={db_port}"
     with psycopg2.connect(dsn) as db_connection:
         with db_connection.cursor() as db_cursor:
             db_cursor.execute(sql)
