@@ -107,7 +107,6 @@ def test_bump_update_marabunta_file(project):
         release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
     )
     content = config.marabunta_mig_file_rel_path.read_text()
-    # TODO: improve these checks
     assert "14.0.0.2.0" in content
     assert result.output.splitlines() == [
         "Running: bumpversion --list minor",
