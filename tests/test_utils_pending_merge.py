@@ -78,7 +78,6 @@ def test_merges_config(project):
     }
 
 
-# TODO: test all cases
 @pytest.mark.usefixtures("all_template_versions")
 @pytest.mark.project_setup(manifest=dict(odoo_version="16.0"))
 def test_generate_pending_merges_file_template():
@@ -99,7 +98,6 @@ def test_generate_pending_merges_file_template():
     compare_dict(repo.merges_config(), expected)
 
 
-# TODO: test all cases
 @pytest.mark.usefixtures("all_template_versions")
 @pytest.mark.project_setup(manifest=dict(odoo_version="16.0"))
 def test_add_pending_pr_from_scratch():
@@ -131,7 +129,30 @@ def test_add_pending_pr_from_scratch():
     assert url == f"git@github.com:camptocamp/{repo_name}.git"
 
 
-# TODO: test all cases
+@pytest.mark.usefixtures("all_template_versions")
+@pytest.mark.project_setup(manifest=dict(odoo_version="16.0"))
+def test_add_pending_pr_from_scratch_duplicate():
+    """Adding the same PR twice should not duplicate it."""
+    repo_name = "edi-framework"
+    mock_pending_merge_repo_paths(repo_name, pending=False)
+    repo = Repo(repo_name, path_check=False)
+    with Path(".gitmodules").open("w") as f:
+        f.write(
+            f'[submodule "{repo.path}"]\n'
+            f"\tpath = {repo.path}\n"
+            f"\turl = git@github.com:OCA/{repo_name}.git\n"
+            f"\tbranch = 16.0\n"
+        )
+    repo.generate_pending_merges_file_template("OCA")
+    repo.add_pending_pull_request("OCA", 778)
+    # Adding the same PR again should be a no-op
+    result = repo.add_pending_pull_request("OCA", 778)
+    assert result is True
+    merges = repo.merges_config()["merges"]
+    # PR should appear only once
+    assert merges.count("OCA refs/pull/778/head") == 1
+
+
 @pytest.mark.usefixtures("all_template_versions")
 def test_add_pending_pr():
     name = "edi"
@@ -154,6 +175,32 @@ def test_add_pending_pr():
         "target": "camptocamp merge-branch-1234-master",
     }
     compare_dict(repo.merges_config(), expected)
+
+
+@pytest.mark.usefixtures("all_template_versions")
+def test_add_pending_pr_duplicate():
+    """Adding a PR that already exists should be a no-op."""
+    name = "edi"
+    mock_pending_merge_repo_paths(name)
+    repo = Repo(name, path_check=False)
+    # PR 774 already exists in the fixture
+    result = repo.add_pending_pull_request("OCA", 774)
+    assert result is True
+    merges = repo.merges_config()["merges"]
+    assert merges.count("OCA refs/pull/774/head") == 1
+
+
+@pytest.mark.usefixtures("all_template_versions")
+def test_add_pending_pr_multiple():
+    """Adding multiple different PRs should work."""
+    name = "edi"
+    mock_pending_merge_repo_paths(name)
+    repo = Repo(name, path_check=False)
+    repo.add_pending_pull_request("OCA", 778)
+    repo.add_pending_pull_request("OCA", 779)
+    merges = repo.merges_config()["merges"]
+    assert "OCA refs/pull/778/head" in merges
+    assert "OCA refs/pull/779/head" in merges
 
 
 @pytest.mark.usefixtures("project")
@@ -254,7 +301,6 @@ def test_add_pending_odoo_pr_v2():
     )
 
 
-# TODO: test all cases
 @pytest.mark.usefixtures("all_template_versions")
 def test_remove_pending_pr():
     name = "edi"
@@ -278,6 +324,16 @@ def test_remove_pending_pr():
         "OCA refs/pull/759/head",
     ]
     assert merges == expected
+
+
+@pytest.mark.usefixtures("all_template_versions")
+def test_remove_pending_pr_not_found():
+    """Removing a PR that doesn't exist should raise Exit."""
+    name = "edi"
+    mock_pending_merge_repo_paths(name)
+    repo = Repo(name, path_check=False)
+    with pytest.raises(Exit):
+        repo.remove_pending_pull("OCA", 999)
 
 
 @pytest.mark.usefixtures("all_template_versions")
@@ -308,7 +364,6 @@ def test_remove_pending_last_pr():
     mock_handle.assert_called_once()
 
 
-# TODO: test all cases
 @pytest.mark.project_setup(manifest=dict(odoo_version="16.0"))
 def __test_add_pending_commit_from_scratch(project):
     name = "edi"
@@ -332,7 +387,6 @@ def __test_add_pending_commit_from_scratch(project):
     compare_dict(repo.merges_config(), expected)
 
 
-# TODO: test all cases
 @pytest.mark.usefixtures("project")
 @pytest.mark.project_setup(proj_tmpl_ver=1)
 def test_add_pending_commit_v1():
@@ -362,7 +416,23 @@ def test_add_pending_commit_v1():
     compare_dict(repo.merges_config(), expected)
 
 
-# TODO: test all cases
+@pytest.mark.usefixtures("project")
+@pytest.mark.project_setup(proj_tmpl_ver=1)
+def test_add_pending_commit_duplicate():
+    """Adding a commit that already exists should be a no-op."""
+    name = "edi"
+    mock_pending_merge_repo_paths(name)
+    repo = Repo(name, path_check=False)
+    sha = "a86f5fe73e1f34f29cb2ad0dca253e47ce625406"
+    repo.add_pending_commit("OCA", sha)
+    # Adding the same commit again should be a no-op
+    result = repo.add_pending_commit("OCA", sha)
+    assert result is True
+    shell_commands = repo.merges_config().get("shell_command_after", [])
+    am_line = f'git am "$(git format-patch -1 {sha} -o ../patches)"'
+    assert shell_commands.count(am_line) == 1
+
+
 @pytest.mark.usefixtures("project")
 @pytest.mark.project_setup(proj_tmpl_ver=2)
 def test_add_pending_commit_v2():
@@ -449,7 +519,6 @@ def test_add_pending_odoo_commit_v2():
     )
 
 
-# TODO: test all cases
 @pytest.mark.usefixtures("project")
 @pytest.mark.project_setup(proj_tmpl_ver=1)
 def test_remove_pending_commit_v1():
@@ -469,7 +538,17 @@ def test_remove_pending_commit_v1():
     assert shell_command_after == expected
 
 
-# TODO: test all cases
+@pytest.mark.usefixtures("project")
+@pytest.mark.project_setup(proj_tmpl_ver=1)
+def test_remove_pending_commit_not_found():
+    """Removing a commit that doesn't exist should raise Exit."""
+    name = "edi"
+    mock_pending_merge_repo_paths(name)
+    repo = Repo(name, path_check=False)
+    with pytest.raises(Exit):
+        repo.remove_pending_commit("OCA", "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
+
+
 @pytest.mark.usefixtures("project")
 @pytest.mark.project_setup(proj_tmpl_ver=2)
 def test_remove_pending_commit_v2():

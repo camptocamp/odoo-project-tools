@@ -36,7 +36,6 @@ def root_path(marker_file=None, raise_if_missing=True):
         )
 
 
-# TODO: add test
 def build_path(path, from_root=True, from_file=None):
     if not from_file and from_root:
         base_path = root_path()
