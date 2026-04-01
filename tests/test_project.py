@@ -11,7 +11,7 @@ from odoo_tools.cli.project import checkout_local_odoo, init
 from odoo_tools.utils.config import config
 from odoo_tools.utils.path import build_path
 
-from .common import compare_line_by_line, get_fixture, mock_subprocess_run
+from .common import MockSubprocessRun, compare_line_by_line, get_fixture
 
 
 @pytest.mark.parametrize(
@@ -134,7 +134,7 @@ def test_init_custom_version(project):
 @pytest.mark.project_setup(proj_tmpl_ver=2, proj_version="16.0.1.1.0")
 def test_checkout_local_odoo(runner):
     odoo_src_path = build_path(config.odoo_src_rel_path)
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": [
@@ -233,7 +233,7 @@ def test_local_odoo_venv(runner):
     def create_config():
         config_file.write_text("db_name=testdb\n")
 
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": [

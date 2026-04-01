@@ -271,9 +271,3 @@ class MockSubprocessRun:
         assert not self.mock_spec, (
             f"{len(self.mock_spec)} calls missing: {self.mock_spec}"
         )
-
-
-def mock_subprocess_run(mock_spec=None):
-    """Return a MockSubprocessRun instance for backward compatibility."""
-    # TODO: deprecate this and use MockSubprocessRun directly
-    return MockSubprocessRun(mock_spec)

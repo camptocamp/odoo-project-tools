@@ -6,7 +6,7 @@ import pytest
 
 from odoo_tools.utils import misc as misc_utils
 
-from .common import mock_subprocess_run
+from .common import MockSubprocessRun
 
 
 def test_parse_ini_key():
@@ -28,7 +28,7 @@ def test_parse_ini_no_header_key():
 )
 @pytest.mark.usefixtures("all_template_versions")
 def test_get_docker_image_commit_hashes():
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": ["docker", "compose", "version", "--short"],

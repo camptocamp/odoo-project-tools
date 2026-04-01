@@ -8,12 +8,12 @@ import pytest
 
 from odoo_tools.cli.cloud import cli as cloud_cli
 
-from .common import mock_subprocess_run
+from .common import MockSubprocessRun
 
 
 def test_dump_download(project):
     """Test dump download command with defaults."""
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": [
@@ -40,7 +40,7 @@ def test_dump_download(project):
 
 def test_dump_download_with_different_customer_platform(project):
     """Test dump download command with explicit parameters."""
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": [
@@ -80,7 +80,7 @@ def test_dump_download_with_different_customer_platform(project):
 
 def test_dump_download_specific_dump(project):
     """Test dump download command with specific dump name."""
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": [
@@ -122,7 +122,7 @@ def test_dump_download_with_restore(project):
     from pathlib import Path
 
     mock_dumps = [{"name": "latest_dump.sql.gpg"}]
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": [
@@ -179,7 +179,7 @@ def test_dump_download_with_restore(project):
 
 def test_dump_create(project):
     """Test dump create command."""
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": [
@@ -210,7 +210,7 @@ def test_dump_create(project):
 
 def test_dump_upload_from_file(project):
     """Test dump upload command with file path."""
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": [
@@ -251,7 +251,7 @@ def test_dump_upload_from_file(project):
 
 def test_dump_upload_from_db(project):
     """Test dump upload command with database."""
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": [
@@ -327,7 +327,7 @@ def test_dump_upload_both_params(project):
 
 def test_dump_restore_from_prod(project):
     """Test dump restore from prod command."""
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": [
@@ -360,7 +360,7 @@ def test_dump_restore_from_prod(project):
 
 def test_dump_restore(project):
     """Test dump restore command."""
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": [
@@ -431,7 +431,7 @@ def test_dump_restore_both_params(project):
 
 def test_dump_list(project):
     """Test dump list command."""
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": [
