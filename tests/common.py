@@ -4,6 +4,7 @@ import shutil
 from contextlib import contextmanager
 from pathlib import Path
 
+import git
 import jinja2
 from click.testing import CliRunner
 
@@ -80,6 +81,7 @@ def make_fake_project_root(
     mock_marabunta_file=False,
     mock_bundle_addon=False,
     extra_files=None,
+    git_init=False,
 ):
     if marker_file is None:
         marker_file = get_root_marker()
@@ -122,6 +124,14 @@ def make_fake_project_root(
         for path, content in extra_files.items():
             Path(path).parent.mkdir(parents=True, exist_ok=True)
             Path(path).write_text(content)
+    # Initialize a git repository
+    if git_init:
+        repo = git.Repo.init(".")
+        with repo.config_writer() as cfg:
+            cfg.set_value("user", "email", "test@test.com")
+            cfg.set_value("user", "name", "Test")
+        repo.index.add(repo.untracked_files)
+        repo.index.commit("initial commit")
 
 
 def fake_marabunta_file(source_file_path=None):

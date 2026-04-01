@@ -134,7 +134,10 @@ def clean(pr_number):
 
 
 def handle_git_repository(pr_number, branch):
-    gh.check_git_diff()
+    if gh.check_git_diff():
+        ui.ask_or_abort(
+            "Your repository has local changes, are you sure you want to continue?"
+        )
     master = f"remotes/origin/{branch}"
 
     with cd(root_path()):

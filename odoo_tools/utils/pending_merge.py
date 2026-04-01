@@ -713,8 +713,10 @@ def push_branches(version=None, force=False):
     version = version or get_current_version()
     branch_name = make_merge_branch_name(version)
     if not force:
-        # TODO
-        gh.check_git_diff()
+        if gh.check_git_diff():
+            ui.ask_or_abort(
+                "Your repository has local changes, are you sure you want to continue?"
+            )
 
     # look through all of the files inside PENDING_MERGES_DIR, push everything
     impacted_repos = []
