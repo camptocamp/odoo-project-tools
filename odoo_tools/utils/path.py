@@ -6,7 +6,6 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from ..exceptions import ProjectRootFolderNotFound
-from . import ui
 
 
 def get_root_marker():
@@ -56,18 +55,6 @@ def cd(path):
         yield
     finally:
         os.chdir(prev)
-
-
-def make_dir(path_dir):
-    path_dir = Path(path_dir)
-    try:
-        path_dir.mkdir(parents=True)
-    except OSError:
-        if not path_dir.is_dir():
-            msg = f"Directory does not exist and could not be created: {path_dir}"
-            ui.exit_msg(msg)
-        else:
-            pass  # directory already exists, nothing to do in this case
 
 
 def is_odoo_module(path: Path) -> bool:
