@@ -60,8 +60,8 @@ def ls(dockerfile=False):
             ["odoo/odoo/paid-modules"],
         )
         lines = (f"/{line}" for line in lines)
-        template = 'ENV ADDONS_PATH="%s" \\\n'
-        print(template % (", \\\n".join(lines)))
+        joined = ", \\\n".join(lines)
+        click.echo(f'ENV ADDONS_PATH="{joined}" \\\n')
     else:
         for line in submodules:
             ui.echo(line)
@@ -113,7 +113,7 @@ def sync_remote(submodule_path=None, repo=None, force_remote=False):
 
     git.set_remote_url(repo.path, new_remote_url)
 
-    print(f"Submodule {repo.path} is now being sourced from {new_remote_url}")
+    click.echo(f"Submodule {repo.path} is now being sourced from {new_remote_url}")
 
     if repo.has_pending_merges():
         # we're being polite here, excode 1 doesn't apply to this answer
