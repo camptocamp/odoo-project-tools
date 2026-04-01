@@ -68,6 +68,7 @@ test = [
   "pytest-cov",
   "pytest-ty",
   "responses",
+  "skills-ref @ git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref",
 ]
 
 [build-system]
