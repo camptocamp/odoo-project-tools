@@ -9,7 +9,7 @@ from odoo_tools.utils import proj as proj_utils
 from odoo_tools.utils.config import config
 from odoo_tools.utils.path import build_path
 
-from .common import compare_line_by_line, mock_subprocess_run
+from .common import MockSubprocessRun, compare_line_by_line
 
 
 def test_get_project_manifest_1(project):
@@ -68,7 +68,7 @@ def test_generate_odoo_config_file(project):
     def create_config():
         config_file.write_text("db_name=testdb\n")
 
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": [

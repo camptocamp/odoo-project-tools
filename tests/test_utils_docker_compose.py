@@ -2,11 +2,11 @@ from unittest.mock import patch
 
 from odoo_tools.utils import docker_compose
 
-from .common import mock_subprocess_run
+from .common import MockSubprocessRun
 
 
 def test_version():
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": ["docker", "compose", "version", "--short"],
@@ -48,7 +48,7 @@ def test_up_override():
 
 
 def test_run_version_2_36():
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": ["docker", "compose", "version", "--short"],
@@ -85,7 +85,7 @@ def test_run_version_2_36():
 
 
 def test_run_version_2_36_other_args():
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": ["docker", "compose", "version", "--short"],
@@ -124,7 +124,7 @@ def test_run_version_2_36_other_args():
 
 
 def test_run_version_2_33():
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": ["docker", "compose", "version", "--short"],

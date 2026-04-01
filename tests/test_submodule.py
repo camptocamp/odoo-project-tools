@@ -5,7 +5,7 @@ import pytest
 
 from odoo_tools.cli import submodule
 
-from .common import get_fixture_path, mock_pending_merge_repo_paths, mock_subprocess_run
+from .common import MockSubprocessRun, get_fixture_path, mock_pending_merge_repo_paths
 
 
 @pytest.mark.project_setup(
@@ -17,7 +17,7 @@ from .common import get_fixture_path, mock_pending_merge_repo_paths, mock_subpro
 )
 def test_init(project):
     odoo_version = "16.0"
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": [
@@ -58,7 +58,7 @@ def test_init(project):
     proj_version="16.0.1.2.3",
 )
 def test_init_missing_gitmodules(project):
-    mock_fn = mock_subprocess_run([])
+    mock_fn = MockSubprocessRun([])
     with mock.patch("subprocess.run", mock_fn):
         result = project.invoke(
             submodule.init,
@@ -77,7 +77,7 @@ def test_init_missing_gitmodules(project):
     },
 )
 def test_update(project):
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": [
@@ -208,7 +208,7 @@ def test_ls_dockerfile(project):
 def test_upgrade_no_pending_merges(project):
     commit_before = "aaa111"
     commit_after = "bbb222"
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             # submodule_update for account-closing
             {
@@ -350,7 +350,7 @@ def test_upgrade_with_pending_merges(project):
 def test_upgrade_force_branch(project):
     commit_before = "aaa111"
     commit_after = "bbb222"
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             # submodule_update
             {

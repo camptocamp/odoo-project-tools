@@ -4,18 +4,18 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-from .common import mock_subprocess_run
+from .common import MockSubprocessRun
 
 
-def test_mock_subprocess_run():
-    mock_fn = mock_subprocess_run([{"args": ["ls", "-l"], "stdout": "file1\nfile2\n"}])
+def test_MockSubprocessRun():
+    mock_fn = MockSubprocessRun([{"args": ["ls", "-l"], "stdout": "file1\nfile2\n"}])
     with patch("subprocess.run", mock_fn):
         res = subprocess.run(["ls", "-l"], check=False)
         assert res.stdout.splitlines() == ["file1", "file2"]
 
 
-def test_mock_subprocess_run_fail():
-    mock_fn = mock_subprocess_run([{"args": ["ls", "-l"], "stdout": "file1\nfile2\n"}])
+def test_MockSubprocessRun_fail():
+    mock_fn = MockSubprocessRun([{"args": ["ls", "-l"], "stdout": "file1\nfile2\n"}])
     with patch("subprocess.run", mock_fn):
         try:
             subprocess.run(["ls", "-a"], check=False)
@@ -23,13 +23,13 @@ def test_mock_subprocess_run_fail():
             assert exc.args == ("Wrong args ['ls', '-a'], expecting ['ls', '-l']",)
 
 
-def test_mock_subprocess_run_side_effect(project):
+def test_MockSubprocessRun_side_effect(project):
 
     def sim_touch(fname):
         Path(fname).touch()
 
     temp_file = Path("foo")
-    mock_fn = mock_subprocess_run(
+    mock_fn = MockSubprocessRun(
         [
             {
                 "args": ["touch", temp_file.name],
