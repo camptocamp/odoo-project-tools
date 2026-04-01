@@ -11,7 +11,7 @@ from odoo_tools.exceptions import Exit, PathNotFound
 from odoo_tools.utils import pending_merge as pm_utils
 from odoo_tools.utils.config import config
 
-from .common import fake_project_root, mock_pending_merge_repo_paths
+from .common import mock_pending_merge_repo_paths
 
 Repo = pm_utils.Repo
 
@@ -23,64 +23,59 @@ def compare_dict(a, b, keys=None):
         assert a[k] == b[k], f"{k} does not match"
 
 
-def test_repo_base():
-    with fake_project_root():
-        ext_rel_path = config.ext_src_rel_path
-        pending_merge_rel_path = config.pending_merge_rel_path
-        cwd = Path().resolve()
-        repo = Repo("edi", path_check=False)
-        expected = {
-            "name": "edi",
-            "company_git_remote": "camptocamp",
-            "path": Path(ext_rel_path) / "edi",
-            "abs_path": cwd / ext_rel_path / "edi",
-            "merges_path": Path(pending_merge_rel_path) / "edi.yml",
-            "abs_merges_path": cwd / pending_merge_rel_path / "edi.yml",
-        }
-        for k, v in expected.items():
-            assert getattr(repo, k) == v, f"{k} does not match"
+def test_repo_base(project):
+    ext_rel_path = config.ext_src_rel_path
+    pending_merge_rel_path = config.pending_merge_rel_path
+    cwd = Path().resolve()
+    repo = Repo("edi", path_check=False)
+    expected = {
+        "name": "edi",
+        "company_git_remote": "camptocamp",
+        "path": Path(ext_rel_path) / "edi",
+        "abs_path": cwd / ext_rel_path / "edi",
+        "merges_path": Path(pending_merge_rel_path) / "edi.yml",
+        "abs_merges_path": cwd / pending_merge_rel_path / "edi.yml",
+    }
+    for k, v in expected.items():
+        assert getattr(repo, k) == v, f"{k} does not match"
 
 
-def test_repo_check_path():
+def test_repo_check_path(project):
     name = "edi"
-    with fake_project_root():
-        with pytest.raises(PathNotFound, match="GIT CONFIG*"):
-            Repo(name)
-        # Add fake git root
-        mock_pending_merge_repo_paths(name, pending=False)
-        with pytest.raises(PathNotFound, match="MERGES PATH*"):
-            Repo(name)
-        mock_pending_merge_repo_paths(name)
-        assert Repo(name)
+    with pytest.raises(PathNotFound, match="GIT CONFIG*"):
+        Repo(name)
+    # Add fake git root
+    mock_pending_merge_repo_paths(name, pending=False)
+    with pytest.raises(PathNotFound, match="MERGES PATH*"):
+        Repo(name)
+    mock_pending_merge_repo_paths(name)
+    assert Repo(name)
 
 
-def test_repositories_from_pending_folder():
+def test_repositories_from_pending_folder(project):
     names = sorted(["edi", "wms", "web-api"])
-    with fake_project_root():
-        for name in names:
-            mock_pending_merge_repo_paths(name)
-        repos = Repo.repositories_from_pending_folder()
-        assert sorted([x.name for x in repos]) == names
-
-
-def test_has_pending_merges():
-    name = "edi"
-    with fake_project_root():
+    for name in names:
         mock_pending_merge_repo_paths(name)
-        repo = Repo(name)
-        assert repo.has_pending_merges()
+    repos = Repo.repositories_from_pending_folder()
+    assert sorted([x.name for x in repos]) == names
 
 
-def test_merges_config():
+def test_has_pending_merges(project):
     name = "edi"
-    with fake_project_root():
-        mock_pending_merge_repo_paths(name)
-        repo = Repo(name)
-        config = repo.merges_config()
-        assert config["remotes"] == {
-            "OCA": "git@github.com:OCA/edi.git",
-            "camptocamp": "git@github.com:camptocamp/edi.git",
-        }
+    mock_pending_merge_repo_paths(name)
+    repo = Repo(name)
+    assert repo.has_pending_merges()
+
+
+def test_merges_config(project):
+    name = "edi"
+    mock_pending_merge_repo_paths(name)
+    repo = Repo(name)
+    config = repo.merges_config()
+    assert config["remotes"] == {
+        "OCA": "git@github.com:OCA/edi.git",
+        "camptocamp": "git@github.com:camptocamp/edi.git",
+    }
 
 
 # TODO: test all cases
@@ -314,27 +309,27 @@ def test_remove_pending_last_pr():
 
 
 # TODO: test all cases
-def __test_add_pending_commit_from_scratch():
+@pytest.mark.project_setup(manifest=dict(odoo_version="16.0"))
+def __test_add_pending_commit_from_scratch(project):
     name = "edi"
-    with fake_project_root(manifest=dict(odoo_version="16.0")):
-        mock_pending_merge_repo_paths(name, pending=False)
-        repo = Repo(name, path_check=False)
-        repo.generate_pending_merges_file_template("OCA")
-        sha = "6d35e8d16afaec2f9bf8996defaf0086cd704481"
-        repo.add_pending_commit("OCA", sha)
-        expected = {
-            "merges": ["OCA 16.0"],
-            "remotes": {
-                "OCA": "git@github.com:OCA/edi.git",
-                "camptocamp": "git@github.com:camptocamp/edi.git",
-            },
-            "shell_command_after": [
-                "git fetch OCA 6d35e8d16afaec2f9bf8996defaf0086cd704481",
-                'git am "$(git format-patch -1 6d35e8d16afaec2f9bf8996defaf0086cd704481 -o ../patches)"',
-            ],
-            "target": "camptocamp merge-branch-1234-master",
-        }
-        compare_dict(repo.merges_config(), expected)
+    mock_pending_merge_repo_paths(name, pending=False)
+    repo = Repo(name, path_check=False)
+    repo.generate_pending_merges_file_template("OCA")
+    sha = "6d35e8d16afaec2f9bf8996defaf0086cd704481"
+    repo.add_pending_commit("OCA", sha)
+    expected = {
+        "merges": ["OCA 16.0"],
+        "remotes": {
+            "OCA": "git@github.com:OCA/edi.git",
+            "camptocamp": "git@github.com:camptocamp/edi.git",
+        },
+        "shell_command_after": [
+            "git fetch OCA 6d35e8d16afaec2f9bf8996defaf0086cd704481",
+            'git am "$(git format-patch -1 6d35e8d16afaec2f9bf8996defaf0086cd704481 -o ../patches)"',
+        ],
+        "target": "camptocamp merge-branch-1234-master",
+    }
+    compare_dict(repo.merges_config(), expected)
 
 
 # TODO: test all cases

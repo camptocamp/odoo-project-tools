@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-from .common import fake_project_root, mock_subprocess_run
+from .common import mock_subprocess_run
 
 
 def test_mock_subprocess_run():
@@ -23,24 +23,23 @@ def test_mock_subprocess_run_fail():
             assert exc.args == ("Wrong args ['ls', '-a'], expecting ['ls', '-l']",)
 
 
-def test_mock_subprocess_run_side_effect():
-    with fake_project_root():
+def test_mock_subprocess_run_side_effect(project):
 
-        def sim_touch(fname):
-            Path(fname).touch()
+    def sim_touch(fname):
+        Path(fname).touch()
 
-        temp_file = Path("foo")
-        mock_fn = mock_subprocess_run(
-            [
-                {
-                    "args": ["touch", temp_file.name],
-                    "sim_call": sim_touch,
-                    "sim_call_args": [temp_file.name],
-                }
-            ]
-        )
-        with patch("subprocess.run", mock_fn):
-            res = subprocess.run(["touch", str(temp_file)], check=False)
-            assert res.returncode == 0
-            assert temp_file.is_file()
-        temp_file.unlink()
+    temp_file = Path("foo")
+    mock_fn = mock_subprocess_run(
+        [
+            {
+                "args": ["touch", temp_file.name],
+                "sim_call": sim_touch,
+                "sim_call_args": [temp_file.name],
+            }
+        ]
+    )
+    with patch("subprocess.run", mock_fn):
+        res = subprocess.run(["touch", str(temp_file)], check=False)
+        assert res.returncode == 0
+        assert temp_file.is_file()
+    temp_file.unlink()

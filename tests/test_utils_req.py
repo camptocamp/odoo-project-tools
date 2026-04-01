@@ -8,7 +8,7 @@ from click.testing import CliRunner
 from odoo_tools.utils import req as req_utils
 from odoo_tools.utils.config import config
 
-from .common import fake_project_root, get_fixture_path
+from .common import get_fixture_path
 
 TMP_REQ_PATH = Path() / "tmp-requirements.txt"
 FAKE_REQ_PATH = get_fixture_path("fake-requirements.txt")
@@ -66,15 +66,14 @@ def test_make_requirement_line_for_pr():
     assert make(pkg_name, pr) == expected
 
 
-def test_make_requirement_line_for_pr_editable():
-    with fake_project_root():
-        make = req_utils.make_requirement_line_for_editable
-        mod_name = "edi_record_metadata_oca"
-        pkg_name = f"odoo14-addon-{mod_name}"
-        pr = "https://github.com/OCA/edi-framework/pull/3"
-        path = config.ext_src_rel_path
-        expected = f"-e {path}/edi-framework/setup/edi_record_metadata_oca"
-        assert make(pkg_name, pr) == expected
+def test_make_requirement_line_for_pr_editable(project):
+    make = req_utils.make_requirement_line_for_editable
+    mod_name = "edi_record_metadata_oca"
+    pkg_name = f"odoo14-addon-{mod_name}"
+    pr = "https://github.com/OCA/edi-framework/pull/3"
+    path = config.ext_src_rel_path
+    expected = f"-e {path}/edi-framework/setup/edi_record_metadata_oca"
+    assert make(pkg_name, pr) == expected
 
 
 def test_add_requirement():
@@ -99,17 +98,16 @@ def test_add_requirement_pr():
         assert TMP_REQ_PATH.read_text() == expected
 
 
-def test_add_requirement_pr_editable():
-    with fake_project_root():
-        pr = "https://github.com/OCA/edi-framework/pull/3"
-        mod_name = "foo"
-        pkg_name = f"odoo-addon-{mod_name}"
-        req_utils.add_requirement(
-            pkg_name, pr=pr, req_filepath=TMP_REQ_PATH, editable=True, use_wool=False
-        )
-        path = config.ext_src_rel_path
-        expected = f"-e {path}/edi-framework/setup/{mod_name}"
-        assert TMP_REQ_PATH.read_text() == expected
+def test_add_requirement_pr_editable(project):
+    pr = "https://github.com/OCA/edi-framework/pull/3"
+    mod_name = "foo"
+    pkg_name = f"odoo-addon-{mod_name}"
+    req_utils.add_requirement(
+        pkg_name, pr=pr, req_filepath=TMP_REQ_PATH, editable=True, use_wool=False
+    )
+    path = config.ext_src_rel_path
+    expected = f"-e {path}/edi-framework/setup/{mod_name}"
+    assert TMP_REQ_PATH.read_text() == expected
 
 
 def test_replace_requirement():
@@ -133,12 +131,11 @@ def test_allowed_version():
     assert not req_utils.allowed_version(a2, "2.1.0")
 
 
-def test_make_requirement_line_for_proj_fork():
-    with fake_project_root():
-        r1 = req_utils.make_requirement_line_for_proj_fork(
-            "odoo-addon-name2", "social", "14.0"
-        )
-        assert (
-            r1
-            == "odoo-addon-name2 @ git+https://github.com/camptocamp/social@14.0#subdirectory=setup/name2"
-        )
+def test_make_requirement_line_for_proj_fork(project):
+    r1 = req_utils.make_requirement_line_for_proj_fork(
+        "odoo-addon-name2", "social", "14.0"
+    )
+    assert (
+        r1
+        == "odoo-addon-name2 @ git+https://github.com/camptocamp/social@14.0#subdirectory=setup/name2"
+    )
