@@ -2,6 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import re
+import subprocess
 from pathlib import Path
 
 from . import ui
@@ -51,7 +52,6 @@ def parse_github_url(entity_spec):
     }
 
 
-# TODO: add tests
 def get_current_rebase_branch():
     current_branch = None
     for rebase_file in ("rebase-merge", "rebase-apply"):
@@ -67,15 +67,10 @@ def get_current_rebase_branch():
     return current_branch
 
 
-# TODO: add tests
-
-
 def get_current_branch():
     return run("git symbolic-ref --short HEAD")
 
 
-# TODO: add tests
-# TODO: not sure how much of this is needed w/o submodules
 def get_target_branch(target_branch=None):
     """Gets the branch to push on and checks if we're overriding something.
 
@@ -97,14 +92,19 @@ def get_target_branch(target_branch=None):
     return target_branch
 
 
-def check_git_diff(direct_abort=False):
-    try:
-        run("git diff --quiet --exit-code")
-        run("git diff --cached --quiet --exit-code")
-    except Exception:
-        if direct_abort:
-            ui.exit_msg("Your repository has local changes. Abort.")
-        # FIXME: should be where it gets called
-        ui.ask_or_abort(
-            "Your repository has local changes, are you sure you want to continue?"
-        )
+def check_git_diff():
+    """Check whether the working tree has staged or unstaged changes.
+
+    Returns True if there are uncommitted changes, False otherwise.
+    Git uses exit code 1 to signal differences; other non-zero codes
+    (e.g. 128 when not in a git repository) are treated as no diff.
+    """
+    unstaged = subprocess.run(
+        ["git", "diff", "--quiet", "--exit-code"],
+        capture_output=True,
+    )
+    staged = subprocess.run(
+        ["git", "diff", "--cached", "--quiet", "--exit-code"],
+        capture_output=True,
+    )
+    return unstaged.returncode == 1 or staged.returncode == 1
