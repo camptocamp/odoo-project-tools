@@ -7,10 +7,10 @@ from ..exceptions import ProjectConfigException
 from ..utils.config import config
 from ..utils.git import get_current_branch
 from ..utils.marabunta import MarabuntaFileHandler
-from ..utils.misc import get_ini_cfg_key
 from ..utils.os_exec import run
 from ..utils.path import build_path
 from ..utils.pending_merge import push_branches
+from ..utils.proj import get_current_version
 
 END_TIPS = [
     "Please continue with the release by:",
@@ -24,18 +24,17 @@ END_TIPS = [
 ]
 
 
-def get_bumpversion_cfg_key(cfg_content, key):
-    return get_ini_cfg_key(cfg_content, "bumpversion", key)
-
-
 def make_bumpversion_cmd(rel_type, new_version=None, dry_run=False):
-    cmd = ["bumpversion", "--list"]
-    if new_version:
-        cmd.append(f"--new-version {new_version}")
     if dry_run:
-        cmd.append("--dry-run")
+        cmd = ["bump-my-version", "show", "new_version", "--increment", rel_type]
+        if new_version:
+            cmd.extend(["--new-version", new_version])
+        return cmd
+    cmd = ["bump-my-version", "bump"]
+    if new_version:
+        cmd.extend(["--new-version", new_version])
     cmd.append(rel_type)
-    return " ".join(cmd)
+    return cmd
 
 
 def make_towncrier_cmd(version):
@@ -76,11 +75,13 @@ def bump(rel_type, new_version=None, dry_run=False, commit=False):
     """Prepare a new release"""
     cmd = make_bumpversion_cmd(rel_type, new_version=new_version, dry_run=dry_run)
     res = run(cmd, check=True, verbose=True)
-    new_version = get_bumpversion_cfg_key(res, "new_version").strip()
 
     if dry_run:
+        new_version = res.strip()
         click.echo(f"New version: {new_version}")
         return
+
+    new_version = get_current_version()
 
     cmd = make_towncrier_cmd(new_version)
     run(cmd, check=True, verbose=True)
