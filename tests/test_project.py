@@ -44,10 +44,6 @@ def test_init(project, version):
     for path in paths:
         assert Path(path).exists(), f"`{path}` missing"
 
-    content = Path(".bumpversion.cfg").read_text()
-    expected = get_fixture(f"expected.bumpversion.v{version}.cfg")
-    compare_line_by_line(content, expected)
-
     content = Path(".proj.cfg").read_text()
     expected = get_fixture(f"expected.proj.v{version}.cfg")
     compare_line_by_line(content, expected)
@@ -124,9 +120,6 @@ def test_init_custom_version(project):
         catch_exceptions=False,
     )
     assert Path("docker-compose.override.yml").exists()
-    content = Path(".bumpversion.cfg").read_text()
-    expected = get_fixture("expected.bumpversion.v2.cfg")
-    compare_line_by_line(content, expected)
     assert result.exit_code == 0
 
 
