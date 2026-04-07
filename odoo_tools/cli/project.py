@@ -20,8 +20,6 @@ from ..utils.misc import (
 from ..utils.path import build_path
 from ..utils.proj import (
     generate_odoo_config_file,
-    get_current_version,
-    get_project_bundle_addon_name,
     setup_venv,
 )
 
@@ -32,31 +30,6 @@ def get_proj_tmpl_ver():
     if ver:
         ui.echo(f"Proj version override: {ver}", fg="red")
     return ver
-
-
-def get_bumpversion_vars(opts):
-    version = opts.version or get_current_version()
-    odoo_major, odoo_minor, __ = version.split(".", 2)
-    bundle_addon_manifest_rel_path = (
-        config.local_src_rel_path / get_project_bundle_addon_name() / "__manifest__.py"
-    )
-    res = {
-        "rel_path_local_addons": config.local_src_rel_path.as_posix(),
-        "rel_path_version_file": (
-            config.version_file_rel_path.as_posix()
-            if config.version_file_rel_path
-            else None
-        ),
-        "rel_path_bundle_addon_manifest": (
-            bundle_addon_manifest_rel_path.as_posix()
-            if build_path(bundle_addon_manifest_rel_path).is_file()
-            else None
-        ),
-        "current_version": version,
-        "odoo_major": odoo_major,
-        "odoo_minor": odoo_minor,
-    }
-    return res
 
 
 def convert_history_to_towncrier(history_path):
@@ -161,13 +134,6 @@ def get_init_template_files():
         {
             "source": "docker-compose.override.tmpl.yml",
             "destination": build_path("./docker-compose.override.yml"),
-        },
-        {
-            "source": ".bumpversion.tmpl.cfg",
-            "destination": build_path("./.bumpversion.cfg"),
-            "variables_getter": get_bumpversion_vars,
-            "check": lambda source_path, dest_path: not dest_path.exists(),
-            "backup": False,
         },
         {
             "source": "towncrier.tmpl.toml",
