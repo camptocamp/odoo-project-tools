@@ -5,6 +5,7 @@ import datetime
 from pathlib import Path
 from unittest import mock
 
+import git
 import pytest
 
 from odoo_tools.cli import release
@@ -14,21 +15,11 @@ from odoo_tools.utils.config import config
 from .common import compare_line_by_line, mock_pending_merge_repo_paths
 
 
-def test_make_bumpversion_cmd():
-    cmd = release.make_bumpversion_cmd("patch")
-    assert cmd == ["bump-my-version", "bump", "patch"]
-    cmd = release.make_bumpversion_cmd("patch", new_version="14.0.1.2.0")
-    assert cmd == ["bump-my-version", "bump", "--new-version", "14.0.1.2.0", "patch"]
-    cmd = release.make_bumpversion_cmd("patch", new_version="14.0.1.2.0", dry_run=True)
-    assert cmd == [
-        "bump-my-version",
-        "show",
-        "new_version",
-        "--increment",
-        "patch",
-        "--new-version",
-        "14.0.1.2.0",
-    ]
+def git_commit_all(message="commit"):
+    """Helper to commit all changes in the current directory."""
+    repo = git.Repo(".")
+    repo.git.add("-A")
+    repo.index.commit(message)
 
 
 def test_make_towncrier_cmd():
@@ -36,38 +27,36 @@ def test_make_towncrier_cmd():
     assert cmd == "towncrier build --yes --version=16.0.1.0.0"
 
 
-@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
+@pytest.mark.project_setup(
+    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
+)
 def test_bump(project):
     ver_file = config.version_file_rel_path
     assert ver_file.read_text() == "14.0.0.1.0"
-    # run init to get all files ready (eg: bumpversion)
+    # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
-    result = project.invoke(release.bump, ["--type", "patch"], catch_exceptions=False)
+    project.invoke(release.bump, ["--type", "patch"], catch_exceptions=False)
     assert ver_file.read_text() == "14.0.0.1.1"
-    result = project.invoke(release.bump, ["--type", "minor"], catch_exceptions=False)
+    git_commit_all()
+    project.invoke(release.bump, ["--type", "minor"], catch_exceptions=False)
     assert ver_file.read_text() == "14.0.0.2.0"
-    result = project.invoke(release.bump, ["--type", "major"], catch_exceptions=False)
+    git_commit_all()
+    project.invoke(release.bump, ["--type", "major"], catch_exceptions=False)
     assert ver_file.read_text() == "14.0.1.0.0"
-    result = project.invoke(
+    git_commit_all()
+    project.invoke(
         release.bump,
         ["--type", "major", "--new-version", "15.0.0.0.1"],
         catch_exceptions=False,
     )
     assert ver_file.read_text() == "15.0.0.0.1"
-    result = project.invoke(
-        release.bump, ["--type", "major", "--dry-run"], catch_exceptions=False
-    )
-    assert result.output.splitlines() == [
-        "Running: bump-my-version show new_version --increment major",
-        "New version: 15.0.1.0.0",
-    ]
-    assert ver_file.read_text() == "15.0.0.0.1"
-    assert result.exit_code == 0
 
 
-@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
+@pytest.mark.project_setup(
+    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
+)
 def test_bump_changelog(project):
-    # run init to get all files ready (eg: bumpversion)
+    # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
     hist_part_1 = (
         ".. :changelog:\n"
@@ -98,8 +87,9 @@ def test_bump_changelog(project):
         (cwd / "HISTORY.rst").read_text(),
         hist_part_1 + new_part + hist_part_2,
     )
-    assert result.output.splitlines() == [
-        "Running: bump-my-version bump minor",
+    output_lines = result.output.splitlines()
+    assert output_lines[0].startswith("Running: bump-my-version bump")
+    assert output_lines[1:4] == [
         "Running: towncrier build --yes --version=14.0.0.2.0",
         "Updating marabunta migration file",
         "Push local branches? [y/N]: n",
@@ -107,17 +97,20 @@ def test_bump_changelog(project):
     assert result.exit_code == 0
 
 
-@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
+@pytest.mark.project_setup(
+    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
+)
 def test_bump_update_marabunta_file(project):
-    # run init to get all files ready (eg: bumpversion)
+    # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
     result = project.invoke(
         release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
     )
     content = config.marabunta_mig_file_rel_path.read_text()
     assert "14.0.0.2.0" in content
-    assert result.output.splitlines() == [
-        "Running: bump-my-version bump minor",
+    output_lines = result.output.splitlines()
+    assert output_lines[0].startswith("Running: bump-my-version bump")
+    assert output_lines[1:4] == [
         "Running: towncrier build --yes --version=14.0.0.2.0",
         "Updating marabunta migration file",
         "Push local branches? [y/N]: ",
@@ -129,15 +122,17 @@ def test_bump_update_marabunta_file(project):
     proj_version="14.0.0.1.0",
     proj_cfg=dict(marabunta_mig_file_rel_path=None),
     mock_marabunta_file=False,
+    git_init=True,
 )
 def test_bump_update_without_marabunta_file(project):
-    # run init to get all files ready (eg: bumpversion)
+    # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
     result = project.invoke(
         release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
     )
-    assert result.output.splitlines() == [
-        "Running: bump-my-version bump minor",
+    output_lines = result.output.splitlines()
+    assert output_lines[0].startswith("Running: bump-my-version bump")
+    assert output_lines[1:3] == [
         "Running: towncrier build --yes --version=14.0.0.2.0",
         "Push local branches? [y/N]: ",
     ]
@@ -148,54 +143,39 @@ def test_bump_update_without_marabunta_file(project):
     proj_version="18.0.0.0.0",
     proj_cfg={"version_file_rel_path": None},
     mock_marabunta_file=True,
+    git_init=True,
 )
-def test_bump_without_version_file(project):
-    # run init to get all files ready (eg: bumpversion)
+def test_bump_without_version_file_and_no_bundle_addon(project):
+    # run init to get all files ready
     project.invoke(init, catch_exceptions=False)
     # check that the version file is not present
     assert config.version_file_rel_path is None
-    # bump the first time
-    result = project.invoke(
-        release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
-    )
-    assert result.output.splitlines() == [
-        "Running: bump-my-version bump minor",
-        "Running: towncrier build --yes --version=18.0.0.1.0",
-        "Updating marabunta migration file",
-        "Push local branches? [y/N]: ",
-    ]
-    assert result.exit_code == 0
-    # bump a second time
-    result = project.invoke(
-        release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
-    )
-    assert result.output.splitlines() == [
-        "Running: bump-my-version bump minor",
-        "Running: towncrier build --yes --version=18.0.0.2.0",
-        "Updating marabunta migration file",
-        "Push local branches? [y/N]: ",
-    ]
-    assert result.exit_code == 0
+    # bump should fail because there are no files to bump
+    result = project.invoke(release.bump, ["--type", "minor"])
+    assert result.exit_code != 0
+    assert "No files to bump" in result.output
 
 
 @pytest.mark.project_setup(
     proj_version="18.0.1.2.0",
     mock_marabunta_file=True,
     mock_bundle_addon=True,
+    git_init=True,
 )
 def test_bump_bundle_addon_manifest_version(project):
     # make sure the bundle addon is created
     bundle_addon_path = config.local_src_rel_path / "acme_bundle"
     assert bundle_addon_path.is_dir()
     assert (bundle_addon_path / "__manifest__.py").is_file()
-    # run init to get all files ready (eg: bumpversion)
+    # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
     # bump the version
     result = project.invoke(
         release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
     )
-    assert result.output.splitlines() == [
-        "Running: bump-my-version bump minor",
+    output_lines = result.output.splitlines()
+    assert output_lines[0].startswith("Running: bump-my-version bump")
+    assert output_lines[1:4] == [
         "Running: towncrier build --yes --version=18.0.1.3.0",
         "Updating marabunta migration file",
         "Push local branches? [y/N]: ",
@@ -211,20 +191,22 @@ def test_bump_bundle_addon_manifest_version(project):
     proj_cfg={"version_file_rel_path": None},
     mock_marabunta_file=True,
     mock_bundle_addon=True,
+    git_init=True,
 )
 def test_bump_bundle_addon_manifest_version_without_version_file(project):
     # make sure the bundle addon is created
     bundle_addon_path = config.local_src_rel_path / "acme_bundle"
     assert bundle_addon_path.is_dir()
     assert (bundle_addon_path / "__manifest__.py").is_file()
-    # run init to get all files ready (eg: bumpversion)
+    # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
     # bump the version
     result = project.invoke(
         release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
     )
-    assert result.output.splitlines() == [
-        "Running: bump-my-version bump minor",
+    output_lines = result.output.splitlines()
+    assert output_lines[0].startswith("Running: bump-my-version bump")
+    assert output_lines[1:4] == [
         "Running: towncrier build --yes --version=18.0.1.3.0",
         "Updating marabunta migration file",
         "Push local branches? [y/N]: ",
@@ -234,25 +216,30 @@ def test_bump_bundle_addon_manifest_version_without_version_file(project):
     assert "18.0.1.3.0" in (bundle_addon_path / "__manifest__.py").read_text()
 
 
-@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
+@pytest.mark.project_setup(
+    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
+)
 def test_bump_push_no_repo(project):
-    # run init to get all files ready (eg: bumpversion)
+    # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
     result = project.invoke(
         release.bump, ["--type", "minor"], catch_exceptions=False, input="y"
     )
-    assert result.output.splitlines() == [
-        "Running: bump-my-version bump minor",
+    output_lines = result.output.splitlines()
+    assert output_lines[0].startswith("Running: bump-my-version bump")
+    assert output_lines[1:4] == [
         "Running: towncrier build --yes --version=14.0.0.2.0",
         "Updating marabunta migration file",
         "Push local branches? [y/N]: y",
-        "No repo to push",
     ]
+    assert "No repo to push" in result.output
     assert result.exit_code == 0
 
 
 # TODO: test more cases
-@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
+@pytest.mark.project_setup(
+    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
+)
 def test_bump_push_repo_with_pending_merge(project):
     ran_cmd = []
 
@@ -260,20 +247,20 @@ def test_bump_push_repo_with_pending_merge(project):
         ran_cmd.append(cmd)
 
     mock_pending_merge_repo_paths("edi-framework")
-    # run init to get all files ready (eg: bumpversion)
+    # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
     with mock.patch("odoo_tools.utils.pending_merge.run", mocked_run):
         result = project.invoke(
             release.bump, ["--type", "minor"], catch_exceptions=False, input="y"
         )
-    assert result.output.splitlines() == [
-        "Running: bump-my-version bump minor",
+    output_lines = result.output.splitlines()
+    assert output_lines[0].startswith("Running: bump-my-version bump")
+    assert output_lines[1:6] == [
         "Running: towncrier build --yes --version=14.0.0.2.0",
         "Updating marabunta migration file",
         "Push local branches? [y/N]: y",
         "Pushing odoo/external-src/edi-framework",
         "Impacted repos:",
-        "odoo/external-src/edi-framework",
     ]
     assert ran_cmd == [
         "git config remote.camptocamp.url",

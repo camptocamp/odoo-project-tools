@@ -7,7 +7,7 @@ from functools import cache
 
 from . import addon, ui
 from .config import config
-from .misc import get_ini_cfg_key, get_template_path
+from .misc import get_template_path
 from .path import build_path, get_root_marker, root_path
 from .yaml import yaml_load
 
@@ -37,31 +37,13 @@ def get_odoo_serie():
 def get_current_version():
     """Gets the current project version
 
-    Historically, we stored the version in the VERSION file.
+    The version is read from the following sources, in order:
 
-    However, since we started using bumpversion it became sort of redundant with the
-    bumpversion config file's `current_version` key.
-
-    Moreover, projects generated with the `odoosh-template` do not have a VERSION file,
-    they simply use the bundle addon manifest's version.
-
-    This method will then try to identify the current version like so:
-
-    - Read the bumpversion config file's `current_version` key.
-    - Fallback to the VERSION file, if it's configured in the project config.
-    - Fallback to the bundle addon manifest's version, if it exists.
+    - The VERSION file, if it's configured in the project config.
+    - The bundle addon manifest's version, if it exists.
     - Generate a new blank version on-the-fly "$ODOO_VERSION.0.0.0" otherwise
     """
-    # Attempt to read from the bumpversion config file
-    bumpversion_config_path = build_path(".bumpversion.cfg")
-    if bumpversion_config_path.is_file():
-        bumpversion_config = bumpversion_config_path.read_text()
-        current_version = get_ini_cfg_key(
-            bumpversion_config, "bumpversion", "current_version"
-        )
-        if current_version:
-            return current_version
-    # Fallback to the VERSION file, if it exists
+    # Read from the VERSION file, if it exists
     if config.version_file_rel_path is not None:
         version_file_path = build_path(config.version_file_rel_path)
         return version_file_path.read_text().strip()
