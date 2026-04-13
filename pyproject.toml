@@ -36,7 +36,7 @@ dependencies = [
     "rich",
     "towncrier",
     "bump-my-version",
-    "requirements-parser>=0.8.0",
+    "requirements-parser>=0.13.0",
     "Jinja2",
     ]
 requires-python = ">=3.10"
