@@ -22,7 +22,7 @@ dependencies = [
     "passlib",
     "clipboard",
     "pre-commit",
-    "psycopg2-binary>=2.7.6",
+    "psycopg2-binary>=2.9.12",
     "gitpython",
     "packaging",
     "setuptools",
