@@ -4,12 +4,11 @@ import click
 
 from ..utils import git, path, proj, ui
 from ..utils import pending_merge as pm_utils
-from ..utils.click import version_option, with_update_check
+from ..utils.click import global_command_decorators
 
 
 @click.group()
-@version_option
-@with_update_check
+@global_command_decorators
 def cli():
     pass
 

@@ -10,7 +10,14 @@ from pathlib import Path
 from textwrap import indent
 from typing import Annotated, Any
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, ValidationError
+from packaging.version import InvalidVersion, Version
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    ValidationError,
+    field_validator,
+)
 
 from ..exceptions import ProjectConfigException
 from .misc import parse_ini_cfg
@@ -102,6 +109,25 @@ class ProjectConfig(BaseModel):
 
     marabunta_mig_file_rel_path: OptionalPath = None
     """The path to the Marabunta migration file."""
+
+    otools_min_version: Annotated[str | None, BeforeValidator(falsy_to_none)] = None
+    """The minimum required version of odoo-tools to operate on this project.
+
+    If set, any ``otools-*`` command will refuse to run when the installed
+    version is lower than this one. Useful to enforce a baseline on shared
+    projects. Example: ``otools_min_version = 0.14.0``.
+    """
+
+    @field_validator("otools_min_version")
+    @classmethod
+    def _validate_otools_min_version(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            Version(v)
+        except InvalidVersion as exc:
+            raise ValueError(f"not a valid version string: {v!r}") from exc
+        return v
 
 
 class LazyConfig:

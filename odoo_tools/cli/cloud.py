@@ -8,7 +8,7 @@ from pathlib import Path
 import click
 
 from .. import utils
-from ..utils.click import version_option, with_update_check
+from ..utils.click import global_command_decorators
 
 
 def get_customer_name_from_project_name(project_name: str) -> str:
@@ -66,8 +66,7 @@ def get_celebrimbor_dump_list(platform=None, customer=None, env="int"):
 
 @click.group()
 @click.option("--debug", is_flag=True)
-@version_option
-@with_update_check
+@global_command_decorators
 def cli(**kwargs):
     """Cloud platform commands."""
     pass

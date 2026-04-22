@@ -10,7 +10,7 @@ import jinja2
 from git import Repo as GitRepo
 
 from ..utils import git, ui
-from ..utils.click import version_option, with_update_check
+from ..utils.click import global_command_decorators
 from ..utils.config import PROJ_CFG_FILE, config
 from ..utils.misc import (
     SmartDict,
@@ -194,8 +194,7 @@ def bootstrap_files(opts):
 
 
 @click.group()
-@version_option
-@with_update_check
+@global_command_decorators
 def cli():
     pass
 

@@ -4,13 +4,34 @@ from functools import wraps
 import click
 
 from .. import __version__
+from .minimum_version import with_minimum_version_check
 from .update_check import with_update_check
 
-__all__ = ["handle_exceptions", "version_option", "with_update_check"]
+__all__ = [
+    "handle_exceptions",
+    "global_command_decorators",
+    "version_option",
+    "with_minimum_version_check",
+    "with_update_check",
+]
 
 version_option = click.version_option(
     __version__, "-V", "--version", package_name="odoo-tools"
 )
+
+
+def global_command_decorators(func):
+    """Apply the standard ``otools-*`` pre-invoke hooks.
+
+    Bundles (in order): update-available check, project ``otools_min_version``
+    enforcement, and the ``-V`` / ``--version`` flag. Place it right above
+    ``def cli(...):`` so it wraps the callback; ``@click.group()`` /
+    ``@click.command()`` and any CLI-specific options stay where they are.
+    """
+    func = with_update_check(func)
+    func = with_minimum_version_check(func)
+    func = version_option(func)
+    return func
 
 
 def handle_exceptions() -> Callable:
