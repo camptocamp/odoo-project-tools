@@ -4,6 +4,9 @@ from functools import wraps
 import click
 
 from .. import __version__
+from .update_check import with_update_check
+
+__all__ = ["handle_exceptions", "version_option", "with_update_check"]
 
 version_option = click.version_option(
     __version__, "-V", "--version", package_name="odoo-tools"

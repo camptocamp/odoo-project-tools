@@ -19,6 +19,7 @@ ODOO_PROJECT_URL = "https://{subdomain}.odoo.camptocamp.{country}"
 @click.group()
 @click.option("--debug", is_flag=True)
 @utils.click.version_option
+@utils.click.with_update_check
 def cli(**kwargs):
     """Password management tools."""
 
