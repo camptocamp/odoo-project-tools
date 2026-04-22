@@ -48,6 +48,7 @@ def _build_odoo_i18n_export_cmd(module_name, language, database, export_path):
 
 @click.group()
 @click.option("--debug", is_flag=True)
+@utils.click.version_option
 def cli(**kwargs):
     """Internationalization (i18n) commands."""
     pass

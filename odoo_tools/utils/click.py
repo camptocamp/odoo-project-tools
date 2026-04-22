@@ -3,6 +3,12 @@ from functools import wraps
 
 import click
 
+from .. import __version__
+
+version_option = click.version_option(
+    __version__, "-V", "--version", package_name="odoo-tools"
+)
+
 
 def handle_exceptions() -> Callable:
     """Decorator to handle exceptions and print a nice error message.

@@ -6,6 +6,7 @@ import click
 
 from ..utils import req as req_utils
 from ..utils import ui
+from ..utils.click import version_option
 from ..utils.config import config
 from ..utils.misc import SmartDict
 from ..utils.path import build_path, is_odoo_module
@@ -14,6 +15,7 @@ from ..utils.pypi import odoo_name_to_pkg_name
 
 
 @click.group()
+@version_option
 def cli():
     pass
 
