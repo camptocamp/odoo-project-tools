@@ -1,1 +1,0 @@
-otools-password: generate and store password in lastpass

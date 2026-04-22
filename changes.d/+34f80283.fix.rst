@@ -1,1 +1,0 @@
-otools-project checkout-local-odoo: use docker compose command

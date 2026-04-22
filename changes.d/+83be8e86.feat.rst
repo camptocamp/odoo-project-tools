@@ -1,1 +1,0 @@
-otools-db addons list: show list of installed addons

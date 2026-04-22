@@ -1,1 +1,0 @@
-otools-pending remove: crash when removing last pending merge

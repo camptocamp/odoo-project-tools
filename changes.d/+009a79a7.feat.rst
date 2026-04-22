@@ -1,1 +1,0 @@
-init: do not overwrite bumpversion and towncrier files, if they exist

@@ -1,3 +1,54 @@
+0.13.0 (2026-04-22)
++++++++++++++++++++
+
+**Features and Improvements**
+
+* Implement CLI commands for db and cloud platform
+* Remove project conversion tool and flag the code for deprecated "version 2" features
+* otools-ba run: ask if an existing database should be reused
+* Implement otools-submodule push (ported invoke submodule.push)
+* Implement otools-submodule upgrade (ported invoke submodule.upgrade)
+* init: do not overwrite bumpversion and towncrier files, if they exist
+* init: don't backup bumpversion config
+* init: don't backup if nothing changes
+* otools-addon where: finds an addon by name
+* otools-db addons list: show list of installed addons
+* otools-password: generate and store password in lastpass
+* otools-pr test: improved DB handling
+* otools-pr: add command ``checkout``
+* otools-project init: convert HISTORY.rst to towncrier format
+
+**Bugfixes**
+
+* fix detection of instance readiness and avoid launching the browser multiple times
+* fix crash on otools-pr test when the version reported by docker compose is not made only of integers (#95)
+* Cleanup deprecated FIXME comments in proj.v1.cfg
+* Fix wrong config import from conversion tool
+* Remove unnecessary odoorpc import/check
+* Wrong branch name in conversion docs
+* otools-convert: keep the existing bundle addons
+* otools-convert: use local-env when running commands
+* otools-i18n export: compatibility with Odoo 19.0
+* otools-pending add: update .gitmodules when adding first pending merge
+* otools-pending remove: crash when removing last pending merge
+* otools-pr: lesser fix to ``clean``
+* otools-project checkout-local-odoo: use docker compose command
+
+**Remove**
+
+* otools-addon: remove deprecated ``add`` and ``add-pending`` commands
+* otools-tasks: nothing left here
+
+**Documentation**
+
+* Add install instructions with uv
+* Simplify docs for conversion, without extra libraries step
+
+**Build**
+
+* Bump git-aggregator to 4.1 and drop the pending merge dep
+* Remove marabunta dependency
+
 0.12.0 (2025-06-25)
 +++++++++++++++++++
 

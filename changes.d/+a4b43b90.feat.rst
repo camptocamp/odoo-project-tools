@@ -1,1 +1,0 @@
-otools-project init: convert HISTORY.rst to towncrier format

@@ -1,1 +1,0 @@
-fix crash on otools-pr test when the version reported by docker compose is not made only of integers (#95)
