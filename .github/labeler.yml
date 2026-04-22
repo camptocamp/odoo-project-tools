@@ -1,0 +1,68 @@
+"tool:tasks":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'odoo_tools/tasks/**'
+          - 'tests/test_tasks.py'
+
+"tool:project":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'odoo_tools/cli/project.py'
+          - 'tests/test_project.py'
+
+"tool:addon":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'odoo_tools/cli/addon.py'
+          - 'tests/test_addon_*.py'
+
+"tool:submodule":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'odoo_tools/cli/submodule.py'
+          - 'tests/test_submodule.py'
+
+"tool:release":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'odoo_tools/cli/release.py'
+          - 'tests/test_release.py'
+
+"tool:pending":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'odoo_tools/cli/pending.py'
+
+"tool:conversion":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'odoo_tools/conversion/**'
+
+"tool:ba":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'odoo_tools/cli/batools.py'
+
+"tool:pr":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'odoo_tools/cli/pr.py'
+
+"tool:migrate-db":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'odoo_tools/cli/migrate_db.py'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**'
+          - '**/*.md'
+          - '**/*.rst'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'tests/**'
+          - '.github/**'
+          - '.pre-commit-config.yaml'
