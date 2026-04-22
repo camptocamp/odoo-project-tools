@@ -71,13 +71,22 @@ test = [
 ]
 
 [build-system]
-requires = ["setuptools>=82.0.1", "setuptools_scm[toml]>=10.0.5"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.27.0", "hatch-vcs>=0.5.0"]
+build-backend = "hatchling.build"
 
-[tool.setuptools.packages]
-find = {}
+[tool.hatch.version]
+source = "vcs"
 
-[tool.setuptools_scm]
+[tool.hatch.build.targets.wheel]
+packages = ["odoo_tools"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "odoo_tools",
+    "HISTORY.rst",
+    "LICENSE",
+    "README.md",
+]
 
 [tool.coverage.run]
 source = ["odoo_tools"]

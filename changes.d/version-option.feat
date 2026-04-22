@@ -1,0 +1,3 @@
+All ``otools-*`` commands now accept a ``-V`` / ``--version`` flag that prints
+the installed ``odoo-tools`` version. The package also exposes
+``odoo_tools.__version__``.

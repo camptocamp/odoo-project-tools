@@ -17,6 +17,7 @@ console = Console()
 
 @click.group()
 @click.option("--debug", is_flag=True)
+@utils.click.version_option
 def cli(**kwargs):
     """Database management commands."""
     pass
