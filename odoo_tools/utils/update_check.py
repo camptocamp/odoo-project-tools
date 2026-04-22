@@ -83,7 +83,7 @@ def _compare(current: str, latest: str) -> bool:
         return False
 
 
-def _upgrade_command(prefix: str | None = None) -> str:
+def upgrade_command(prefix: str | None = None) -> str:
     """Return the best-guess upgrade command for the current install layout."""
     prefix = prefix or sys.prefix
     parts = Path(prefix).parts
@@ -108,7 +108,7 @@ def check_for_update() -> None:
     click.secho(
         f"A new version of odoo-tools is available: {latest} "
         f"(installed: {__version__})\n"
-        f"  Update with: {_upgrade_command()}",
+        f"  Update with: {upgrade_command()}",
         fg="yellow",
         err=True,
     )

@@ -6,7 +6,7 @@ from git import Repo as GitRepo
 from rich.console import Console
 
 from ..exceptions import ProjectConfigException
-from ..utils.click import version_option, with_update_check
+from ..utils.click import global_command_decorators
 from ..utils.config import config
 from ..utils.git import get_current_branch
 from ..utils.marabunta import MarabuntaFileHandler
@@ -89,8 +89,7 @@ def update_marabunta_file(version):
 
 
 @click.group()
-@version_option
-@with_update_check
+@global_command_decorators
 def cli():
     pass
 

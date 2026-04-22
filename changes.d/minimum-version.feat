@@ -1,0 +1,5 @@
+A project's ``.proj.cfg`` can now declare ``otools_min_version``, the
+minimum version of ``odoo-tools`` required to operate on that project.
+When the installed version is older, every ``otools-*`` command exits
+with a clear error pointing to the required version and the upgrade
+command for the detected install layout.

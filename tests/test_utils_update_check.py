@@ -127,7 +127,7 @@ def test_compare(current, latest, expected):
     ],
 )
 def test_upgrade_command(prefix, expected):
-    assert update_check._upgrade_command(prefix) == expected
+    assert update_check.upgrade_command(prefix) == expected
 
 
 def test_check_for_update_prints_warning(cache_dir, mocked_releases, capsys):
@@ -167,7 +167,7 @@ def test_check_for_update_suggests_detected_install_method(
     with (
         patch.object(update_check, "__version__", "0.13.0"),
         patch.object(
-            update_check, "_upgrade_command", return_value="pipx upgrade odoo-tools"
+            update_check, "upgrade_command", return_value="pipx upgrade odoo-tools"
         ),
     ):
         update_check.check_for_update()

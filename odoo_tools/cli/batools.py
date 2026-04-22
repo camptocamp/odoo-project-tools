@@ -10,7 +10,7 @@ import click
 import jinja2
 
 from ..utils import docker_compose, ui
-from ..utils.click import version_option, with_update_check
+from ..utils.click import global_command_decorators
 from ..utils.misc import get_cache_path
 from ..utils.path import cd
 
@@ -21,8 +21,7 @@ def _check_docker_compose_file_is_old(dcfile) -> bool:
 
 
 @click.group()
-@version_option
-@with_update_check
+@global_command_decorators
 def cli():
     pass
 
