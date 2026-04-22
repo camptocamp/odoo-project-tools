@@ -5,11 +5,12 @@ import click
 
 from ..utils import pending_merge as pm_utils
 from ..utils import ui
-from ..utils.click import version_option
+from ..utils.click import version_option, with_update_check
 
 
 @click.group()
 @version_option
+@with_update_check
 def cli():
     pass
 

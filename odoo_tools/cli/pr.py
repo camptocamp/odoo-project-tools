@@ -6,13 +6,14 @@ from pathlib import Path
 import click
 
 from ..utils import db, docker_compose, gh, git, ui
-from ..utils.click import version_option
+from ..utils.click import version_option, with_update_check
 from ..utils.os_exec import run
 from ..utils.path import cd, root_path
 
 
 @click.group()
 @version_option
+@with_update_check
 def cli():
     pass
 

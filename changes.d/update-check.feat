@@ -1,0 +1,4 @@
+``otools-*`` commands now check once every 24 hours for a new release on
+GitHub and print a warning on stderr when one is available. The result is
+cached under ``~/.cache/otools/update-check.json``. Set
+``OTOOLS_SKIP_UPDATE_CHECK=1`` to opt out (for example in CI).

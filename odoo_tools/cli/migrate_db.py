@@ -33,7 +33,7 @@ from urllib.request import urlretrieve
 import click
 import psycopg2
 
-from ..utils.click import version_option
+from ..utils.click import version_option, with_update_check
 from ..utils.path import build_path, root_path
 from ..utils.proj import get_current_version
 
@@ -96,6 +96,7 @@ def dt():
     help="Do not generate database snapshots after each migration step.",
 )
 @version_option
+@with_update_check
 @click.pass_context
 def cli(
     ctx: click.Context,

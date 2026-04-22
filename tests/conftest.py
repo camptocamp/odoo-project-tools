@@ -72,3 +72,13 @@ def all_template_versions(project):
 @pytest.fixture(autouse=True)
 def clear_caches():
     get_project_manifest.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def skip_update_check(monkeypatch):
+    """Disable the update check for every test.
+
+    The tests that exercise the check itself opt in by clearing this
+    environment variable in their own fixture.
+    """
+    monkeypatch.setenv("OTOOLS_SKIP_UPDATE_CHECK", "1")
