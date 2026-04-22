@@ -26,7 +26,7 @@ dependencies = [
     "gitpython",
     "packaging",
     "setuptools",
-    "pydantic>=2.0.0",
+    "pydantic>=2.13.3",
     "pyyaml>=6.0.3",
     "ruamel.yaml",
     "kaptan==0.6.0",
