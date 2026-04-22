@@ -1,0 +1,47 @@
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+  categories:
+    - title: otools-tasks
+      labels:
+        - 'tool:tasks'
+    - title: otools-project
+      labels:
+        - 'tool:project'
+    - title: otools-addon
+      labels:
+        - 'tool:addon'
+    - title: otools-submodule
+      labels:
+        - 'tool:submodule'
+    - title: otools-release
+      labels:
+        - 'tool:release'
+    - title: otools-pending
+      labels:
+        - 'tool:pending'
+    - title: otools-conversion
+      labels:
+        - 'tool:conversion'
+    - title: otools-ba
+      labels:
+        - 'tool:ba'
+    - title: otools-pr
+      labels:
+        - 'tool:pr'
+    - title: otools-migrate-db
+      labels:
+        - 'tool:migrate-db'
+    - title: Documentation
+      labels:
+        - documentation
+    - title: CI & Tooling
+      labels:
+        - ci
+    - title: Dependencies
+      labels:
+        - dependencies
+    - title: Other Changes
+      labels:
+        - '*'
