@@ -1,17 +1,34 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import arrow
 import click
+from rich.console import Console
+from rich.live import Live
+from rich.spinner import Spinner
+from rich.table import Table
 
 from ..utils import pending_merge as pm_utils
-from ..utils import ui
-from ..utils.click import global_command_decorators
+from ..utils.click import deprecated_option, global_command_decorators
+
+console = Console()
+
+PR_STATE_STYLES = {"open": "green", "closed": "red", "merged": "magenta"}
 
 
 @click.group()
 @global_command_decorators
 def cli():
     pass
+
+
+def _resolve_repos(repo_paths):
+    if not repo_paths:
+        return pm_utils.Repo.repositories_from_pending_folder()
+    return [pm_utils.Repo(repo_path) for repo_path in repo_paths]
 
 
 @cli.command(name="show")
@@ -21,36 +38,144 @@ def cli():
     nargs=-1,
 )
 @click.option(
-    "-s",
-    "--state",
-    "state",
-    help="only list pull requests in the specified state",
-    type=click.Choice(["open", "merged", "closed"], case_sensitive=False),
-)
-@click.option(
-    "-p",
-    "--purge",
-    "purge",
-    help="remove the pull request in a state matching the value if the option from the git-aggregator file",
-    type=click.Choice(["closed", "merged"], case_sensitive=False),
-)
-@click.option(
-    "--yes-all/--no-all",
-    "yes_all",
+    "--check/--no-check",
+    "check",
     is_flag=True,
     default=True,
-    help="assume yes to all questions, useful for automation",
+    help="Check each pull request's state via the GitHub API",
 )
-def show_pending(repo_paths=(), state=None, purge=None, yes_all=True):
-    """List pull requests on <repo_path>"""
-    if yes_all:
-        ui.echo("``--yes-all`` flag on -> Assuming yes to all questions")
-    if not repo_paths:
-        repositories = pm_utils.Repo.repositories_from_pending_folder()
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Output as JSON",
+)
+@deprecated_option(
+    "--purge",
+    message="`--purge` has been removed from `otools-pending show`. "
+    "Use `otools-pending clean` instead.",
+)
+def show_pending(repo_paths=(), check=True, as_json=False):
+    """List pull requests on <repo_path>."""
+    repos = _resolve_repos(repo_paths)
+    all_prs = [pr for repo in repos for pr in repo._iter_pending_pull_requests()]
+    # In case of --json, output directly
+    if as_json:
+        if check:
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                list(pool.map(lambda pr: pr.enrich_with_github(), all_prs))
+        click.echo(json.dumps([pr.to_dict() for pr in all_prs], indent=2, default=str))
+        return
+
+    def build_grid():
+        grid = Table.grid(padding=(0, 1))
+        grid.add_column(no_wrap=True)  # state dot / spinner
+        grid.add_column(no_wrap=True)  # shortcut (linked)
+        grid.add_column(no_wrap=True, style="dim")  # patch marker
+        grid.add_column(no_wrap=True, overflow="ellipsis")  # title
+        grid.add_column(no_wrap=True, justify="right", style="dim")  # last updated
+        for pr in all_prs:
+            if not check:
+                state_cell, updated, title = "-", "", ""
+            elif not pr.is_enriched:
+                state_cell, updated, title = Spinner("dots"), "", ""
+            else:
+                state = "merged" if pr.merged else pr.state
+                state_cell = f"[{PR_STATE_STYLES.get(state, 'white')}]●[/]"
+                updated = arrow.get(pr.updated_at).humanize() if pr.updated_at else ""
+                title = pr.title or ""
+            grid.add_row(
+                state_cell,
+                f"[link={pr.url}]{pr.shortcut}[/link]",
+                "(patch)" if pr.is_patch else "",
+                title,
+                updated,
+            )
+        return grid
+
+    if check and all_prs:
+        with (
+            Live(build_grid(), console=console, refresh_per_second=10) as live,
+            ThreadPoolExecutor(max_workers=8) as pool,
+        ):
+            futures = [pool.submit(pr.enrich_with_github) for pr in all_prs]
+            for _ in as_completed(futures):
+                live.update(build_grid())
     else:
-        repositories = [pm_utils.Repo(repo_path) for repo_path in repo_paths]
-    for repo in repositories:
-        repo.show_prs(state=state, purge=purge, yes_all=yes_all)
+        console.print(build_grid())
+
+
+@cli.command(name="clean")
+@click.argument(
+    "repo_paths",
+    required=False,
+    nargs=-1,
+)
+@click.option(
+    "--aggregate/--no-aggregate",
+    "aggregate",
+    is_flag=True,
+    default=True,
+    help="Run git aggregate (and push) on each touched repo after purging",
+)
+def clean_pending(repo_paths=(), aggregate=True):
+    """Remove merged pull requests from pending-merge files."""
+    repos = _resolve_repos(repo_paths)
+    all_prs = [pr for repo in repos for pr in repo._iter_pending_pull_requests()]
+    if not all_prs:
+        return
+    touched_repos: set[pm_utils.Repo] = set()
+    removed: set[int] = set()  # ids of PRs removed from their merges file
+
+    def build_grid():
+        grid = Table.grid(padding=(0, 1))
+        grid.add_column(no_wrap=True)  # state dot / spinner
+        grid.add_column(no_wrap=True)  # shortcut (linked)
+        grid.add_column(no_wrap=True, style="dim")  # patch marker
+        grid.add_column(no_wrap=True)  # outcome
+        for pr in all_prs:
+            if not pr.is_enriched:
+                state_cell, outcome = Spinner("dots"), ""
+            else:
+                state = "merged" if pr.merged else pr.state
+                state_cell = f"[{PR_STATE_STYLES.get(state, 'white')}]●[/]"
+                outcome = "[green]removed[/]" if id(pr) in removed else ""
+            grid.add_row(
+                state_cell,
+                f"[link={pr.url}]{pr.shortcut}[/link]",
+                "(patch)" if pr.is_patch else "",
+                outcome,
+            )
+        return grid
+
+    # Enrich every PR via the GitHub API in parallel; remove the merged ones
+    # from the merges file as soon as we know the verdict, on the main thread
+    # (so concurrent yaml edits stay race-free).
+    with (
+        Live(build_grid(), console=console, refresh_per_second=10) as live,
+        ThreadPoolExecutor(max_workers=8) as pool,
+    ):
+        futures = {pool.submit(pr.enrich_with_github): pr for pr in all_prs}
+        for future in as_completed(futures):
+            future.result()
+            pr = futures[future]
+            if pr.merged:
+                if pr.is_patch:
+                    pr._repo.remove_pending_pull_from_patches(pr.owner, pr.pr)
+                else:
+                    pr._repo.remove_pending_pull(pr.owner, pr.pr)
+                touched_repos.add(pr._repo)
+                removed.add(id(pr))
+            live.update(build_grid())
+    # Per-repo post-processing: clean up an empty merges file or re-aggregate.
+    for repo in touched_repos:
+        if not repo.has_any_pr_left():
+            repo._handle_empty_merges_file(delete_file=True)
+        elif aggregate:
+            aggregator = repo.get_aggregator()
+            aggregator.aggregate()
+            aggregator.push()
 
 
 # TODO: add tests

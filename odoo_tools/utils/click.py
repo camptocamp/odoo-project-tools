@@ -8,12 +8,45 @@ from .minimum_version import with_minimum_version_check
 from .update_check import with_update_check
 
 __all__ = [
+    "deprecated_option",
     "handle_exceptions",
     "global_command_decorators",
     "version_option",
     "with_minimum_version_check",
     "with_update_check",
 ]
+
+
+def deprecated_option(*param_decls, message: str | None = None, **kwargs):
+    """``click.option`` variant that rejects use with a deprecation message.
+
+    The option is hidden from ``--help``, accepts no value, and exits with
+    a friendly error pointing the user at the replacement.
+
+    Usage:
+
+    .. code-block:: python
+
+        @deprecated_option("--purge", message="Use `... clean` instead.")
+        def show_pending(...):
+            ...
+    """
+
+    def callback(ctx, param, value):
+        if value:
+            raise click.BadOptionUsage(
+                param.opts[0],
+                message or f"`{param.opts[0]}` has been removed.",
+                ctx=ctx,
+            )
+
+    kwargs.setdefault("is_flag", True)
+    kwargs.setdefault("default", False)
+    kwargs["hidden"] = True
+    kwargs["expose_value"] = False
+    kwargs["callback"] = callback
+    return click.option(*param_decls, **kwargs)
+
 
 version_option = click.version_option(
     __version__, "-V", "--version", package_name="odoo-tools"

@@ -2,9 +2,11 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 from pathlib import Path
+from textwrap import dedent
 from unittest import mock
 
 import pytest
+import responses
 from git.config import GitConfigParser
 
 from odoo_tools.exceptions import Exit, PathNotFound
@@ -620,3 +622,204 @@ def test_add_pending_pull_request_patch():
     line_tmpl = "curl -sSL https://github.com/OCA/edi/pull/{}.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'"
     for pid in (1470, 1471):
         assert line_tmpl.format(pid) in shell_command_after, shell_command_after
+
+
+def test_iter_pending_pull_requests(project):
+    name = "edi"
+    mock_pending_merge_repo_paths(
+        name,
+        tmpl=dedent(
+            """
+            ../{ext_src_rel_path}/{repo_name}:
+                remotes:
+                    camptocamp: git@github.com:camptocamp/{repo_name}.git
+                    {org_name}: git@github.com:{org_name}/{repo_name}.git
+                target: camptocamp merge-branch-{pid}-master
+                merges:
+                - {org_name} 14.0
+                - {org_name} refs/pull/774/head
+                - {org_name} refs/pull/773/head
+                shell_command_after:
+                - curl -sSL https://github.com/OCA/edi/pull/999.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
+            """
+        ),
+    )
+    repo = Repo(name)
+    prs = list(repo._iter_pending_pull_requests())
+    # 2 merges (the base ``OCA 14.0`` is skipped) + 1 patch
+    assert len(prs) == 3
+    pulls = [pr for pr in prs if not pr.is_patch]
+    patches = [pr for pr in prs if pr.is_patch]
+    assert sorted(pr.pr for pr in pulls) == [773, 774]
+    assert [pr.pr for pr in patches] == [999]
+    pr = pulls[0]
+    assert pr._repo is repo
+    assert pr.repo == "edi"
+    assert pr.owner == "OCA"
+    assert pr.shortcut.startswith("OCA/edi#")
+    assert pr.url.startswith("https://github.com/OCA/edi/pull/")
+    assert isinstance(pr, pm_utils.PendingPR)
+    assert pr.is_enriched is False
+
+
+@pytest.mark.project_setup(proj_tmpl_ver=1)
+def test_iter_pending_pull_requests_with_mismatched_github_repo(project):
+    """The submodule directory name and the GitHub repo name don't always match.
+
+    Real-world example: the ``src`` submodule (checked out under ``odoo/src``)
+    pulls a base merge from ``OCA/OCB`` and patches from ``odoo/odoo`` —
+    neither of those GitHub repos is named ``src``.
+    """
+    mock_pending_merge_repo_paths(
+        "src",
+        tmpl=dedent(
+            """
+            ../odoo/src:
+              remotes:
+                camptocamp: git@github.com:camptocamp/odoo.git
+                oca: git@github.com:OCA/OCB.git
+                odoo: git@github.com:odoo/odoo.git
+              target: camptocamp merge-branch-{pid}-master
+              merges:
+              - oca 17.0
+              - oca refs/pull/100/head
+              shell_command_after:
+              - curl -sSL https://github.com/odoo/odoo/pull/215486.patch | git am -3
+            """
+        ),
+    )
+    repo = Repo("src")
+    prs = list(repo._iter_pending_pull_requests())
+    assert len(prs) == 2
+    merge_pr = next(pr for pr in prs if not pr.is_patch)
+    patch_pr = next(pr for pr in prs if pr.is_patch)
+    # Submodule directory is ``src``, but the GitHub repo is ``OCB``.
+    assert merge_pr._repo.name == "src"
+    assert merge_pr.owner == "OCA"
+    assert merge_pr.repo == "OCB"
+    assert merge_pr.shortcut == "OCA/OCB#100"
+    assert merge_pr.url == "https://github.com/OCA/OCB/pull/100"
+    # Patch entry resolves owner+repo from the patch URL itself.
+    assert patch_pr.owner == "odoo"
+    assert patch_pr.repo == "odoo"
+    assert patch_pr.shortcut == "odoo/odoo#215486"
+    assert patch_pr.url == "https://github.com/odoo/odoo/pull/215486"
+
+
+def _fake_enrich(pr_states):
+    """Build a side_effect that mutates a ``PendingPR`` in place.
+
+    :param pr_states: mapping of PR number -> ``(state, merged)`` tuple.
+    """
+
+    def enrich(self):
+        state, merged = pr_states.get(self.pr, ("open", False))
+        self.state = state
+        self.merged = merged
+        self.title = f"PR {self.pr}"
+        self.number = self.pr
+
+    return enrich
+
+
+def test_purge_merged_prs(project):
+    name = "edi"
+    mock_pending_merge_repo_paths(name)
+    repo = Repo(name)
+    pr_states = {
+        774: ("open", False),
+        773: ("closed", True),
+        759: ("closed", False),
+    }
+    with mock.patch.object(
+        pm_utils.PendingPR,
+        "enrich_with_github",
+        autospec=True,
+        side_effect=_fake_enrich(pr_states),
+    ):
+        # Materialize within the patch context: ``purge_merged_prs`` is a
+        # generator, so the API calls only happen as we iterate.
+        purged = list(repo.purge_merged_prs())
+    # Only the merged one is removed
+    assert [pr.pr for pr in purged] == [773]
+    remaining = repo.merges_config()["merges"]
+    # base (OCA 14.0) + 774 + 663 + 759 stay; 773 is gone
+    assert "OCA refs/pull/773/head" not in remaining
+    assert "OCA refs/pull/774/head" in remaining
+    assert "OCA refs/pull/759/head" in remaining
+
+
+def _make_pending(repo, pr_id):
+    return pm_utils.PendingPR(
+        _repo=repo,
+        owner="OCA",
+        pr=pr_id,
+        is_patch=False,
+    )
+
+
+def test_enrich_with_github(project):
+    name = "edi"
+    mock_pending_merge_repo_paths(name)
+    repo = Repo(name)
+    pending = _make_pending(repo, 773)
+    with responses.RequestsMock() as rsps:
+        rsps.add(
+            responses.GET,
+            "https://api.github.com/repos/OCA/edi/pulls/773",
+            json={
+                "state": "closed",
+                "merged": True,
+                "number": 773,
+                "title": "A merged PR",
+                "updated_at": "2025-01-02T00:00:00Z",
+                "labels": [{"name": "bug"}, {"name": "16.0"}],
+            },
+            status=200,
+        )
+        pending.enrich_with_github()
+    assert pending.is_enriched
+    assert pending.state == "closed"
+    assert pending.merged is True
+    assert pending.title == "A merged PR"
+    assert pending.labels == ["bug", "16.0"]
+    # Locally-derivable fields are unchanged
+    assert pending._repo is repo
+    assert pending.repo == "edi"
+    assert pending.is_patch is False
+
+
+def test_enrich_with_github_api_error(project):
+    name = "edi"
+    mock_pending_merge_repo_paths(name)
+    repo = Repo(name)
+    pending = _make_pending(repo, 9999)
+    with responses.RequestsMock() as rsps:
+        rsps.add(
+            responses.GET,
+            "https://api.github.com/repos/OCA/edi/pulls/9999",
+            status=404,
+        )
+        pending.enrich_with_github()
+    # Empty state on API failure means purge_merged_prs won't touch it
+    assert pending.is_enriched
+    assert pending.state == ""
+    assert pending.merged is False
+
+
+def test_enrich_with_github_uses_token(project, monkeypatch):
+    name = "edi"
+    mock_pending_merge_repo_paths(name)
+    repo = Repo(name)
+    pending = _make_pending(repo, 773)
+    monkeypatch.setenv("GITHUB_TOKEN", "secret-token")
+    with responses.RequestsMock() as rsps:
+        rsps.add(
+            responses.GET,
+            "https://api.github.com/repos/OCA/edi/pulls/773",
+            json={"state": "open", "merged": False},
+            status=200,
+        )
+        pending.enrich_with_github()
+        sent = list(rsps.calls)
+        assert sent[0].request.headers.get("Authorization") == "token secret-token"

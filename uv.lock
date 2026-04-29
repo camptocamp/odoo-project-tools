@@ -656,6 +656,7 @@ wheels = [
 name = "odoo-tools"
 source = { editable = "." }
 dependencies = [
+    { name = "arrow" },
     { name = "bump-my-version" },
     { name = "click" },
     { name = "clipboard" },
@@ -690,6 +691,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
+    { name = "arrow" },
     { name = "bump-my-version" },
     { name = "click", specifier = ">=8.3.2" },
     { name = "clipboard" },

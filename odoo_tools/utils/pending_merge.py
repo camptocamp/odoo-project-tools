@@ -2,6 +2,10 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import logging
+import os
+import re
+from collections.abc import Iterator
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import click
@@ -20,7 +24,92 @@ from .path import build_path, cd
 from .proj import get_current_version, get_project_manifest_key
 from .yaml import yaml_dump, yaml_load
 
+logger = logging.getLogger(__name__)
+
 git_aggregator.main.setup_logger()
+
+
+@dataclass(kw_only=True)
+class PendingPR:
+    """A pending-merge pull request, derived from the local merges file.
+
+    The fields below ``is_patch`` are populated by
+    :meth:`enrich_with_github`; until then ``state`` is ``None``.
+    """
+
+    _repo: "Repo"
+    owner: str
+    pr: int
+    is_patch: bool
+    # GitHub repo name; can differ from the local submodule directory name
+    # (``self._repo.name``). Defaults to it when unspecified.
+    repo: str | None = None
+    # Filled in by enrich_with_github(); ``state is None`` means not yet enriched.
+    state: str | None = None
+    merged: bool = False
+    labels: list[str] = field(default_factory=list)
+    number: int | None = None
+    title: str | None = None
+    updated_at: str | None = None
+
+    def __post_init__(self):
+        if self.repo is None:
+            self.repo = self._repo.name
+
+    @property
+    def shortcut(self) -> str:
+        return f"{self.owner}/{self.repo}#{self.pr}"
+
+    @property
+    def url(self) -> str:
+        return f"https://github.com/{self.owner}/{self.repo}/pull/{self.pr}"
+
+    @property
+    def is_enriched(self) -> bool:
+        return self.state is not None
+
+    def to_dict(self) -> dict:
+        """Return a JSON-friendly dict (with computed properties)."""
+        return {
+            "repo": self.repo,
+            "owner": self.owner,
+            "pr": self.pr,
+            "is_patch": self.is_patch,
+            "state": self.state,
+            "merged": self.merged,
+            "labels": self.labels,
+            "number": self.number,
+            "title": self.title,
+            "updated_at": self.updated_at,
+            "shortcut": self.shortcut,
+            "url": self.url,
+        }
+
+    def enrich_with_github(self) -> None:
+        """Fetch the PR's GitHub state and update this instance in place."""
+        api_url = (
+            f"https://api.github.com/repos/{self.owner}/{self.repo}/pulls/{self.pr}"
+        )
+        headers = {}
+        if token := os.environ.get("GITHUB_TOKEN"):
+            headers["Authorization"] = f"token {token}"
+        response = requests.get(api_url, headers=headers)
+        if not response.ok:
+            logger.warning(
+                "Could not get status of %s: %s %s",
+                self.shortcut,
+                response.status_code,
+                response.reason,
+            )
+            self.state = ""
+            return
+        data = response.json()
+        self.state = data.get("state") or ""
+        self.merged = bool(data.get("merged"))
+        self.labels = [label["name"] for label in data.get("labels") or []]
+        self.number = data.get("number")
+        self.title = data.get("title")
+        self.updated_at = data.get("updated_at")
 
 
 class Repo:
@@ -406,143 +495,66 @@ class Repo:
             extra_config["target"]["remote"] = target_remote
         return RepoAggregator(self, **extra_config)
 
-    # TODO: add tests
-    def show_prs(self, state=None, purge=None, yes_all=False):
-        """Show all pull requests in pending merges.
+    def _iter_pending_pull_requests(self) -> Iterator[PendingPR]:
+        merges_config = self.merges_config()
+        if not merges_config:
+            return
+        remotes = merges_config.get("remotes") or {}
+        # Skip the first ``merges`` entry, which is the base ref (e.g. ``OCA 16.0``)
+        for merge_line in list(merges_config.get("merges") or [])[1:]:
+            parts = str(merge_line).split()
+            if len(parts) != 2:
+                continue
+            remote, ref = parts
+            pull_match = re.match(r"^(?:refs/)?pull/(\d+)/head$", ref)
+            if not pull_match:
+                continue
+            try:
+                owner, github_repo = gh.parse_remote_url(remotes.get(remote, ""))
+            except ValueError:
+                owner = remote
+                github_repo = self.name
+            yield PendingPR(
+                _repo=self,
+                owner=owner,
+                repo=github_repo,
+                pr=int(pull_match.group(1)),
+                is_patch=False,
+            )
+        for line in merges_config.get("shell_command_after") or []:
+            if ".patch" not in line or "git am" not in line:
+                continue
+            url = line.split(".patch")[0]
+            try:
+                info = gh.parse_github_url(url)
+            except ValueError:
+                continue
+            yield PendingPR(
+                _repo=self,
+                owner=info["upstream"],
+                repo=info["repo_name"],
+                pr=int(info["entity_id"]),
+                is_patch=True,
+            )
 
-        :param state: list only matching states
-        :param purge: purge matching states
+    def purge_merged_prs(self) -> Iterator[PendingPR]:
+        """Remove merged pull requests from the pending-merges file.
+
+        Iterates the local pending-merges, enriches each one via the GitHub
+        API, and yields the merged ones as soon as they are removed so that
+        callers can report progress in real time.
         """
-        if purge:
-            assert purge in ("closed", "merged")
-        logging.getLogger("requests").setLevel(logging.ERROR)
-
-        # NOTE: to collect all this info you must provide your GITHUB_TOKEN.
-        # See git-aggregator README.
-        pr_info_msg = (
-            "#{number} {title}\n"
-            "      State: {state} ({merged})\n"
-            "      Updated at: {updated_at}\n"
-            "      View: {html_url}\n"
-            "      Shortcut: {shortcut}\n"
-        )
-        all_repos_prs = {}
-        ui.echo("--")
-        ui.echo(f"Checking: {self.name}")
-        ui.echo(f"Path: {self.path}")
-        ui.echo(f"Merge file: {self.merges_path}")
-
-        all_prs = self._collect_prs()
-
-        if state is not None:
-            if state == "merged":
-                all_prs = {"closed": all_prs.get("closed", [])}
-                all_prs["closed"] = [
-                    pr for pr in all_prs["closed"] if pr.get("merged") == "merged"
-                ]
+        for pr in self._iter_pending_pull_requests():
+            pr.enrich_with_github()
+            if not pr.merged:
+                continue
+            if pr.is_patch:
+                self.remove_pending_pull_from_patches(pr.owner, pr.pr)
             else:
-                all_prs = {k: v for k, v in all_prs.items() if k == state}
-        for pr_state, prs in all_prs.items():
-            ui.echo(f"State: {pr_state}")
-            for i, pr_info in enumerate(prs, 1):
-                all_repos_prs.setdefault(pr_state, []).append(pr_info)
-                pr_info["raw"].update(pr_info)
-                nr = str(i).zfill(2)
-                pr = pr_info_msg.format(**pr_info["raw"])
-                ui.echo(f"  {nr}) {pr}")
-
-        purged = None
-        if purge and all_repos_prs.get("closed", []):
-            kw = {f"purge_{purge}": True}
-            purged = self._purge_closed_prs(all_repos_prs, **kw)
-
-        if purged and self.has_pending_merges():
-            if yes_all or ui.ask_confirmation("Do you want to re-aggregate and push?"):
-                aggregator = self.get_aggregator()
-                aggregator.aggregate()
-                aggregator.push()
+                self.remove_pending_pull(pr.owner, pr.pr)
+            yield pr
         if not self.has_any_pr_left():
-            self._handle_empty_merges_file(delete_file=yes_all)
-        return all_repos_prs
-
-    def _collect_prs(self):
-        aggregator = self.get_aggregator()
-        # Normal merges
-        all_prs = aggregator.collect_prs_info()
-        # patches
-        patch_merges = []
-        # Convert lines like:
-        # "curl -sSL https://github.com/OCA/manufacture/pull/1469.patch
-        # | git am -3 --keep-non-patch --exclude '*requirements.txt'"
-        # ...to...
-        # OCA refs/pull/1469/head
-        patches = self.merges_config().get("shell_command_after") or []
-        if not patches:
-            return all_prs
-        for line in patches:
-            if ".patch" in line and "git am" in line:
-                line = line.split(".patch")[0]
-                pr_info = gh.parse_github_url(line)
-                patch_merges.append(
-                    {
-                        "remote": pr_info["upstream"],
-                        "ref": f"refs/{pr_info['entity_type']}/{pr_info['entity_id']}/head",
-                    }
-                )
-        patch_merges = aggregator.collect_prs_info(merges=patch_merges)
-        for state, prs in patch_merges.items():
-            for pr_info in prs:
-                pr_info["_patch"] = True
-            all_prs.setdefault(state, []).extend(prs)
-        return all_prs
-
-    # TODO: add tests
-    def _purge_closed_prs(self, all_repos_prs, purge_merged=False, purge_closed=False):
-        assert purge_closed or purge_merged
-        closed_prs = all_repos_prs.get("closed", [])
-        closed_unmerged_prs = [
-            pr for pr in closed_prs if pr.get("merged") == "not merged"
-        ]
-        closed_merged_prs = [pr for pr in closed_prs if pr.get("merged") == "merged"]
-
-        # This list will receive all closed and unmerged pr's url to return
-        # If purge_closed is set to True, removed prs will not be returned
-        unmerged_prs_urls = [pr.get("url") for pr in closed_unmerged_prs]
-
-        purged = False
-        if closed_unmerged_prs and purge_closed:
-            ui.echo("Purging closed ones...")
-            for closed_pr_info in closed_unmerged_prs:
-                try:
-                    if closed_pr_info.get("_patch"):
-                        self.remove_pending_pull_from_patches(
-                            closed_pr_info["owner"], closed_pr_info["pr"]
-                        )
-                    else:
-                        self.remove_pending_pull(
-                            closed_pr_info["owner"], closed_pr_info["pr"]
-                        )
-                    unmerged_prs_urls.remove(closed_pr_info.get("url"))
-                    purged = True
-                except Exception as e:
-                    ui.echo(
-                        "An error occurs during '{}' removal : {}".format(
-                            closed_pr_info.get("url"), e
-                        )
-                    )
-        if closed_merged_prs and purge_merged:
-            ui.echo("Purging merged ones...")
-            for closed_pr_info in closed_merged_prs:
-                if closed_pr_info.get("_patch"):
-                    self.remove_pending_pull_from_patches(
-                        closed_pr_info["owner"], closed_pr_info["pr"]
-                    )
-                else:
-                    self.remove_pending_pull(
-                        closed_pr_info["owner"], closed_pr_info["pr"]
-                    )
-                purged = True
-        return purged
+            self._handle_empty_merges_file(delete_file=True)
 
     def _handle_empty_merges_file(self, delete_file=False):
         odoo_version = get_project_manifest_key("odoo_version")
