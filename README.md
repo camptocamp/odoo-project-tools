@@ -74,8 +74,11 @@ aggregating branches, and adding or removing pending merges.
 
 Commands:
     - `show`: List pull requests for specified repositories or all repositories
-      in the pending folder. Supports filtering by state and purging closed or
-      merged pull requests.
+      in the pending folder. Pass `--no-check` to skip the GitHub API lookup
+      and produce a local-only listing. Pass `--json` to emit a JSON array
+      with all available fields instead of human-readable text.
+    - `clean`: Remove merged pull requests from pending-merge files and
+      re-aggregate the affected repositories.
     - `aggregate`: Perform a git aggregation on a specified repository and push
       the result to a remote branch if desired.
     - `add`: Add a pending merge using a given entity URL. Optionally, run git

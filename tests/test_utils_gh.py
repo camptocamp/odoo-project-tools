@@ -156,6 +156,34 @@ class TestGetTargetBranch:
             mock_ask.assert_called_once()
 
 
+class TestParseRemoteUrl:
+    @pytest.mark.parametrize(
+        "url, expected",
+        [
+            ("git@github.com:OCA/edi.git", ("OCA", "edi")),
+            ("git@github.com:OCA/edi", ("OCA", "edi")),
+            ("https://github.com/OCA/edi.git", ("OCA", "edi")),
+            ("https://github.com/OCA/edi", ("OCA", "edi")),
+            ("http://github.com/OCA/edi.git", ("OCA", "edi")),
+        ],
+    )
+    def test_valid(self, url, expected):
+        assert gh_utils.parse_remote_url(url) == expected
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "",
+            "git@gitlab.com:OCA/edi.git",
+            "https://example.com/OCA/edi",
+            "OCA/edi",
+        ],
+    )
+    def test_invalid_raises(self, url):
+        with pytest.raises(ValueError):
+            gh_utils.parse_remote_url(url)
+
+
 @pytest.mark.project_setup(git_init=True)
 @pytest.mark.usefixtures("project")
 class TestCheckGitDiff:

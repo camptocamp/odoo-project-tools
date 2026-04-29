@@ -9,6 +9,29 @@ from . import ui
 from .os_exec import run
 from .proj import get_project_manifest_key
 
+RE_GH_REMOTE_URL = re.compile(
+    r"^(?:https?://github\.com/|git@github\.com:)"
+    r"(?P<owner>[^/]+)/(?P<repo>[^/]+?)(?:\.git)?$"
+)
+
+
+def parse_remote_url(url: str) -> tuple[str, str]:
+    """Parse a github remote URL and return ``(owner, repo)``.
+
+    Supports both ``git@github.com:OWNER/repo.git`` and
+    ``https://github.com/OWNER/repo`` forms (the ``.git`` suffix is
+    optional).
+
+    :raises ValueError: when ``url`` is empty or does not match a github
+        remote URL.
+    """
+    if not url:
+        raise ValueError("empty remote URL")
+    match = RE_GH_REMOTE_URL.match(str(url))
+    if not match:
+        raise ValueError(f"Invalid github remote URL: {url}")
+    return match.group("owner"), match.group("repo")
+
 
 def parse_github_url(entity_spec):
     # "entity" is either a PR, commit or a branch

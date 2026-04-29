@@ -325,7 +325,14 @@ def test_upgrade_with_pending_merges(project):
             "has_pending_merges",
             return_value=True,
         ),
-        mock.patch.object(submodule.pm_utils.Repo, "show_prs") as mock_show_prs,
+        mock.patch.object(
+            submodule.pm_utils.Repo,
+            "has_any_pr_left",
+            return_value=True,
+        ),
+        mock.patch.object(
+            submodule.pm_utils.Repo, "purge_merged_prs", return_value=[]
+        ) as mock_purge,
         mock.patch.object(
             submodule.pm_utils.Repo, "rebuild_consolidation_branch"
         ) as mock_rebuild,
@@ -336,7 +343,7 @@ def test_upgrade_with_pending_merges(project):
             catch_exceptions=False,
         )
     assert result.exit_code == 0
-    mock_show_prs.assert_called_once_with(purge="merged", yes_all=True)
+    mock_purge.assert_called_once_with()
     mock_rebuild.assert_called_once_with(push=True)
 
 
