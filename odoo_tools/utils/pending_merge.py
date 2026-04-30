@@ -171,10 +171,10 @@ class Repo:
         return (base_path / repo_name).with_suffix(".yml")
 
     @classmethod
-    def repositories_from_pending_folder(cls, path=None):
+    def repositories_from_pending_folder(cls, path=None, path_check=True):
         pending_merge_abs_path = build_path(config.pending_merge_rel_path)
         path = Path(path or pending_merge_abs_path)
-        return [cls(pth.stem) for pth in path.rglob("*.yml")]
+        return [cls(pth.stem, path_check=path_check) for pth in path.rglob("*.yml")]
 
     def has_pending_merges(self):
         # either empty or commented out

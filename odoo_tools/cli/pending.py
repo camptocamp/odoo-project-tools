@@ -25,10 +25,10 @@ def cli():
     pass
 
 
-def _resolve_repos(repo_paths):
+def _resolve_repos(repo_paths, path_check=True):
     if not repo_paths:
-        return pm_utils.Repo.repositories_from_pending_folder()
-    return [pm_utils.Repo(repo_path) for repo_path in repo_paths]
+        return pm_utils.Repo.repositories_from_pending_folder(path_check=path_check)
+    return [pm_utils.Repo(repo_path, path_check=path_check) for repo_path in repo_paths]
 
 
 @cli.command(name="show")
@@ -58,7 +58,7 @@ def _resolve_repos(repo_paths):
 )
 def show_pending(repo_paths=(), check=True, as_json=False):
     """List pull requests on <repo_path>."""
-    repos = _resolve_repos(repo_paths)
+    repos = _resolve_repos(repo_paths, path_check=False)
     all_prs = [pr for repo in repos for pr in repo._iter_pending_pull_requests()]
     # In case of --json, output directly
     if as_json:
