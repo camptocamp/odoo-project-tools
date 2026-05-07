@@ -1,3 +1,0 @@
-Switched the build backend to ``hatchling`` + ``hatch-vcs``. The package version
-is now derived from the git tag at build time; no source file has to be edited
-on release.

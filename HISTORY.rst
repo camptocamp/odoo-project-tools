@@ -1,3 +1,28 @@
+0.14.0 (2026-05-07)
++++++++++++++++++++
+
+**Features and Improvements**
+
+* ``otools-pending show`` refactored and split into ``otools-pending clean``
+* A project's ``.proj.cfg`` can now declare ``otools_min_version``, the
+  minimum version of ``odoo-tools`` required to operate on that project.
+  When the installed version is older, every ``otools-*`` command exits
+  with a clear error pointing to the required version and the upgrade
+  command for the detected install layout.
+* ``otools-*`` commands now check once every 24 hours for a new release on
+  GitHub and print a warning on stderr when one is available. The result is
+  cached under ``~/.cache/otools/update-check.json``. Set
+  ``OTOOLS_SKIP_UPDATE_CHECK=1`` to opt out (for example in CI).
+* All ``otools-*`` commands now accept a ``-V`` / ``--version`` flag that prints
+  the installed ``odoo-tools`` version. The package also exposes
+  ``odoo_tools.__version__``.
+
+**Build**
+
+* Switched the build backend to ``hatchling`` + ``hatch-vcs``. The package version
+  is now derived from the git tag at build time; no source file has to be edited
+  on release.
+
 0.13.0 (2026-04-22)
 +++++++++++++++++++
 
