@@ -137,10 +137,12 @@ def clean_pending(repo_paths=(), aggregate=True):
         for pr in all_prs:
             if not pr.is_enriched:
                 state_cell, outcome = Spinner("dots"), ""
-            else:
+            elif id(pr) in removed:
                 state = "merged" if pr.merged else pr.state
                 state_cell = f"[{PR_STATE_STYLES.get(state, 'white')}]●[/]"
-                outcome = "[green]removed[/]" if id(pr) in removed else ""
+                outcome = "[green]removed[/]"
+            else:
+                continue  # enriched but not removed — nothing to do here
             grid.add_row(
                 state_cell,
                 f"[link={pr.url}]{pr.shortcut}[/link]",
