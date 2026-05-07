@@ -12,11 +12,5 @@ Run:
     git tag -as $VERSION
     # copy the content from HISTORY.rst into the tag annotation
     git push --tags && git push
-    uv build
 
 then create a release on https://github.com/camptocamp/odoo-project-tools/releases
-and upload the artifacts from the [dist](dist/) directory to the release.
-
-To verify the installed version at any time:
-
-    otools-project --version
