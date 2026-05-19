@@ -35,21 +35,48 @@ def test_bump(project):
     assert ver_file.read_text() == "14.0.0.1.0"
     # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
-    project.invoke(release.bump, ["--type", "patch"], catch_exceptions=False)
+    project.invoke(release.bump, ["patch"], catch_exceptions=False)
     assert ver_file.read_text() == "14.0.0.1.1"
     git_commit_all()
-    project.invoke(release.bump, ["--type", "minor"], catch_exceptions=False)
+    project.invoke(release.bump, ["minor"], catch_exceptions=False)
     assert ver_file.read_text() == "14.0.0.2.0"
     git_commit_all()
-    project.invoke(release.bump, ["--type", "major"], catch_exceptions=False)
+    project.invoke(release.bump, ["major"], catch_exceptions=False)
     assert ver_file.read_text() == "14.0.1.0.0"
+    git_commit_all()
+    project.invoke(release.bump, ["minor"], catch_exceptions=False)
+    assert ver_file.read_text() == "14.0.1.1.0"
+    git_commit_all()
+    project.invoke(release.bump, ["patch"], catch_exceptions=False)
+    assert ver_file.read_text() == "14.0.1.1.1"
+    git_commit_all()
+    project.invoke(release.bump, ["major"], catch_exceptions=False)
+    assert ver_file.read_text() == "14.0.2.0.0"
     git_commit_all()
     project.invoke(
         release.bump,
-        ["--type", "major", "--new-version", "15.0.0.0.1"],
+        ["major", "--new-version", "15.0.0.0.1"],
         catch_exceptions=False,
     )
     assert ver_file.read_text() == "15.0.0.0.1"
+
+
+@pytest.mark.project_setup(
+    proj_version="14.0.1.2.0", mock_marabunta_file=True, git_init=True
+)
+def test_bump_wrong_parameters(project):
+    ver_file = config.version_file_rel_path
+    assert ver_file.read_text() == "14.0.1.2.0"
+    # run init to get all files ready (eg: towncrier)
+    project.invoke(init, catch_exceptions=False)
+    # bump should fail because there's too many parameters
+    result = project.invoke(release.bump, ["--type", "patch"])
+    assert result.exit_code > 0
+    assert "No such option" in result.output
+    result = project.invoke(release.bump, ["patch", "major"])
+    assert result.exit_code > 0
+    assert "Got unexpected extra argument" in result.output
+    assert ver_file.read_text() == "14.0.1.2.0"
 
 
 @pytest.mark.project_setup(
@@ -70,9 +97,7 @@ def test_bump_changelog(project):
     (cwd / "changes.d/1234.bug").write_text("Fixed a thing!")
     (cwd / "changes.d/2345.feat").write_text("Added a thing!")
     (cwd / "HISTORY.rst").write_text(hist_part_1 + hist_part_2)
-    result = project.invoke(
-        release.bump, ["--type", "minor"], catch_exceptions=False, input="n"
-    )
+    result = project.invoke(release.bump, ["minor"], catch_exceptions=False, input="n")
     new_part = (
         f"14.0.0.2.0 ({datetime.date.today():%Y-%m-%d})\n"
         "+++++++++++++++++++++++\n\n"
@@ -103,9 +128,7 @@ def test_bump_changelog(project):
 def test_bump_update_marabunta_file(project):
     # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
-    result = project.invoke(
-        release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
-    )
+    result = project.invoke(release.bump, ["minor"], catch_exceptions=False, input="\n")
     content = config.marabunta_mig_file_rel_path.read_text()
     assert "14.0.0.2.0" in content
     output_lines = result.output.splitlines()
@@ -127,9 +150,7 @@ def test_bump_update_marabunta_file(project):
 def test_bump_update_without_marabunta_file(project):
     # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
-    result = project.invoke(
-        release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
-    )
+    result = project.invoke(release.bump, ["minor"], catch_exceptions=False, input="\n")
     output_lines = result.output.splitlines()
     assert output_lines[0].startswith("Running: bump-my-version bump")
     assert output_lines[1:3] == [
@@ -151,7 +172,7 @@ def test_bump_without_version_file_and_no_bundle_addon(project):
     # check that the version file is not present
     assert config.version_file_rel_path is None
     # bump should fail because there are no files to bump
-    result = project.invoke(release.bump, ["--type", "minor"])
+    result = project.invoke(release.bump, ["minor"])
     assert result.exit_code != 0
     assert "No files to bump" in result.output
 
@@ -170,9 +191,7 @@ def test_bump_bundle_addon_manifest_version(project):
     # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
     # bump the version
-    result = project.invoke(
-        release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
-    )
+    result = project.invoke(release.bump, ["minor"], catch_exceptions=False, input="\n")
     output_lines = result.output.splitlines()
     assert output_lines[0].startswith("Running: bump-my-version bump")
     assert output_lines[1:4] == [
@@ -201,9 +220,7 @@ def test_bump_bundle_addon_manifest_version_without_version_file(project):
     # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
     # bump the version
-    result = project.invoke(
-        release.bump, ["--type", "minor"], catch_exceptions=False, input="\n"
-    )
+    result = project.invoke(release.bump, ["minor"], catch_exceptions=False, input="\n")
     output_lines = result.output.splitlines()
     assert output_lines[0].startswith("Running: bump-my-version bump")
     assert output_lines[1:4] == [
@@ -222,9 +239,7 @@ def test_bump_bundle_addon_manifest_version_without_version_file(project):
 def test_bump_push_no_repo(project):
     # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
-    result = project.invoke(
-        release.bump, ["--type", "minor"], catch_exceptions=False, input="y"
-    )
+    result = project.invoke(release.bump, ["minor"], catch_exceptions=False, input="y")
     output_lines = result.output.splitlines()
     assert output_lines[0].startswith("Running: bump-my-version bump")
     assert output_lines[1:4] == [
@@ -251,7 +266,7 @@ def test_bump_push_repo_with_pending_merge(project):
     project.invoke(init, catch_exceptions=False)
     with mock.patch("odoo_tools.utils.pending_merge.run", mocked_run):
         result = project.invoke(
-            release.bump, ["--type", "minor"], catch_exceptions=False, input="y"
+            release.bump, ["minor"], catch_exceptions=False, input="y"
         )
     output_lines = result.output.splitlines()
     assert output_lines[0].startswith("Running: bump-my-version bump")

@@ -94,12 +94,9 @@ def cli():
     pass
 
 
-@cli.command()
-@click.option(
-    "--type",
-    "rel_type",
-    help="version increment to use",
-    type=click.Choice(["major", "minor", "patch"], case_sensitive=False),
+@cli.command(help="Increment version")
+@click.argument(
+    "rel_type", type=click.Choice(["major", "minor", "patch"], case_sensitive=False)
 )
 @click.option("--new-version", "new_version", help="explicit new version to create")
 def bump(rel_type, new_version=None):
