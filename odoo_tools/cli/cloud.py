@@ -16,7 +16,9 @@ def get_customer_name_from_project_name(project_name: str) -> str:
     return "-".join(project_name.split("_")[:-1])
 
 
-def build_celebrimbor_command(command, platform=None, customer=None, env="int", *args):
+def build_celebrimbor_command(
+    command, platform=None, customer=None, env="int", token=None, *args
+):
     """Build celebrimbor_cli command."""
     if platform is None:
         platform = utils.proj.get_project_manifest_key("country")
@@ -27,13 +29,7 @@ def build_celebrimbor_command(command, platform=None, customer=None, env="int", 
     extra_args = [*args]
 
     # celebrimbor_cli expects --token before the command name.
-    if "--token" in extra_args:
-        token_index = extra_args.index("--token")
-        try:
-            token = extra_args[token_index + 1]
-        except IndexError as err:
-            raise click.UsageError("Token value is missing after --token") from err
-        extra_args = extra_args[:token_index] + extra_args[token_index + 2 :]
+    if token is not None:
         command_args.extend(["--token", token])
 
     command_args.extend(
@@ -52,7 +48,13 @@ def build_celebrimbor_command(command, platform=None, customer=None, env="int", 
 
 
 def run_celebrimbor(
-    command, platform=None, customer=None, env="int", *extra_args, **subprocess_kwargs
+    command,
+    platform=None,
+    customer=None,
+    env="int",
+    *extra_args,
+    token=None,
+    **subprocess_kwargs,
 ):
     """Run celebrimbor_cli with default values from project manifest."""
     if not utils.os_exec.has_exec("celebrimbor_cli"):
@@ -64,7 +66,7 @@ def run_celebrimbor(
         )
         return
     return subprocess.run(
-        build_celebrimbor_command(command, platform, customer, env, *extra_args),
+        build_celebrimbor_command(command, platform, customer, env, token, *extra_args),
         env=utils.os_exec.get_venv(),
         check=True,
         **subprocess_kwargs,
@@ -139,9 +141,7 @@ def download(
     extra_args = []
     if name is not None:
         extra_args.extend(["--name", name])
-    if token is not None:
-        extra_args.extend(["--token", token])
-    run_celebrimbor("download", platform, customer, env, *extra_args)
+    run_celebrimbor("download", platform, customer, env, *extra_args, token=token)
     # Restore if requested
     if restore_to_db:
         dump_path = Path(name.removesuffix(".gpg"))
@@ -200,8 +200,7 @@ def restore(dump_name, platform, customer, env, from_prod):
 @utils.click.handle_exceptions()
 def list(platform, customer, env, token):
     """List available dumps on the cloud platform."""
-    extra_args = ["--token", token] if token else []
-    run_celebrimbor("list", platform, customer, env, *extra_args)
+    run_celebrimbor("list", platform, customer, env, token=token)
 
 
 if __name__ == "__main__":
