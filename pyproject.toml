@@ -33,7 +33,10 @@ dependencies = [
     "kaptan==0.6.0",
     "wheel",
     "cookiecutter",
-    "click>=8.4.1",
+    # NOTE: keep click <8.4 until bump-my-version supports it. bump-my-version
+    # 1.3.0 requires click<8.4, and the only release allowing click 8.4 (1.2.2)
+    # crashes on bump (Sentinel object has no attribute 'decode').
+    "click>=8.3.2,<8.4",
     "rich",
     "towncrier",
     "bump-my-version",
