@@ -230,6 +230,18 @@ otools-cloud dump download --env prod --name celebrimbor-database-name.pg.gpg --
 otools-cloud dump upload --from-db odoodb --env labs.my-lab
 ```
 
+##### List dumps with an explicit API token
+
+```
+otools-cloud dump list --env prod --token "$CELEBRIMBOR_TOKEN"
+```
+
+##### Download a specific dump with an explicit API token
+
+```
+otools-cloud dump download --env prod --name celebrimbor-database-name.pg.gpg --token "$CELEBRIMBOR_TOKEN"
+```
+
 ### otools-i18n
 
 Tools to manage internationalization (i18n).

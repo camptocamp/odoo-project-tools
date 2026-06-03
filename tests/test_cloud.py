@@ -459,3 +459,71 @@ def test_dump_list(project):
         )
         assert result.exit_code == 0
         mock_fn.assert_completed_calls()
+
+
+def test_dump_list_with_token(project):
+    """Test dump list command with API token."""
+    mock_fn = MockSubprocessRun(
+        [
+            {
+                "args": [
+                    "celebrimbor_cli",
+                    "--token",
+                    "my-token",
+                    "--platform",
+                    "ch",
+                    "list",
+                    "--customer",
+                    "acme",
+                    "--env",
+                    "int",
+                ],
+            }
+        ]
+    )
+
+    with (
+        mock.patch("odoo_tools.cli.cloud.utils.os_exec.has_exec", return_value=True),
+        mock.patch("subprocess.run", mock_fn),
+    ):
+        result = project.invoke(
+            cloud_cli,
+            ["dump", "list", "--token", "my-token"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code == 0
+        mock_fn.assert_completed_calls()
+
+
+def test_dump_download_with_token(project):
+    """Test dump download command with API token."""
+    mock_fn = MockSubprocessRun(
+        [
+            {
+                "args": [
+                    "celebrimbor_cli",
+                    "--token",
+                    "my-token",
+                    "--platform",
+                    "ch",
+                    "download",
+                    "--customer",
+                    "acme",
+                    "--env",
+                    "int",
+                ],
+            }
+        ]
+    )
+
+    with (
+        mock.patch("odoo_tools.cli.cloud.utils.os_exec.has_exec", return_value=True),
+        mock.patch("subprocess.run", mock_fn),
+    ):
+        result = project.invoke(
+            cloud_cli,
+            ["dump", "download", "--token", "my-token"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code == 0
+        mock_fn.assert_completed_calls()
