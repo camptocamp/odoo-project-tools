@@ -143,7 +143,7 @@ def download(
         extra_args.extend(["--name", name])
     run_celebrimbor("download", platform, customer, env, *extra_args, token=token)
     # Restore if requested
-    if restore_to_db:
+    if restore_to_db and name is not None:
         dump_path = Path(name.removesuffix(".gpg"))
         utils.db.create_db_from_db_dump(restore_to_db, dump_path)
 
