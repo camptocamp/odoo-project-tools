@@ -53,6 +53,29 @@
       - any-glob-to-any-file:
           - 'odoo_tools/cli/migrate_db.py'
 
+"tool:cloud":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'odoo_tools/cli/cloud.py'
+          - 'tests/test_cloud.py'
+
+"tool:db":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'odoo_tools/cli/db.py'
+          - 'tests/test_db_*.py'
+
+"tool:i18n":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'odoo_tools/cli/i18n.py'
+
+"tool:password":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'odoo_tools/cli/password.py'
+          - 'tests/test_password.py'
+
 documentation:
   - changed-files:
       - any-glob-to-any-file:
