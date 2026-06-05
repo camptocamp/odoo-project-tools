@@ -22,7 +22,7 @@ from .config import config
 from .os_exec import run
 from .path import build_path, cd
 from .proj import get_current_version, get_project_manifest_key
-from .yaml import yaml_dump, yaml_load
+from .yaml import remove_seq_item_with_comments, yaml_dump, yaml_load
 
 logger = logging.getLogger(__name__)
 
@@ -443,7 +443,7 @@ class Repo:
             )
         for line in lines_to_drop:
             if line in conf["shell_command_after"]:
-                conf["shell_command_after"].remove(line)
+                remove_seq_item_with_comments(conf["shell_command_after"], line)
         if not conf["shell_command_after"]:
             del conf["shell_command_after"]
         self.update_merges_config(conf)
@@ -458,7 +458,7 @@ class Repo:
                 " having troubles removing that:\n"
                 f"Looking for: {line_to_drop}"
             )
-        conf["merges"].remove(line_to_drop)
+        remove_seq_item_with_comments(conf["merges"], line_to_drop)
         self.update_merges_config(conf)
 
     def remove_pending_pull_from_patches(self, upstream, pull_id):
@@ -470,7 +470,7 @@ class Repo:
         found = False
         for line in patches:
             if line_bit_to_drop in line:
-                patches.remove(line)
+                remove_seq_item_with_comments(patches, line)
                 found = True
                 break
         if not found:

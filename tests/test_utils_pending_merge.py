@@ -749,6 +749,60 @@ def test_purge_merged_prs(project):
     assert "OCA refs/pull/759/head" in remaining
 
 
+def test_purge_merged_prs_with_comments(project):
+    """Purging a merged PR drops its own preceding comment block and keeps the
+    comment block of the still-pending PR that followed it."""
+    name = "edi"
+    tmpl = """
+../{ext_src_rel_path}/{repo_name}:
+  remotes:
+    camptocamp: git@github.com:camptocamp/{repo_name}.git
+    {org_name}: git@github.com:{org_name}/{repo_name}.git
+  target: camptocamp merge-branch-{pid}-master
+  merges:
+  - {org_name} 19.0
+  # [19.0][ADD] website_sale_stock_picking_policy
+  # https://github.com/OCA/{repo_name}/pull/1195
+  - {org_name} refs/pull/1195/head
+  # [19.0][ADD] website_sale_product_multiple_qty
+  # https://github.com/OCA/{repo_name}/pull/1172
+  - {org_name} refs/pull/1172/head
+"""
+    mock_pending_merge_repo_paths(name, tmpl=tmpl)
+    repo = Repo(name)
+    # 1195 is merged, 1172 is still open.
+    pr_states = {
+        1195: ("closed", True),
+        1172: ("open", False),
+    }
+    with mock.patch.object(
+        pm_utils.PendingPR,
+        "enrich_with_github",
+        autospec=True,
+        side_effect=_fake_enrich(pr_states),
+    ):
+        purged = list(repo.purge_merged_prs())
+    # Only the merged one is removed
+    assert [pr.pr for pr in purged] == [1195]
+    # The 1195 line and its comment block are gone; the 1172 line keeps its own
+    # comment block intact.
+    expected = dedent(
+        """\
+        ../odoo/external-src/edi:
+          remotes:
+            camptocamp: git@github.com:camptocamp/edi.git
+            OCA: git@github.com:OCA/edi.git
+          target: camptocamp merge-branch-1234-master
+          merges:
+            - OCA 19.0
+          # [19.0][ADD] website_sale_product_multiple_qty
+          # https://github.com/OCA/edi/pull/1172
+            - OCA refs/pull/1172/head
+        """
+    )
+    assert repo.abs_merges_path.read_text() == expected
+
+
 def _make_pending(repo, pr_id):
     return pm_utils.PendingPR(
         _repo=repo,
