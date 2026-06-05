@@ -32,6 +32,8 @@
   - changed-files:
       - any-glob-to-any-file:
           - 'odoo_tools/cli/pending.py'
+          - 'odoo_tools/utils/pending_merge.py'
+          - 'tests/test_utils_pending_merge.py'
 
 "tool:conversion":
   - changed-files:
