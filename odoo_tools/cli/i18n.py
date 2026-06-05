@@ -124,26 +124,80 @@ def export(module_paths, languages, clean_db, init_db, export_pot):
         with console.status(
             f"Initializing Odoo database for i18n export: {', '.join(module_names)}"
         ):
-            utils.os_exec.run(
-                utils.docker_compose.run(
-                    "odoo",
-                    [
+            odoo_serie = int(get_odoo_serie())
+            if odoo_serie >= 19:
+                # Odoo 19+ — the boot-time `--load-language=<codes>` flag still
+                # exists (see odoo/tools/config.py and modules/loading.py) but
+                # does not reliably activate the `res.lang` records in the
+                # fresh temp database. The subsequent `odoo i18n export` then
+                # fires `Ignoring not found languages: <code>` and produces
+                # nothing. Odoo 19 introduces a dedicated
+                # `odoo i18n loadlang -l <codes>` subcommand (see
+                # odoo/cli/i18n.py:_loadlang) that searches `res.lang` with
+                # `active_test=False` and explicitly activates the language
+                # records — which is what we want here. So split the init
+                # into two docker compose runs: first init the modules,
+                # then activate the languages via the new subcommand.
+                utils.os_exec.run(
+                    utils.docker_compose.run(
                         "odoo",
-                        "--log-level=warn",
-                        "--workers=0",
-                        "--database=tmp_generate_pot",
-                        f"--load-language={','.join(languages)}",
-                        "--stop-after-init",
-                        f"--init={','.join(module_names)}",
-                    ],
-                    environment={
-                        "DEMO": "True",
-                        "MIGRATE": "False",
-                    },
-                    quiet=False,
-                ),
-                check=True,
-            )
+                        [
+                            "odoo",
+                            "--log-level=warn",
+                            "--workers=0",
+                            "--database=tmp_generate_pot",
+                            "--stop-after-init",
+                            f"--init={','.join(module_names)}",
+                        ],
+                        environment={
+                            "DEMO": "True",
+                            "MIGRATE": "False",
+                        },
+                        quiet=False,
+                    ),
+                    check=True,
+                )
+                utils.os_exec.run(
+                    utils.docker_compose.run(
+                        "odoo",
+                        [
+                            "odoo",
+                            "i18n",
+                            "loadlang",
+                            "--database",
+                            "tmp_generate_pot",
+                            "-l",
+                            *languages,
+                        ],
+                        environment={
+                            "DEMO": "True",
+                            "MIGRATE": "False",
+                        },
+                        quiet=False,
+                    ),
+                    check=True,
+                )
+            else:
+                utils.os_exec.run(
+                    utils.docker_compose.run(
+                        "odoo",
+                        [
+                            "odoo",
+                            "--log-level=warn",
+                            "--workers=0",
+                            "--database=tmp_generate_pot",
+                            f"--load-language={','.join(languages)}",
+                            "--stop-after-init",
+                            f"--init={','.join(module_names)}",
+                        ],
+                        environment={
+                            "DEMO": "True",
+                            "MIGRATE": "False",
+                        },
+                        quiet=False,
+                    ),
+                    check=True,
+                )
     else:
         console.print(
             "🚨 Not initializing Odoo database. We're not even checking the modules "
