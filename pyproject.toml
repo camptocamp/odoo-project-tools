@@ -21,7 +21,6 @@ dependencies = [
     "git-aggregator>=4.1",
     "git-autoshare",
     "passlib",
-    "clipboard",
     "pre-commit",
     "psycopg2-binary>=2.9.12",
     "gitpython",
