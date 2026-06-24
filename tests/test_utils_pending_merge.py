@@ -206,8 +206,9 @@ def test_add_pending_pr_multiple():
 
 
 def test_add_pending_pr_with_comments(project):
-    """A new pending merge is appended at the end of the list, after the comment
-    block of the previous entry (and not in between)."""
+    """A new pending merge is appended at the end of the list with its PR title
+    and URL on the two comment lines above it, aligned with the merge items, and
+    after the comment block of the previous entry (not in between)."""
     name = "edi"
     tmpl = """
 ../{ext_src_rel_path}/{repo_name}:
@@ -216,14 +217,26 @@ def test_add_pending_pr_with_comments(project):
     {org_name}: git@github.com:{org_name}/{repo_name}.git
   target: camptocamp merge-branch-{pid}-master
   merges:
-  - {org_name} 19.0
-  # [19.0] [ADD] sale_stock_picking_backorder_policy
-  # https://github.com/OCA/{repo_name}/pull/2372
-  - {org_name} refs/pull/2372/head
+    - {org_name} 19.0
+    # [19.0] [ADD] sale_stock_picking_backorder_policy
+    # https://github.com/OCA/{repo_name}/pull/2372
+    - {org_name} refs/pull/2372/head
 """
     mock_pending_merge_repo_paths(name, tmpl=tmpl)
     repo = Repo(name, path_check=False)
-    repo.add_pending_pull_request("OCA", 2373)
+    with responses.RequestsMock() as rsps:
+        rsps.add(
+            responses.GET,
+            "https://api.github.com/repos/OCA/edi/pulls/2373",
+            json={
+                "title": "[19.0] [ADD] sale_stock_picking_backorder_split_policy",
+                "html_url": "https://github.com/OCA/edi/pull/2373",
+                # match the project's odoo_version so no divergent-branch prompt
+                "base": {"ref": "14.0"},
+            },
+            status=200,
+        )
+        repo.add_pending_pull_request("OCA", 2373)
     expected = dedent(
         """\
         ../odoo/external-src/edi:
@@ -233,8 +246,50 @@ def test_add_pending_pr_with_comments(project):
           target: camptocamp merge-branch-1234-master
           merges:
             - OCA 19.0
-          # [19.0] [ADD] sale_stock_picking_backorder_policy
-          # https://github.com/OCA/edi/pull/2372
+            # [19.0] [ADD] sale_stock_picking_backorder_policy
+            # https://github.com/OCA/edi/pull/2372
+            - OCA refs/pull/2372/head
+            # [19.0] [ADD] sale_stock_picking_backorder_split_policy
+            # https://github.com/OCA/edi/pull/2373
+            - OCA refs/pull/2373/head
+        """
+    )
+    assert repo.abs_merges_path.read_text() == expected
+
+
+def test_add_pending_pr_without_title_no_comment(project):
+    """When the GitHub call fails, the merge is still appended at the end but
+    with no comment block (graceful degradation)."""
+    name = "edi"
+    tmpl = """
+../{ext_src_rel_path}/{repo_name}:
+  remotes:
+    camptocamp: git@github.com:camptocamp/{repo_name}.git
+    {org_name}: git@github.com:{org_name}/{repo_name}.git
+  target: camptocamp merge-branch-{pid}-master
+  merges:
+  - {org_name} 19.0
+  - {org_name} refs/pull/2372/head
+"""
+    mock_pending_merge_repo_paths(name, tmpl=tmpl)
+    repo = Repo(name, path_check=False)
+    with responses.RequestsMock() as rsps:
+        rsps.add(
+            responses.GET,
+            "https://api.github.com/repos/OCA/edi/pulls/2373",
+            json={"message": "Not Found"},
+            status=404,
+        )
+        repo.add_pending_pull_request("OCA", 2373)
+    expected = dedent(
+        """\
+        ../odoo/external-src/edi:
+          remotes:
+            camptocamp: git@github.com:camptocamp/edi.git
+            OCA: git@github.com:OCA/edi.git
+          target: camptocamp merge-branch-1234-master
+          merges:
+            - OCA 19.0
             - OCA refs/pull/2372/head
             - OCA refs/pull/2373/head
         """
