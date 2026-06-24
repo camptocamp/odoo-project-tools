@@ -25,7 +25,6 @@ dependencies = [
     "psycopg2-binary>=2.9.12",
     "gitpython",
     "packaging",
-    "setuptools",
     "pydantic>=2.13.4",
     "pyyaml>=6.0.3",
     "ruamel.yaml",
