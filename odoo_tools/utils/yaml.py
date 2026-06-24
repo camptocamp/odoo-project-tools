@@ -113,19 +113,41 @@ def remove_seq_item_with_comments(seq, value):
     _rebuild_seq_comments(seq, eol, above)
 
 
-def append_seq_item_with_comments(seq, value):
+def sequence_item_indent(depth=1):
+    """Whitespace prefix that lines a comment up with a block-sequence's item
+    dashes, for a sequence nested ``depth`` mapping levels under the document
+    root (pending-merges files use depth 1).
+
+    Derived from the shared dumper's configuration so it tracks whatever
+    indentation the items are rendered with rather than hardcoding a column.
+    """
+    return " " * (depth * (yaml.map_indent or 2) + (yaml.sequence_dash_offset or 0))
+
+
+def append_seq_item_with_comments(seq, value, comment=None, comment_indent=""):
     """Append ``value`` to the end of a ruamel ``CommentedSeq`` keeping every
-    existing item's comments anchored to that item. The appended item gets no
-    comment of its own.
+    existing item's comments anchored to that item.
 
     A plain ``seq.append(value)`` would leave any block comment that trailed the
     list dangling before the new item; normalising and rebuilding keeps that
     block attached to the previously-last item so the new line lands cleanly at
     the end.
+
+    ``comment`` is an optional list of plain text lines (no ``#``) to print as a
+    block *above* the appended item; each is rendered as
+    ``{comment_indent}# {line}``. ``comment_indent`` should line the comment up
+    with the rendered list items (see :func:`sequence_item_indent`).
     """
     eol, above = _normalize_seq_comments(seq)
+    length = len(seq)  # index the appended item will occupy
     seq.append(value)
     eol.append(None)  # new last item: no end-of-line comment
+    if comment:
+        block = "".join(
+            f"{comment_indent}# {line.replace(chr(10), ' ')}\n" for line in comment
+        )
+        # ``above[length]`` is the block printed before the new last item.
+        above[length] = (above[length] or "") + block
     above.append(None)  # new trailing slot: empty
     _rebuild_seq_comments(seq, eol, above)
 

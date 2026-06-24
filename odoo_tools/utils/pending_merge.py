@@ -25,6 +25,7 @@ from .proj import get_current_version, get_project_manifest_key
 from .yaml import (
     append_seq_item_with_comments,
     remove_seq_item_with_comments,
+    sequence_item_indent,
     yaml_dump,
     yaml_load,
 )
@@ -324,36 +325,40 @@ class Repo:
         response = requests.get(f"{self.api_url(upstream=upstream)}/pulls/{pull_id}")
 
         # TODO: auth
-        base_branch = response.json().get("base", {}).get("ref")
+        data = response.json()
+        base_branch = data.get("base", {}).get("ref")
+        # Describe the new pending merge with its title + URL on the comment
+        # lines above it, fetched from GitHub. When the call fails we simply skip
+        # the comment (and the branch validation).
+        comment = []
         if response.ok:
-            if base_branch:
-                if base_branch != odoo_version:
-                    ui.ask_or_abort(
-                        "Requested PR targets branch different from"
-                        " current project's major version. Proceed?"
-                    )
+            if base_branch and base_branch != odoo_version:
+                ui.ask_or_abort(
+                    "Requested PR targets branch different from"
+                    " current project's major version. Proceed?"
+                )
+            if title := data.get("title"):
+                comment.append(title)
+            if pr_url := data.get("html_url"):
+                comment.append(pr_url)
         else:
             ui.echo(
                 f"Github API call failed ({response.status_code}):"
                 " skipping target branch validation."
             )
 
-        # TODO: handle comment
-        # if response.ok:
-        #     # probably, wrapping `if` could be an overkill
-        #     pending_mrg_comment = response.json().get('title')
-        # else:
-        #     pending_mrg_comment = False
-        #     print('Unable to get a pull request title.'
-        #           ' You can provide it manually by editing {}.'.format(
-        #               self.abs_merges_path))
-
         known_remotes = conf["remotes"]
         if upstream not in known_remotes:
             known_remotes.insert(0, upstream, self.ssh_url(upstream))
         # Append the new pending merge at the end of the list, keeping the
-        # comment blocks of the existing entries anchored to them.
-        append_seq_item_with_comments(conf["merges"], pending_mrg_line)
+        # comment blocks of the existing entries anchored to them, and aligning
+        # the new comment with the merge items.
+        append_seq_item_with_comments(
+            conf["merges"],
+            pending_mrg_line,
+            comment=comment,
+            comment_indent=sequence_item_indent(),
+        )
         self.update_merges_config(conf)
         return True
 

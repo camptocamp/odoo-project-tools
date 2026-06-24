@@ -10,6 +10,8 @@ from ruamel.yaml import YAML
 from odoo_tools.utils.yaml import (
     append_seq_item_with_comments,
     remove_seq_item_with_comments,
+    sequence_item_indent,
+    yaml,
 )
 
 
@@ -345,14 +347,16 @@ class TestRemoveSeqItemWithComments:
 
 class TestAppendSeqItemWithComments:
     @staticmethod
-    def _roundtrip(src, value):
+    def _roundtrip(src, value, comment=None, comment_indent=""):
         """Load ``src``, append ``value`` to its top-level ``items`` sequence
         and return the re-dumped document."""
-        yaml = YAML()
-        data = yaml.load(src)
-        append_seq_item_with_comments(data["items"], value)
+        loader = YAML()
+        data = loader.load(src)
+        append_seq_item_with_comments(
+            data["items"], value, comment=comment, comment_indent=comment_indent
+        )
         buf = io.StringIO()
-        yaml.dump(data, buf)
+        loader.dump(data, buf)
         return buf.getvalue()
 
     def test_append_after_item_with_block_comment(self):
@@ -465,6 +469,67 @@ class TestAppendSeqItemWithComments:
             """
         )
         assert result == expected
+
+    def test_append_with_comment_block(self):
+        """A comment block is printed directly above the appended item, after the
+        previous item."""
+        src = dedent(
+            """\
+            items:
+            - a
+            - b
+            """
+        )
+        result = self._roundtrip(src, "c", comment=["the title", "the url"])
+        expected = dedent(
+            """\
+            items:
+            - a
+            - b
+            # the title
+            # the url
+            - c
+            """
+        )
+        assert result == expected
+
+    def test_append_comment_honors_indent(self):
+        """``comment_indent`` is used as the literal prefix of each comment
+        line."""
+        src = dedent(
+            """\
+            items:
+            - a
+            """
+        )
+        result = self._roundtrip(src, "b", comment=["title"], comment_indent="    ")
+        expected = "items:\n- a\n    # title\n- b\n"
+        assert result == expected
+
+    def test_append_without_comment_unchanged(self):
+        """``comment=None`` still appends with no comment block."""
+        src = dedent(
+            """\
+            items:
+            - a
+            """
+        )
+        result = self._roundtrip(src, "b")
+        expected = dedent(
+            """\
+            items:
+            - a
+            - b
+            """
+        )
+        assert result == expected
+
+
+def test_sequence_item_indent_matches_pending_merge_config():
+    """Under the pending-merges dump config the item-aligned indent is 4
+    spaces (lines a comment up with the ``    - item`` dashes)."""
+    yaml.indent(mapping=2, sequence=4, offset=2)
+    assert sequence_item_indent() == "    "
 
 
 class TestRuamelUpstreamCanary:
