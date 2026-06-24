@@ -7,7 +7,10 @@ from textwrap import dedent
 import pytest
 from ruamel.yaml import YAML
 
-from odoo_tools.utils.yaml import remove_seq_item_with_comments
+from odoo_tools.utils.yaml import (
+    append_seq_item_with_comments,
+    remove_seq_item_with_comments,
+)
 
 
 class TestRemoveSeqItemWithComments:
@@ -334,6 +337,130 @@ class TestRemoveSeqItemWithComments:
             """\
             items:
             - a  # inline a
+            - c
+            """
+        )
+        assert result == expected
+
+
+class TestAppendSeqItemWithComments:
+    @staticmethod
+    def _roundtrip(src, value):
+        """Load ``src``, append ``value`` to its top-level ``items`` sequence
+        and return the re-dumped document."""
+        yaml = YAML()
+        data = yaml.load(src)
+        append_seq_item_with_comments(data["items"], value)
+        buf = io.StringIO()
+        yaml.dump(data, buf)
+        return buf.getvalue()
+
+    def test_append_after_item_with_block_comment(self):
+        """The new item lands at the end, after the previous item's comment
+        block -- not in between the block and the item it describes."""
+        src = dedent(
+            """\
+            items:
+            - a
+            # comment for b
+            - b
+            """
+        )
+        result = self._roundtrip(src, "c")
+        expected = dedent(
+            """\
+            items:
+            - a
+            # comment for b
+            - b
+            - c
+            """
+        )
+        assert result == expected
+
+    def test_append_to_plain_list(self):
+        src = dedent(
+            """\
+            items:
+            - a
+            - b
+            """
+        )
+        result = self._roundtrip(src, "c")
+        expected = dedent(
+            """\
+            items:
+            - a
+            - b
+            - c
+            """
+        )
+        assert result == expected
+
+    def test_append_keeps_all_block_comments(self):
+        """Every existing comment block stays anchored to its own item."""
+        src = dedent(
+            """\
+            items:
+            - a
+            # comment for b
+            - b
+            # comment for c
+            - c
+            """
+        )
+        result = self._roundtrip(src, "d")
+        expected = dedent(
+            """\
+            items:
+            - a
+            # comment for b
+            - b
+            # comment for c
+            - c
+            - d
+            """
+        )
+        assert result == expected
+
+    def test_append_keeps_inline_comments(self):
+        """Inline (end-of-line) comments stay with their own item."""
+        src = dedent(
+            """\
+            items:
+            - a  # inline a
+            - b  # inline b
+            """
+        )
+        result = self._roundtrip(src, "c")
+        expected = dedent(
+            """\
+            items:
+            - a  # inline a
+            - b  # inline b
+            - c
+            """
+        )
+        assert result == expected
+
+    def test_append_preserves_multiline_comment_blocks(self):
+        src = dedent(
+            """\
+            items:
+            - a
+            # b line 1
+            # b line 2
+            - b
+            """
+        )
+        result = self._roundtrip(src, "c")
+        expected = dedent(
+            """\
+            items:
+            - a
+            # b line 1
+            # b line 2
+            - b
             - c
             """
         )

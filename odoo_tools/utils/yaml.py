@@ -39,29 +39,18 @@ def _set_seq_start_comment(seq, leading):
             seq.ca.comment = [None, [token]]
 
 
-def remove_seq_item_with_comments(seq, value):
-    """Remove ``value`` from a ruamel ``CommentedSeq`` along with the comments
-    that belong to it (its end-of-line comment and the block above it), keeping
-    every other item's comments anchored to that item.
+def _normalize_seq_comments(seq):
+    """Normalise a ruamel ``CommentedSeq``'s stored comments into a per-item
+    model and return ``(eol, above)``.
 
-    ruamel does not model this directly: ``seq.ca.items[i]`` holds the comment
-    printed *after* item ``i`` -- which mixes item ``i``'s end-of-line comment
-    with the block comment that precedes item ``i + 1`` -- and the block above
-    the first item lives on the sequence's start comment. A plain
-    ``seq.remove(value)`` therefore drops the *next* item's comment and leaves
-    the removed item's block dangling on the survivor (upstream ticket, no stable
-    public API yet: https://sourceforge.net/p/ruamel-yaml/tickets/377/).
-
-    We sidestep that by normalising the stored comments into a per-item model
-    (each item's inline comment + the block above it), dropping the removed
-    item's entries, then rebuilding ``ca.items`` and the start comment. Inline
-    placement is restored from the token column; block indentation rides along
-    as leading whitespace inside the token value.
+    ``eol[i]`` is ``(text, column)`` of item ``i``'s end-of-line comment;
+    ``above[i]`` is the block printed before item ``i`` (``above[length]``
+    trails the whole list). This sidesteps ruamel's storage where
+    ``seq.ca.items[i]`` holds the comment printed *after* item ``i`` -- mixing
+    item ``i``'s end-of-line comment with the block that precedes item ``i + 1``
+    -- and the block above the first item lives on the sequence's start comment.
     """
-    idx = seq.index(value)  # raises ValueError if absent, like list.remove
     length = len(seq)
-    # Normalise: eol[i] = (text, column) of item i's end-of-line comment;
-    # above[i] = block printed before item i (above[length] trails the list).
     eol = [None] * length
     above = [None] * (length + 1)
     for i, entry in seq.ca.items.items():
@@ -76,12 +65,15 @@ def remove_seq_item_with_comments(seq, value):
     start = seq.ca.comment
     if start and start[1]:
         above[0] = "".join(token.value for token in start[1] if token is not None)
-    # Drop the item together with its own inline + preceding-block comments.
-    # ``above[idx + 1]`` shifts into ``idx``, staying anchored to the survivor.
-    del seq[idx]
-    eol.pop(idx)
-    above.pop(idx)
-    # Rebuild ruamel's storage from the model.
+    return eol, above
+
+
+def _rebuild_seq_comments(seq, eol, above):
+    """Rebuild ``seq.ca.items`` and the start comment from the per-item model
+    produced by :func:`_normalize_seq_comments`. Inline placement is restored
+    from the token column; block indentation rides along as leading whitespace
+    inside the token value.
+    """
     seq.ca.items.clear()
     _set_seq_start_comment(seq, above[0])
     for i in range(len(seq)):
@@ -95,6 +87,47 @@ def remove_seq_item_with_comments(seq, value):
         else:
             continue
         seq.ca.items[i] = [token, None, None, None]
+
+
+def remove_seq_item_with_comments(seq, value):
+    """Remove ``value`` from a ruamel ``CommentedSeq`` along with the comments
+    that belong to it (its end-of-line comment and the block above it), keeping
+    every other item's comments anchored to that item.
+
+    ruamel does not model this directly (see :func:`_normalize_seq_comments`): a
+    plain ``seq.remove(value)`` drops the *next* item's comment and leaves the
+    removed item's block dangling on the survivor (upstream ticket, no stable
+    public API yet: https://sourceforge.net/p/ruamel-yaml/tickets/377/).
+
+    We sidestep that by normalising the stored comments into a per-item model,
+    dropping the removed item's entries, then rebuilding ``ca.items`` and the
+    start comment.
+    """
+    idx = seq.index(value)  # raises ValueError if absent, like list.remove
+    eol, above = _normalize_seq_comments(seq)
+    # Drop the item together with its own inline + preceding-block comments.
+    # ``above[idx + 1]`` shifts into ``idx``, staying anchored to the survivor.
+    del seq[idx]
+    eol.pop(idx)
+    above.pop(idx)
+    _rebuild_seq_comments(seq, eol, above)
+
+
+def append_seq_item_with_comments(seq, value):
+    """Append ``value`` to the end of a ruamel ``CommentedSeq`` keeping every
+    existing item's comments anchored to that item. The appended item gets no
+    comment of its own.
+
+    A plain ``seq.append(value)`` would leave any block comment that trailed the
+    list dangling before the new item; normalising and rebuilding keeps that
+    block attached to the previously-last item so the new line lands cleanly at
+    the end.
+    """
+    eol, above = _normalize_seq_comments(seq)
+    seq.append(value)
+    eol.append(None)  # new last item: no end-of-line comment
+    above.append(None)  # new trailing slot: empty
+    _rebuild_seq_comments(seq, eol, above)
 
 
 def update_yml_file(path, new_data, main_key=None):
