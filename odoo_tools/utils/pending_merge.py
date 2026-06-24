@@ -22,7 +22,12 @@ from .config import config
 from .os_exec import run
 from .path import build_path, cd
 from .proj import get_current_version, get_project_manifest_key
-from .yaml import remove_seq_item_with_comments, yaml_dump, yaml_load
+from .yaml import (
+    append_seq_item_with_comments,
+    remove_seq_item_with_comments,
+    yaml_dump,
+    yaml_load,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -346,11 +351,9 @@ class Repo:
         known_remotes = conf["remotes"]
         if upstream not in known_remotes:
             known_remotes.insert(0, upstream, self.ssh_url(upstream))
-        # we're just at the place to append a new pending merge
-        # ruamel.yaml's API won't allow ppl to insert items at the end of
-        # array, so the closest solution would be to insert it at position 1,
-        # straight after `OCA basebranch` merge item.
-        conf["merges"].insert(1, pending_mrg_line)
+        # Append the new pending merge at the end of the list, keeping the
+        # comment blocks of the existing entries anchored to them.
+        append_seq_item_with_comments(conf["merges"], pending_mrg_line)
         self.update_merges_config(conf)
         return True
 

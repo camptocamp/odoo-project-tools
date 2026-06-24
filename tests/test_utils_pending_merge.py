@@ -164,11 +164,11 @@ def test_add_pending_pr():
     expected = {
         "merges": [
             "OCA 14.0",
-            "OCA refs/pull/778/head",
             "OCA refs/pull/774/head",
             "OCA refs/pull/773/head",
             "OCA refs/pull/663/head",
             "OCA refs/pull/759/head",
+            "OCA refs/pull/778/head",
         ],
         "remotes": {
             "OCA": "git@github.com:OCA/edi.git",
@@ -203,6 +203,43 @@ def test_add_pending_pr_multiple():
     merges = repo.merges_config()["merges"]
     assert "OCA refs/pull/778/head" in merges
     assert "OCA refs/pull/779/head" in merges
+
+
+def test_add_pending_pr_with_comments(project):
+    """A new pending merge is appended at the end of the list, after the comment
+    block of the previous entry (and not in between)."""
+    name = "edi"
+    tmpl = """
+../{ext_src_rel_path}/{repo_name}:
+  remotes:
+    camptocamp: git@github.com:camptocamp/{repo_name}.git
+    {org_name}: git@github.com:{org_name}/{repo_name}.git
+  target: camptocamp merge-branch-{pid}-master
+  merges:
+  - {org_name} 19.0
+  # [19.0] [ADD] sale_stock_picking_backorder_policy
+  # https://github.com/OCA/{repo_name}/pull/2372
+  - {org_name} refs/pull/2372/head
+"""
+    mock_pending_merge_repo_paths(name, tmpl=tmpl)
+    repo = Repo(name, path_check=False)
+    repo.add_pending_pull_request("OCA", 2373)
+    expected = dedent(
+        """\
+        ../odoo/external-src/edi:
+          remotes:
+            camptocamp: git@github.com:camptocamp/edi.git
+            OCA: git@github.com:OCA/edi.git
+          target: camptocamp merge-branch-1234-master
+          merges:
+            - OCA 19.0
+          # [19.0] [ADD] sale_stock_picking_backorder_policy
+          # https://github.com/OCA/edi/pull/2372
+            - OCA refs/pull/2372/head
+            - OCA refs/pull/2373/head
+        """
+    )
+    assert repo.abs_merges_path.read_text() == expected
 
 
 @pytest.mark.usefixtures("project")
