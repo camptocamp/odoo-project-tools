@@ -18,11 +18,24 @@ from ..utils.misc import (
     get_docker_image_commit_hashes,
     get_template_path,
 )
-from ..utils.path import build_path
+from ..utils.path import build_path, root_path
 from ..utils.proj import (
     generate_odoo_config_file,
     setup_venv,
 )
+
+_README_PROJECT_ID_RE = re.compile(r"Our internal id for this project is: (\d+)")
+
+
+def _read_project_id_from_readme() -> str | None:
+    """Extract the project ID from README.md at the project root, if present."""
+    readme = root_path() / "README.md"
+    try:
+        content = readme.read_text()
+    except FileNotFoundError:
+        return None
+    match = _README_PROJECT_ID_RE.search(content)
+    return match.group(1) if match else None
 
 
 # TODO: proj_tmpl_ver=2 is deprecated
@@ -131,6 +144,9 @@ def get_init_template_files():
             "source": f".proj.v{get_proj_tmpl_ver() or '1'}.cfg",
             "destination": build_path(f"./{PROJ_CFG_FILE}"),
             "check": lambda source_path, dest_path: not dest_path.exists(),
+            "variables_getter": lambda opts: {
+                "project_id": _read_project_id_from_readme()
+            },
         },
         {
             "source": "docker-compose.override.tmpl.yml",

@@ -11,8 +11,133 @@ from git.config import GitConfigParser
 from git_autoshare.core import find_autoshare_repository
 
 from . import ui
+from .config import config as proj_config
 from .os_exec import run
 from .path import build_path, cd, root_path
+from .proj import get_odoo_version, get_project_id
+
+
+def _repo_name_from_url(url: str) -> str:
+    """Extract repository name from a GitHub SSH or HTTPS URL."""
+    return url.rstrip("/").split("/")[-1].removesuffix(".git")
+
+
+def _remote_exists(git_dir: str | Path, remote_name: str) -> bool:
+    """Return True if the named remote exists in the repo at git_dir."""
+    result = subprocess.run(
+        ["git", "-C", str(git_dir), "remote", "get-url", remote_name],
+        capture_output=True,
+    )
+    return result.returncode == 0
+
+
+def ensure_remote(git_dir: str | Path, remote_name: str, url: str) -> bool:
+    """Add a named remote if it doesn't already exist.
+
+    Returns True if the remote was added, False if it was already present.
+    """
+    if _remote_exists(git_dir, remote_name):
+        return False
+    run(
+        ["git", "-C", str(git_dir), "remote", "add", remote_name, url],
+        check=True,
+    )
+    return True
+
+
+def fetch_targeted(git_dir: str | Path, remote_name: str, refspec: str) -> None:
+    """Fetch a single refspec from a named remote, emitting a warning on failure."""
+    try:
+        run(
+            ["git", "-C", str(git_dir), "fetch", remote_name, refspec],
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        ui.echo(
+            f"WARNING: fetch {remote_name} {refspec} in {git_dir} failed: {e}",
+            fg="yellow",
+        )
+
+
+def setup_submodule_remotes(
+    repo_path: str | Path,
+    submodule_url: str,
+    base_branch: str,
+    project_id: str | None,
+    company_remote: str,
+) -> None:
+    """Ensure OCA and <company_remote> (e.g. camptocamp) remotes exist and fetch targeted branches.
+
+    Fetch strategy:
+      OCA              -> base branch only (e.g. refs/heads/18.0)
+      <company_remote> -> merge-branch-<project_id>-* only (skipped when project_id is None)
+
+    Safe to call on both submodule working trees and autoshare bare caches.
+    """
+    repo_name = _repo_name_from_url(submodule_url)
+    oca_url = f"git@github.com:OCA/{repo_name}.git"
+    c2c_url = f"git@github.com:{company_remote}/{repo_name}.git"
+
+    ensure_remote(repo_path, "OCA", oca_url)
+    fetch_targeted(
+        repo_path,
+        "OCA",
+        f"+refs/heads/{base_branch}:refs/remotes/OCA/{base_branch}",
+    )
+
+    if project_id:
+        ensure_remote(repo_path, company_remote, c2c_url)
+        fetch_targeted(
+            repo_path,
+            company_remote,
+            f"+refs/heads/merge-branch-{project_id}-*"
+            f":refs/remotes/{company_remote}/merge-branch-{project_id}-*",
+        )
+
+
+def get_pinned_sha(submodule_path: str | PathLike) -> str | None:
+    """Return the commit SHA recorded in the parent repo HEAD for this submodule."""
+    try:
+        output = run(["git", "ls-tree", "HEAD", str(submodule_path)], check=True)
+        if output:
+            # "160000 commit <sha>\t<path>"
+            parts = output.split()
+            if len(parts) >= 3:
+                return parts[2]
+    except (subprocess.CalledProcessError, IndexError):
+        pass
+    return None
+
+
+def pin_submodule_commit(repo_path: str | Path, pinned_sha: str) -> bool:
+    """Create refs/c2c-sync/pinned pointing to pinned_sha to prevent fallback fetches.
+
+    When a commit exists in the object store via alternates but is not pointed
+    to by any local ref, git's fallback fetch tries all alternate-repo remotes —
+    including a parent repo's 'me' remote — via blocked file:// transport.
+    Pinning a local ref makes the commit reachable from --all so the fallback
+    never triggers.
+
+    Returns True if the ref was set, False if the commit is not in the object store.
+    """
+    check = subprocess.run(
+        ["git", "-C", str(repo_path), "cat-file", "-e", f"{pinned_sha}^{{commit}}"],
+        capture_output=True,
+    )
+    if check.returncode != 0:
+        return False
+    run(
+        [
+            "git",
+            "-C",
+            str(repo_path),
+            "update-ref",
+            "refs/c2c-sync/pinned",
+            pinned_sha,
+        ],
+        check=True,
+    )
+    return True
 
 
 class SubmoduleInfo(NamedTuple):
@@ -127,12 +252,28 @@ def submodule_update(path: str | PathLike):
     args = []
     # Use git-autoshare if available
     submodule = next(iter_gitmodules(filter_path=path), None)
+    project_id: str | None = None
+    base_branch: str = get_odoo_version()
+    company_remote = proj_config.company_git_remote
     if submodule:
         ui.echo(f"Updating submodule {submodule.path}")
+        project_id = get_project_id()
+        base_branch = submodule.branch or base_branch
         __, autoshare_repo = find_autoshare_repository([submodule.url])
         if autoshare_repo:
             if not Path(autoshare_repo.repo_dir).exists():
                 autoshare_repo.prefetch(True)
+            # Populate the autoshare cache with targeted OCA/<company_remote> refs so
+            # that the recorded commit is reachable from a named ref in the cache.
+            # This prevents git's fallback fetch from reaching parent-repo remotes
+            # (including any 'me' remote) via blocked file:// transport.
+            setup_submodule_remotes(
+                autoshare_repo.repo_dir,
+                submodule.url,
+                base_branch,
+                project_id,
+                company_remote,
+            )
             args += ["--reference", autoshare_repo.repo_dir]
         else:
             ui.echo(
@@ -140,6 +281,20 @@ def submodule_update(path: str | PathLike):
             )
     args.append(str(path))
     run(cmd + args, check=True)
+    # After the submodule is updated: ensure it has OCA/<company_remote> remotes and
+    # pin the recorded commit so subsequent git operations never trigger the
+    # fallback fetch path.
+    if submodule and Path(build_path(submodule.path)).exists():
+        setup_submodule_remotes(
+            build_path(submodule.path),
+            submodule.url,
+            base_branch,
+            project_id,
+            company_remote,
+        )
+        pinned_sha = get_pinned_sha(submodule.path)
+        if pinned_sha:
+            pin_submodule_commit(build_path(submodule.path), pinned_sha)
 
 
 def submodule_set_url(repo_path, url, remote="origin"):
