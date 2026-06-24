@@ -526,18 +526,6 @@ wheels = [
 ]
 
 [[package]]
-name = "kaptan"
-version = "0.6.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pyyaml" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ca/c8/3569c90535df1b7c6079c75b7fd3f304d6ec8ee1626855d37ca137409ba2/kaptan-0.6.0.tar.gz", hash = "sha256:101330a44fdede888586f3010bd145c0ec48a4806bc56429fa5487a6774021f8", size = 11861, upload-time = "2023-08-27T11:24:04.62Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/26/4e7fa0e03e8bac6fc489f11f4bddfcf0174f725bc19e72609219ab44ca1f/kaptan-0.6.0-py3-none-any.whl", hash = "sha256:05b6a3d9eb4c4e53173519491cf32847a56d923226145938f1ffce547e4eac27", size = 11032, upload-time = "2023-08-27T11:24:03.318Z" },
-]
-
-[[package]]
 name = "markdown-it-py"
 version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -665,7 +653,6 @@ dependencies = [
     { name = "git-autoshare" },
     { name = "gitpython" },
     { name = "jinja2" },
-    { name = "kaptan" },
     { name = "packaging" },
     { name = "passlib" },
     { name = "pre-commit" },
@@ -700,7 +687,6 @@ requires-dist = [
     { name = "git-autoshare" },
     { name = "gitpython" },
     { name = "jinja2" },
-    { name = "kaptan", specifier = "==0.6.0" },
     { name = "packaging" },
     { name = "passlib" },
     { name = "pre-commit" },
