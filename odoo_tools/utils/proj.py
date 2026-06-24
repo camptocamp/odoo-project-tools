@@ -34,6 +34,16 @@ def get_odoo_serie():
     return get_odoo_version().split(".")[0]
 
 
+def get_project_id() -> str | None:
+    """Return the project ID from the project config (.proj.cfg), or None.
+
+    The value is stored in .proj.cfg as ``project_id`` and written there
+    automatically by ``otools-project init`` when the README contains the
+    line ``Our internal id for this project is: <id>``.
+    """
+    return config.project_id
+
+
 def get_current_version():
     """Gets the current project version
 
