@@ -1,13 +1,34 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+import os
+
 import click
+from rich.console import Console
 
 from ..exceptions import Exit
+
+# Rich console writing to stderr, for warnings/diagnostics that must not be
+# mixed with a command's stdout (e.g. JSON output or a live-rendered table).
+err_console = Console(stderr=True)
 
 
 def exit_msg(msg):
     raise Exit(msg)
+
+
+def warn_missing_github_token():
+    """Warn (on stderr) when no GITHUB_TOKEN is set.
+
+    Unauthenticated GitHub API requests share a low rate limit and quickly
+    start failing; commands that hit the API should call this up front.
+    """
+    if not os.environ.get("GITHUB_TOKEN"):
+        err_console.print(
+            "Warning: GITHUB_TOKEN is not set; GitHub API requests "
+            "are unauthenticated and may hit rate limits.",
+            style="yellow",
+        )
 
 
 def ask_confirmation(message):

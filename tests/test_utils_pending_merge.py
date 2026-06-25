@@ -6,6 +6,7 @@ from textwrap import dedent
 from unittest import mock
 
 import pytest
+import requests
 import responses
 from git.config import GitConfigParser
 
@@ -841,6 +842,45 @@ def test_purge_merged_prs(project):
     assert "OCA refs/pull/759/head" in remaining
 
 
+def test_purge_merged_prs_skips_unreachable(project, caplog):
+    """A PR whose status can't be fetched is left in place (with a warning),
+    and the failure doesn't abort purging the other PRs."""
+    name = "edi"
+    mock_pending_merge_repo_paths(name)
+    repo = Repo(name)
+    pr_states = {
+        774: ("open", False),
+        773: ("closed", True),
+        759: ("closed", False),
+    }
+    enrich = _fake_enrich(pr_states)
+
+    def enrich_or_fail(self):
+        # PR 774 is unreachable (e.g. rate limited); the rest succeed.
+        if self.pr == 774:
+            raise requests.HTTPError("403 rate limit exceeded")
+        enrich(self)
+
+    with (
+        mock.patch.object(
+            pm_utils.PendingPR,
+            "enrich_with_github",
+            autospec=True,
+            side_effect=enrich_or_fail,
+        ),
+        caplog.at_level("WARNING", logger="odoo_tools.utils.pending_merge"),
+    ):
+        purged = list(repo.purge_merged_prs())
+    # The merged PR is still removed; the unreachable one is left alone.
+    assert [pr.pr for pr in purged] == [773]
+    remaining = repo.merges_config()["merges"]
+    assert "OCA refs/pull/773/head" not in remaining
+    assert "OCA refs/pull/774/head" in remaining
+    assert "OCA refs/pull/759/head" in remaining
+    # The failure is reported via a log warning.
+    assert "OCA/edi#774" in caplog.text
+
+
 def test_purge_merged_prs_with_comments(project):
     """Purging a merged PR drops its own preceding comment block and keeps the
     comment block of the still-pending PR that followed it."""
@@ -944,13 +984,31 @@ def test_enrich_with_github_api_error(project):
         rsps.add(
             responses.GET,
             "https://api.github.com/repos/OCA/edi/pulls/9999",
-            status=404,
+            status=403,
         )
-        pending.enrich_with_github()
-    # Empty state on API failure means purge_merged_prs won't touch it
-    assert pending.is_enriched
-    assert pending.state == ""
-    assert pending.merged is False
+        # The error is raised loudly; callers decide how to surface it.
+        with pytest.raises(requests.HTTPError):
+            pending.enrich_with_github()
+    # State is left untouched (not enriched) so callers can flag the failure.
+    assert not pending.is_enriched
+    assert pending.state is None
+
+
+def test_enrich_with_github_connection_error(project):
+    name = "edi"
+    mock_pending_merge_repo_paths(name)
+    repo = Repo(name)
+    pending = _make_pending(repo, 9999)
+    with responses.RequestsMock() as rsps:
+        rsps.add(
+            responses.GET,
+            "https://api.github.com/repos/OCA/edi/pulls/9999",
+            body=requests.ConnectionError("boom"),
+        )
+        with pytest.raises(requests.ConnectionError):
+            pending.enrich_with_github()
+    assert not pending.is_enriched
+    assert pending.state is None
 
 
 def test_enrich_with_github_uses_token(project, monkeypatch):

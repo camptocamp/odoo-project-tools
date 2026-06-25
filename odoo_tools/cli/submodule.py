@@ -160,6 +160,7 @@ def upgrade(submodule_path, force_branch):
     re-aggregate if needed.
     """
     odoo_version = proj.get_project_manifest_key("odoo_version")
+    ui.warn_missing_github_token()
     with path.cd(path.root_path()):
         for submodule in git.iter_gitmodules(filter_path=submodule_path):
             repo = pm_utils.Repo(submodule.path, path_check=False)

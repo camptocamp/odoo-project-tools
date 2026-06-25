@@ -8,10 +8,12 @@ import arrow
 import click
 from rich.console import Console
 from rich.live import Live
+from rich.markup import escape
 from rich.spinner import Spinner
 from rich.table import Table
 
 from ..utils import pending_merge as pm_utils
+from ..utils import ui
 from ..utils.click import deprecated_option, global_command_decorators
 
 console = Console()
@@ -60,11 +62,21 @@ def show_pending(repo_paths=(), check=True, as_json=False):
     """List pull requests on <repo_path>."""
     repos = _resolve_repos(repo_paths, path_check=False)
     all_prs = [pr for repo in repos for pr in repo._iter_pending_pull_requests()]
+    if check:
+        ui.warn_missing_github_token()
+    # ids of PRs whose enrichment failed -> error message
+    errors: dict[int, str] = {}
     # In case of --json, output directly
     if as_json:
         if check:
             with ThreadPoolExecutor(max_workers=8) as pool:
-                list(pool.map(lambda pr: pr.enrich_with_github(), all_prs))
+                futures = {pool.submit(pr.enrich_with_github): pr for pr in all_prs}
+                for future in as_completed(futures):
+                    try:
+                        future.result()
+                    except Exception:
+                        # leave state as None in the JSON output
+                        pass
         click.echo(json.dumps([pr.to_dict() for pr in all_prs], indent=2, default=str))
         return
 
@@ -78,6 +90,10 @@ def show_pending(repo_paths=(), check=True, as_json=False):
         for pr in all_prs:
             if not check:
                 state_cell, updated, title = "-", "", ""
+            elif id(pr) in errors:
+                state_cell = "[red]?[/]"
+                updated = ""
+                title = f"[red]{escape(errors[id(pr)])}[/]"
             elif not pr.is_enriched:
                 state_cell, updated, title = Spinner("dots"), "", ""
             else:
@@ -99,8 +115,13 @@ def show_pending(repo_paths=(), check=True, as_json=False):
             Live(build_grid(), console=console, refresh_per_second=10) as live,
             ThreadPoolExecutor(max_workers=8) as pool,
         ):
-            futures = [pool.submit(pr.enrich_with_github) for pr in all_prs]
-            for _ in as_completed(futures):
+            futures = {pool.submit(pr.enrich_with_github): pr for pr in all_prs}
+            for future in as_completed(futures):
+                pr = futures[future]
+                try:
+                    future.result()
+                except Exception as exc:
+                    errors[id(pr)] = str(exc)
                 live.update(build_grid())
     else:
         console.print(build_grid())
@@ -125,17 +146,23 @@ def clean_pending(repo_paths=(), aggregate=True):
     all_prs = [pr for repo in repos for pr in repo._iter_pending_pull_requests()]
     if not all_prs:
         return
+    ui.warn_missing_github_token()
     touched_repos: set[pm_utils.Repo] = set()
     removed: set[int] = set()  # ids of PRs removed from their merges file
+    # ids of PRs whose enrichment failed -> error message
+    errors: dict[int, str] = {}
 
     def build_grid():
         grid = Table.grid(padding=(0, 1))
         grid.add_column(no_wrap=True)  # state dot / spinner
         grid.add_column(no_wrap=True)  # shortcut (linked)
         grid.add_column(no_wrap=True, style="dim")  # patch marker
-        grid.add_column(no_wrap=True)  # outcome
+        grid.add_column(no_wrap=True, overflow="ellipsis")  # outcome
         for pr in all_prs:
-            if not pr.is_enriched:
+            if id(pr) in errors:
+                state_cell = "[red]?[/]"
+                outcome = f"[red]{escape(errors[id(pr)])}[/]"
+            elif not pr.is_enriched:
                 state_cell, outcome = Spinner("dots"), ""
             elif id(pr) in removed:
                 state = "merged" if pr.merged else pr.state
@@ -160,8 +187,14 @@ def clean_pending(repo_paths=(), aggregate=True):
     ):
         futures = {pool.submit(pr.enrich_with_github): pr for pr in all_prs}
         for future in as_completed(futures):
-            future.result()
             pr = futures[future]
+            try:
+                future.result()
+            except Exception as exc:
+                # Leave the PR in place; we can't tell if it was merged.
+                errors[id(pr)] = str(exc)
+                live.update(build_grid())
+                continue
             if pr.merged:
                 if pr.is_patch:
                     pr._repo.remove_pending_pull_from_patches(pr.owner, pr.pr)
