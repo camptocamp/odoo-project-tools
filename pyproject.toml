@@ -79,7 +79,6 @@ packages = ["odoo_tools"]
 [tool.hatch.build.targets.sdist]
 include = [
     "odoo_tools",
-    "HISTORY.rst",
     "LICENSE",
     "README.md",
 ]
@@ -128,35 +127,3 @@ ignore = [
 
 [tool.ruff.lint.mccabe]
 max-complexity = 16
-
-[tool.towncrier]
-directory = "changes.d"
-filename = "HISTORY.rst"
-template = ".towncrier-template.rst"
-title_format = ""
-issue_format = "{issue}"
-
-[[tool.towncrier.type]]
-directory = "feat"
-name = "Features and Improvements"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "fix"
-name = "Bugfixes"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "rem"
-name = "Remove"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "doc"
-name = "Documentation"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "build"
-name = "Build"
-showcontent = true
