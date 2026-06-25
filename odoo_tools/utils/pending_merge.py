@@ -92,23 +92,20 @@ class PendingPR:
         }
 
     def enrich_with_github(self) -> None:
-        """Fetch the PR's GitHub state and update this instance in place."""
+        """Fetch the PR's GitHub state and update this instance in place.
+
+        Raises ``requests.RequestException`` (e.g. ``HTTPError`` on a rate-limit
+        403, or a timeout/connection error) on failure; callers are expected to
+        catch and decide how to surface it.
+        """
         api_url = (
             f"https://api.github.com/repos/{self.owner}/{self.repo}/pulls/{self.pr}"
         )
         headers = {}
         if token := os.environ.get("GITHUB_TOKEN"):
             headers["Authorization"] = f"token {token}"
-        response = requests.get(api_url, headers=headers)
-        if not response.ok:
-            logger.warning(
-                "Could not get status of %s: %s %s",
-                self.shortcut,
-                response.status_code,
-                response.reason,
-            )
-            self.state = ""
-            return
+        response = requests.get(api_url, headers=headers, timeout=30)
+        response.raise_for_status()
         data = response.json()
         self.state = data.get("state") or ""
         self.merged = bool(data.get("merged"))
@@ -551,9 +548,17 @@ class Repo:
         Iterates the local pending-merges, enriches each one via the GitHub
         API, and yields the merged ones as soon as they are removed so that
         callers can report progress in real time.
+
+        A PR whose GitHub status can't be fetched (rate limit, timeout, …) is
+        left in place: we can't tell whether it was merged, so removing it
+        would be unsafe.
         """
         for pr in self._iter_pending_pull_requests():
-            pr.enrich_with_github()
+            try:
+                pr.enrich_with_github()
+            except requests.RequestException as exc:
+                logger.warning("Could not get status of %s: %s", pr.shortcut, exc)
+                continue
             if not pr.merged:
                 continue
             if pr.is_patch:
