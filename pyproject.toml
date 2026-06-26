@@ -28,7 +28,7 @@ dependencies = [
     "pydantic>=2.13.4",
     "ruamel.yaml",
     "cookiecutter",
-    "click>=8.4.1,<8.5",
+    "click>=8.4.2,<8.5",
     "rich",
     "towncrier",
     "bump-my-version",
