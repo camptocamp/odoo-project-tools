@@ -18,10 +18,8 @@ class ProjectConfigException(Exception):
 
 
 class Exit(_Exit):
-    exit_code = 1
-
-    def __init__(self, msg):
-        super().__init__(self.exit_code)
+    def __init__(self, msg, exit_code=1):
+        super().__init__(exit_code)
         self.message = msg
         print(self.message)
 
