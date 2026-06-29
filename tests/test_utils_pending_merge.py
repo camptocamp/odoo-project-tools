@@ -10,6 +10,7 @@ import requests
 import responses
 from git.config import GitConfigParser
 
+from odoo_tools.cli import pending
 from odoo_tools.exceptions import Exit, PathNotFound
 from odoo_tools.utils import pending_merge as pm_utils
 from odoo_tools.utils.config import config
@@ -715,6 +716,86 @@ def test_add_pending_pull_request_patch():
     line_tmpl = "curl -sSL https://github.com/OCA/edi/pull/{}.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'"
     for pid in (1470, 1471):
         assert line_tmpl.format(pid) in shell_command_after, shell_command_after
+
+
+def test_cli_add_multiple_urls(project):
+    """`otools-pending add` accepts several URLs at once, writing every entry to
+    its merges file. URLs for the same submodule land in the same file."""
+    mock_pending_merge_repo_paths("edi")
+    mock_pending_merge_repo_paths("web")
+    edi = Repo("edi", path_check=False)
+    web = Repo("web", path_check=False)
+    with responses.RequestsMock() as rsps:
+        # match the project's odoo_version so no divergent-branch prompt
+        for pull_id in (1470, 1471):
+            rsps.add(
+                responses.GET,
+                f"https://api.github.com/repos/OCA/edi/pulls/{pull_id}",
+                json={"base": {"ref": "14.0"}},
+                status=200,
+            )
+        rsps.add(
+            responses.GET,
+            "https://api.github.com/repos/OCA/web/pulls/2000",
+            json={"base": {"ref": "14.0"}},
+            status=200,
+        )
+        result = project.invoke(
+            pending.add_pending,
+            [
+                "https://github.com/OCA/edi/pull/1470",
+                "https://github.com/OCA/edi/pull/1471",
+                "https://github.com/OCA/web/pull/2000",
+                "--no-aggregate",
+            ],
+            catch_exceptions=False,
+        )
+    assert result.exit_code == 0
+    edi_merges = edi.merges_config()["merges"]
+    assert "OCA refs/pull/1470/head" in edi_merges
+    assert "OCA refs/pull/1471/head" in edi_merges
+    web_merges = web.merges_config()["merges"]
+    assert "OCA refs/pull/2000/head" in web_merges
+
+
+def test_cli_add_multiple_urls_aggregates_once_per_submodule(project):
+    """Submodules are aggregated once each, after all entries are written, even
+    when several URLs target the same submodule (no intermediate aggregation)."""
+    mock_pending_merge_repo_paths("edi")
+    mock_pending_merge_repo_paths("web")
+    aggregator = mock.MagicMock()
+    with responses.RequestsMock() as rsps:
+        # match the project's odoo_version so no divergent-branch prompt
+        for pull_id in (1470, 1471):
+            rsps.add(
+                responses.GET,
+                f"https://api.github.com/repos/OCA/edi/pulls/{pull_id}",
+                json={"base": {"ref": "14.0"}},
+                status=200,
+            )
+        rsps.add(
+            responses.GET,
+            "https://api.github.com/repos/OCA/web/pulls/2000",
+            json={"base": {"ref": "14.0"}},
+            status=200,
+        )
+        with mock.patch.object(
+            pm_utils.Repo, "get_aggregator", return_value=aggregator
+        ) as get_aggregator:
+            result = project.invoke(
+                pending.add_pending,
+                [
+                    "https://github.com/OCA/edi/pull/1470",
+                    "https://github.com/OCA/edi/pull/1471",
+                    "https://github.com/OCA/web/pull/2000",
+                ],
+                catch_exceptions=False,
+            )
+    assert result.exit_code == 0
+    # edi is referenced twice but aggregated once: 2 unique submodules total.
+    assert get_aggregator.call_count == 2
+    assert aggregator.aggregate.call_count == 2
+    assert aggregator.push.call_count == 2
 
 
 def test_iter_pending_pull_requests(project):
