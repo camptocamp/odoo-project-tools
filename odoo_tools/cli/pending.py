@@ -239,7 +239,7 @@ def aggregate(repo_path, target_branch=None, push=None):
 
 
 @cli.command(name="add")
-@click.argument("entity_url")
+@click.argument("entity_urls", nargs=-1, required=True)
 @click.option(
     "--aggregate/--no-aggregate",
     "aggregate",
@@ -262,13 +262,26 @@ def aggregate(repo_path, target_branch=None, push=None):
     default=True,
     help="push the result of the aggregation to a remote branch",
 )
-def add_pending(entity_url, aggregate=True, patch=False, push=True):
-    """Add a pending merge using given entity link"""
+def add_pending(entity_urls, aggregate=True, patch=False, push=True):
+    """Add one or more pending merges using the given entity link(s)"""
     # pattern, given an https://github.com/<user>/<repo>/pull/<pr-index>
     # # PR headline
     # # PR link as is
     # - refs/pull/<pr-index>/head
-    pm_utils.add_pending(entity_url, aggregate=aggregate, patch=patch, push=push)
+    # Add every pending merge to its file first, without aggregating, and
+    # collect the affected repos deduplicated by their merges file so that a
+    # submodule referenced by several URLs is aggregated only once.
+    repos = {}
+    for entity_url in entity_urls:
+        repo = pm_utils.add_pending(entity_url, aggregate=False, patch=patch)
+        repos[repo.abs_merges_path] = repo
+    # Then aggregate each affected submodule once.
+    if aggregate:
+        for repo in repos.values():
+            aggregator = repo.get_aggregator()
+            aggregator.aggregate()
+            if push:
+                aggregator.push()
 
 
 @cli.command(name="remove")
