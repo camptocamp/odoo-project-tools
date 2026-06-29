@@ -5,6 +5,7 @@ import click
 from ..utils import git, path, proj, ui
 from ..utils import pending_merge as pm_utils
 from ..utils.click import global_command_decorators
+from ..utils.config import config
 
 
 @click.group()
@@ -51,15 +52,26 @@ def ls(dockerfile=False):
     if dockerfile:
         blacklist = {"odoo/src"}
         lines = (f"odoo/{line}" for line in submodules if line not in blacklist)
-        lines = chain(
-            [
+        if config.template_version == 1:
+            base_addons_paths = [
+                "odoo/src/odoo/odoo/addons",
+                "odoo/src/odoo/addons",
+                "odoo/local-src",
+            ]
+        else:
+            base_addons_paths = [
                 "odoo/src/odoo/odoo/addons",
                 "odoo/src/odoo/addons",
                 "odoo/src/enterprise",
                 "odoo/odoo/addons",
-            ],
+            ]
+        trailing_addons_paths = []
+        if path.build_path("odoo/odoo/paid-modules").exists():
+            trailing_addons_paths.append("odoo/odoo/paid-modules")
+        lines = chain(
+            base_addons_paths,
             lines,
-            ["odoo/odoo/paid-modules"],
+            trailing_addons_paths,
         )
         lines = (f"/{line}" for line in lines)
         joined = ", \\\n".join(lines)
