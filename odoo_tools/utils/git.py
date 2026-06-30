@@ -320,13 +320,11 @@ def checkout(branch_name, remote="origin"):
 
 
 def get_current_branch():
+    """Return the current branch name, or None when not on a branch."""
     try:
-        branch = subprocess.check_output(
-            ["git", "branch", "--show-current"], text=True
-        ).strip()
+        return run(["git", "branch", "--show-current"], check=True) or None
     except subprocess.CalledProcessError:
-        branch = None
-    return branch
+        return None
 
 
 def delete_branch(branch_name):

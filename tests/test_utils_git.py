@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 from unittest import mock
 
+import git
 import pytest
 
 from odoo_tools.utils import git as git_utils
@@ -366,3 +367,15 @@ def test_submodule_update_pins_commit_after_clone(project, tmp_path):
     mock_pin.assert_called_once()
     call_args = mock_pin.call_args[0]
     assert call_args[1] == pinned_sha
+
+
+# ── get_current_branch ────────────────────────────────────────────────────────
+
+
+@pytest.mark.project_setup(git_init=True)
+@pytest.mark.usefixtures("project")
+class TestGetCurrentBranch:
+    def test_returns_branch_name(self):
+        repo = git.Repo(".")
+        repo.create_head("my-feature").checkout()
+        assert git_utils.get_current_branch() == "my-feature"
