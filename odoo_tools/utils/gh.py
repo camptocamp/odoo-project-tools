@@ -5,7 +5,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from . import ui
+from . import git, ui
 from .os_exec import run
 from .proj import get_project_manifest_key
 
@@ -90,10 +90,6 @@ def get_current_rebase_branch():
     return current_branch
 
 
-def get_current_branch():
-    return run("git symbolic-ref --short HEAD")
-
-
 def get_target_branch(target_branch=None):
     """Gets the branch to push on and checks if we're overriding something.
 
@@ -102,7 +98,7 @@ def get_target_branch(target_branch=None):
     """
     current_branch = get_current_rebase_branch()
     if not current_branch:
-        current_branch = get_current_branch()
+        current_branch = git.get_current_branch()
     project_id = get_project_manifest_key("project_id")
     if not target_branch:
         commit = run("git rev-parse HEAD")[:8]

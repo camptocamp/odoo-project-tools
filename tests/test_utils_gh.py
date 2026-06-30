@@ -83,15 +83,6 @@ class TestParseGithubUrl:
 
 @pytest.mark.project_setup(git_init=True)
 @pytest.mark.usefixtures("project")
-class TestGetCurrentBranch:
-    def test_returns_branch_name(self):
-        repo = git.Repo(".")
-        repo.create_head("my-feature").checkout()
-        assert gh_utils.get_current_branch() == "my-feature"
-
-
-@pytest.mark.project_setup(git_init=True)
-@pytest.mark.usefixtures("project")
 class TestGetCurrentRebaseBranch:
     def test_returns_none_when_no_rebase(self):
         assert gh_utils.get_current_rebase_branch() is None
