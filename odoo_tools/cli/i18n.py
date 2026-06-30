@@ -1,6 +1,7 @@
 # Copyright 2025 Camptocamp SA (https://www.camptocamp.com).
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
+import os
 import tempfile
 from pathlib import Path
 
@@ -82,6 +83,11 @@ def cli(**kwargs):
 @utils.click.handle_exceptions()
 def export(module_paths, languages, clean_db, init_db, export_pot):
     """Export the translation files for a given module."""
+    # Run Odoo in the container as the current host user, so the exported
+    # translation files end up owned by us instead of the container's default
+    # user (uid 999 in the docker-odoo-project image). The image entrypoint
+    # picks up LOCAL_USER_ID to map the in-container user.
+    local_user_id = str(os.getuid())
     # Identify the module names to export, from the module paths
     module_names = [
         module_path.name
@@ -152,6 +158,7 @@ def export(module_paths, languages, clean_db, init_db, export_pot):
                         environment={
                             "DEMO": "True",
                             "MIGRATE": "False",
+                            "LOCAL_USER_ID": local_user_id,
                         },
                         quiet=False,
                     ),
@@ -172,6 +179,7 @@ def export(module_paths, languages, clean_db, init_db, export_pot):
                         environment={
                             "DEMO": "True",
                             "MIGRATE": "False",
+                            "LOCAL_USER_ID": local_user_id,
                         },
                         quiet=False,
                     ),
@@ -193,6 +201,7 @@ def export(module_paths, languages, clean_db, init_db, export_pot):
                         environment={
                             "DEMO": "True",
                             "MIGRATE": "False",
+                            "LOCAL_USER_ID": local_user_id,
                         },
                         quiet=False,
                     ),
@@ -214,13 +223,6 @@ def export(module_paths, languages, clean_db, init_db, export_pot):
         # Create a temporary directory to mount onto the container as volume
         with console.status(f"({progress}) {module_name}...") as status:
             with tempfile.TemporaryDirectory() as tmp_dir:
-                # The Odoo container typically runs as a non-host user (UID
-                # 999 in the canonical Camptocamp docker-odoo-project image).
-                # `tempfile.TemporaryDirectory` defaults to mode 0o700
-                # (owner-only), which prevents the container from writing
-                # the exported .po/.pot files into the bind-mounted volume.
-                # Loosen the host-side perms so the container can write.
-                Path(tmp_dir).chmod(0o777)
                 # Export the translation files
                 local_volume_path = Path(tmp_dir)
                 container_volume_path = Path("/tmp/otools_i18n")
@@ -243,6 +245,7 @@ def export(module_paths, languages, clean_db, init_db, export_pot):
                             environment={
                                 "DEMO": "True",
                                 "MIGRATE": "False",
+                                "LOCAL_USER_ID": local_user_id,
                             },
                             volumes=[(local_volume_path, container_volume_path)],
                         ),
