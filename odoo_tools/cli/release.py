@@ -98,6 +98,17 @@ def update_marabunta_file(version):
     handler.update(version)
 
 
+def _warn_deprecated_bumpversion_cfg():
+    """Warn if the deprecated .bumpversion.cfg file is present."""
+    if build_path(".bumpversion.cfg").is_file():
+        console.print(
+            "Deprecated .bumpversion.cfg file found. It is not recommended to use it.\n"
+            "Custom configuration is allowed, but it's recommended to do it in the "
+            "pyproject.toml. See bump-my-version documentation for more details.",
+            style="yellow",
+        )
+
+
 @click.group()
 @global_command_decorators
 def cli():
@@ -143,14 +154,7 @@ def bump(  # noqa: C901
         )
     repo = GitRepo(".")
     # Warn about deprecated .bumpversion.cfg file
-    bumpversion_cfg = build_path(".bumpversion.cfg")
-    if bumpversion_cfg.is_file():
-        console.print(
-            "Deprecated .bumpversion.cfg file found. It is not recommended to use it.\n"
-            "Custom configuration is allowed, but it's recommended to do it in the "
-            "pyproject.toml. See bump-my-version documentation for more details.",
-            style="yellow",
-        )
+    _warn_deprecated_bumpversion_cfg()
     # Obtain the list files where a version is written
     files = get_bumpversion_files()
     if not files:
