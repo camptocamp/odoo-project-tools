@@ -19,9 +19,8 @@ from ..exceptions import PathNotFound
 from ..utils.misc import SmartDict, get_docker_image_commit_hashes
 from . import gh, git, ui
 from .config import config
-from .os_exec import run
 from .path import build_path, cd
-from .proj import get_current_version, get_project_manifest_key
+from .proj import get_project_manifest_key
 from .yaml import (
     append_seq_item_with_comments,
     remove_seq_item_with_comments,
@@ -724,46 +723,6 @@ def make_merge_branch_name(version):
     project_id = get_project_manifest_key("project_id")
     branch_name = f"merge-branch-{project_id}-{version}"
     return branch_name
-
-
-def push_branches(version=None, force=False):
-    """Push the local branches to the camptocamp remote
-
-    The branch name will be composed of the id of the project and the current
-    version number (the one in odoo/VERSION).
-
-    It should be done at the closing of every release, so we are able
-    to build a new patch branch from the same commits if required.
-    """
-    version = version or get_current_version()
-    branch_name = make_merge_branch_name(version)
-    if not force:
-        if gh.check_git_diff():
-            ui.ask_or_abort(
-                "Your repository has local changes, are you sure you want to continue?"
-            )
-
-    # look through all of the files inside PENDING_MERGES_DIR, push everything
-    impacted_repos = []
-    company_git_remote = config.company_git_remote
-    for repo in Repo.repositories_from_pending_folder():
-        if not repo.has_pending_merges():
-            continue
-        merges_config = repo.merges_config()
-        impacted_repos.append(repo.path)
-        ui.echo(f"Pushing {repo.path}")
-        with cd(repo.abs_path):
-            try:
-                run(f"git config remote.{company_git_remote}.url")
-            except Exception:  # TODO
-                remote_url = merges_config["remotes"][company_git_remote]
-                run(f"git remote add {company_git_remote} {remote_url}")
-            run(f"git push -f -v {company_git_remote} HEAD:refs/heads/{branch_name}")
-    if impacted_repos:
-        ui.echo("Impacted repos:")
-        ui.echo("\n - ".join([x.as_posix() for x in impacted_repos]))
-    else:
-        ui.echo("No repo to push")
 
 
 def get_new_remote_url(repo: Repo, force_remote: str | bool = False):

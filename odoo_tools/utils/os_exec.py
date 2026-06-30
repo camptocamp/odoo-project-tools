@@ -32,13 +32,16 @@ def get_venv():
     return env
 
 
-def run(cmd, drop_trailing_spaces=True, check=False, with_env=None, verbose=False):
+def run(
+    cmd, drop_trailing_spaces=True, check=False, with_env=None, verbose=False, cwd=None
+):
     """Execute system commands and return output.
 
     :param cmd: the command to execute, as a string or a preparsed list
     :param drop_trailing_eol: remove trailing end-of-line chars or other wrapping spaces.
     :param with_env: a dictionary of environment variables to set, or None.
     :param verbose: if True, print the command before running it.
+    :param cwd: the working directory to run the command in, or None.
     """
     if isinstance(cmd, str):
         cmd = shlex.split(cmd)
@@ -48,7 +51,7 @@ def run(cmd, drop_trailing_spaces=True, check=False, with_env=None, verbose=Fals
     if with_env:
         env.update(with_env)
     try:
-        res = subprocess.run(cmd, capture_output=True, env=env, check=check)
+        res = subprocess.run(cmd, capture_output=True, env=env, check=check, cwd=cwd)
     except subprocess.CalledProcessError as e:
         if e.stderr:
             print(e.stderr.decode(), file=sys.stderr)

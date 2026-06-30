@@ -1,19 +1,26 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import click
 from git import Repo as GitRepo
 from rich.console import Console
+from rich.live import Live
+from rich.markup import escape
 from rich.prompt import Confirm
+from rich.spinner import Spinner
+from rich.table import Table
 
 from ..exceptions import ProjectConfigException
+from ..utils import gh, ui
 from ..utils.click import global_command_decorators
 from ..utils.config import config
 from ..utils.git import get_current_branch, tag_signing_enabled
 from ..utils.marabunta import MarabuntaFileHandler
 from ..utils.os_exec import run
 from ..utils.path import build_path
-from ..utils.pending_merge import push_branches
+from ..utils.pending_merge import Repo, make_merge_branch_name
 from ..utils.proj import get_current_version, get_project_bundle_addon_name
 
 console = Console()
@@ -146,6 +153,77 @@ def _do_bump(rel_type, new_version=None):
     return new_version, modified
 
 
+def _push_repo_branch(repo, branch_name, company_git_remote):
+    """Push a single repo's pending-merge branch to the company remote."""
+    merges_config = repo.merges_config()
+    try:
+        run(f"git config remote.{company_git_remote}.url", cwd=repo.abs_path)
+    except Exception:  # TODO
+        remote_url = merges_config["remotes"][company_git_remote]
+        run(f"git remote add {company_git_remote} {remote_url}", cwd=repo.abs_path)
+    run(
+        f"git push -f -v {company_git_remote} HEAD:refs/heads/{branch_name}",
+        cwd=repo.abs_path,
+    )
+
+
+def _push_aggregated_branches(version=None, force=False):
+    """Push the local aggregated (pending-merge) branches to the company remote.
+
+    The branch name is composed of the project id and the version number. It is
+    done when closing a release, so a new patch branch can be rebuilt from the
+    same commits if required. Repos are pushed in parallel.
+    """
+    version = version or get_current_version()
+    branch_name = make_merge_branch_name(version)
+    if not force and gh.check_git_diff():
+        ui.ask_or_abort(
+            "Your repository has local changes, are you sure you want to continue?"
+        )
+    company_git_remote = config.company_git_remote
+    repos = [
+        repo
+        for repo in Repo.repositories_from_pending_folder()
+        if repo.has_pending_merges()
+    ]
+    if not repos:
+        ui.echo("No repo to push")
+        return
+    states = {}  # repo -> "done" | error message
+
+    def build_grid():
+        grid = Table.grid(padding=(0, 1))
+        grid.add_column(no_wrap=True)  # state dot / spinner
+        grid.add_column(no_wrap=True, overflow="ellipsis")  # repo + outcome
+        for repo in repos:
+            state = states.get(repo)
+            path = repo.path.as_posix()
+            if state is None:
+                grid.add_row(Spinner("dots"), path)
+            elif state == "done":
+                grid.add_row("[green]●[/]", f"{path} [green]pushed {branch_name}[/]")
+            else:
+                grid.add_row("[red]?[/]", f"{path} [red]{escape(state)}[/]")
+        return grid
+
+    with (
+        Live(build_grid(), console=console, refresh_per_second=10) as live,
+        ThreadPoolExecutor(max_workers=8) as pool,
+    ):
+        futures = {
+            pool.submit(_push_repo_branch, repo, branch_name, company_git_remote): repo
+            for repo in repos
+        }
+        for future in as_completed(futures):
+            repo = futures[future]
+            try:
+                future.result()
+                states[repo] = "done"
+            except Exception as exc:
+                states[repo] = str(exc)
+            live.update(build_grid())
+
+
 @click.group()
 @global_command_decorators
 def cli():
@@ -210,7 +288,7 @@ def bump(
             "Push aggregated branches?", default=True
         )
     if push_aggregated_branches:
-        push_branches(version=new_version, force=True)
+        _push_aggregated_branches(version=new_version, force=True)
     # Resolve the commit decision now that the release files are ready to review
     if do_commit is None:
         do_commit = Confirm.ask("Create the release commit?", default=True)
