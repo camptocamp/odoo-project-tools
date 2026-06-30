@@ -3,6 +3,7 @@
 
 import subprocess
 from collections.abc import Iterator
+from functools import cache
 from os import PathLike
 from pathlib import Path
 from typing import NamedTuple
@@ -22,7 +23,7 @@ def _repo_name_from_url(url: str) -> str:
     return url.rstrip("/").split("/")[-1].removesuffix(".git")
 
 
-def _remote_exists(git_dir: str | Path, remote_name: str) -> bool:
+def remote_exists(git_dir: str | Path, remote_name: str) -> bool:
     """Return True if the named remote exists in the repo at git_dir."""
     result = subprocess.run(
         ["git", "-C", str(git_dir), "remote", "get-url", remote_name],
@@ -31,12 +32,29 @@ def _remote_exists(git_dir: str | Path, remote_name: str) -> bool:
     return result.returncode == 0
 
 
+@cache
+def remote_repo_exists(url: str) -> bool:
+    """Return True if the github repository at ``url`` is reachable.
+
+    Used to avoid registering a remote that points to a non-existent repository.
+    A dangling remote breaks git's fallback ``fetch --all`` with
+    ``Repository not found``, which is exactly what registering targeted remotes
+    is meant to prevent.
+
+    Results are cached because ``setup_submodule_remotes`` is called twice per
+    submodule (autoshare cache and working tree), so the network probe would
+    otherwise be repeated.
+    """
+    result = subprocess.run(["git", "ls-remote", url], capture_output=True)
+    return result.returncode == 0
+
+
 def ensure_remote(git_dir: str | Path, remote_name: str, url: str) -> bool:
     """Add a named remote if it doesn't already exist.
 
     Returns True if the remote was added, False if it was already present.
     """
-    if _remote_exists(git_dir, remote_name):
+    if remote_exists(git_dir, remote_name):
         return False
     run(
         ["git", "-C", str(git_dir), "remote", "add", remote_name, url],
@@ -72,20 +90,31 @@ def setup_submodule_remotes(
       OCA              -> base branch only (e.g. refs/heads/18.0)
       <company_remote> -> merge-branch-<project_id>-* only (skipped when project_id is None)
 
+    A remote is only added when the corresponding github repository actually
+    exists. Many submodules are not OCA repositories (e.g. private
+    ``<company_remote>/...`` modules), so blindly adding an ``OCA/<repo>`` remote
+    would point at a non-existent repository and break git's fallback fetch.
+
+    The (network) existence probe is skipped when the remote is already
+    configured locally: an existing remote is trusted and only re-fetched.
+
     Safe to call on both submodule working trees and autoshare bare caches.
     """
     repo_name = _repo_name_from_url(submodule_url)
     oca_url = f"git@github.com:OCA/{repo_name}.git"
     c2c_url = f"git@github.com:{company_remote}/{repo_name}.git"
 
-    ensure_remote(repo_path, "OCA", oca_url)
-    fetch_targeted(
-        repo_path,
-        "OCA",
-        f"+refs/heads/{base_branch}:refs/remotes/OCA/{base_branch}",
-    )
+    if remote_exists(repo_path, "OCA") or remote_repo_exists(oca_url):
+        ensure_remote(repo_path, "OCA", oca_url)
+        fetch_targeted(
+            repo_path,
+            "OCA",
+            f"+refs/heads/{base_branch}:refs/remotes/OCA/{base_branch}",
+        )
 
-    if project_id:
+    if project_id and (
+        remote_exists(repo_path, company_remote) or remote_repo_exists(c2c_url)
+    ):
         ensure_remote(repo_path, company_remote, c2c_url)
         fetch_targeted(
             repo_path,

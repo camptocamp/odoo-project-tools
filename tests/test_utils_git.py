@@ -63,13 +63,13 @@ def test_repo_name_from_url_trailing_slash():
     assert git_utils._repo_name_from_url("git@github.com:OCA/foo.git/") == "foo"
 
 
-# ── _remote_exists ────────────────────────────────────────────────────────────
+# ── remote_exists ────────────────────────────────────────────────────────────
 
 
 def test_remote_exists_true():
     with mock.patch("subprocess.run") as mock_run:
         mock_run.return_value = mock.Mock(returncode=0)
-        assert git_utils._remote_exists("/some/path", "OCA") is True
+        assert git_utils.remote_exists("/some/path", "OCA") is True
         mock_run.assert_called_once_with(
             ["git", "-C", "/some/path", "remote", "get-url", "OCA"],
             capture_output=True,
@@ -79,7 +79,7 @@ def test_remote_exists_true():
 def test_remote_exists_false():
     with mock.patch("subprocess.run") as mock_run:
         mock_run.return_value = mock.Mock(returncode=128)
-        assert git_utils._remote_exists("/some/path", "OCA") is False
+        assert git_utils.remote_exists("/some/path", "OCA") is False
 
 
 # ── ensure_remote ─────────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ def test_remote_exists_false():
 
 def test_ensure_remote_adds_when_missing():
     with (
-        mock.patch("odoo_tools.utils.git._remote_exists", return_value=False),
+        mock.patch("odoo_tools.utils.git.remote_exists", return_value=False),
         mock.patch("odoo_tools.utils.git.run") as mock_run,
     ):
         result = git_utils.ensure_remote("/repo", "OCA", "git@github.com:OCA/foo.git")
@@ -108,7 +108,7 @@ def test_ensure_remote_adds_when_missing():
 
 def test_ensure_remote_skips_when_present():
     with (
-        mock.patch("odoo_tools.utils.git._remote_exists", return_value=True),
+        mock.patch("odoo_tools.utils.git.remote_exists", return_value=True),
         mock.patch("odoo_tools.utils.git.run") as mock_run,
     ):
         result = git_utils.ensure_remote("/repo", "OCA", "git@github.com:OCA/foo.git")
@@ -157,8 +157,10 @@ def test_fetch_targeted_warns_on_failure():
 
 def test_setup_submodule_remotes_with_project_id():
     with (
+        mock.patch("odoo_tools.utils.git.remote_exists", return_value=False),
         mock.patch("odoo_tools.utils.git.ensure_remote") as mock_ensure,
         mock.patch("odoo_tools.utils.git.fetch_targeted") as mock_fetch,
+        mock.patch("odoo_tools.utils.git.remote_repo_exists", return_value=True),
     ):
         git_utils.setup_submodule_remotes(
             "/cache/account-payment",
@@ -191,8 +193,10 @@ def test_setup_submodule_remotes_with_project_id():
 
 def test_setup_submodule_remotes_without_project_id():
     with (
+        mock.patch("odoo_tools.utils.git.remote_exists", return_value=False),
         mock.patch("odoo_tools.utils.git.ensure_remote") as mock_ensure,
         mock.patch("odoo_tools.utils.git.fetch_targeted") as mock_fetch,
+        mock.patch("odoo_tools.utils.git.remote_repo_exists", return_value=True),
     ):
         git_utils.setup_submodule_remotes(
             "/cache/account-payment",
@@ -210,6 +214,114 @@ def test_setup_submodule_remotes_without_project_id():
             "OCA",
             "+refs/heads/18.0:refs/remotes/OCA/18.0",
         )
+
+
+def test_setup_submodule_remotes_skips_missing_oca():
+    """Regression test for #230.
+
+    A non-OCA submodule (e.g. a private ``camptocamp/odoo-tools`` module) has no
+    ``OCA/odoo-tools`` counterpart, so the OCA remote must not be added. The
+    company remote, which does exist, is still set up.
+    """
+
+    def repo_exists(url):
+        return not url.startswith("git@github.com:OCA/")
+
+    with (
+        mock.patch("odoo_tools.utils.git.remote_exists", return_value=False),
+        mock.patch("odoo_tools.utils.git.ensure_remote") as mock_ensure,
+        mock.patch("odoo_tools.utils.git.fetch_targeted") as mock_fetch,
+        mock.patch("odoo_tools.utils.git.remote_repo_exists", side_effect=repo_exists),
+    ):
+        git_utils.setup_submodule_remotes(
+            "/cache/odoo-tools",
+            "git@github.com:camptocamp/odoo-tools.git",
+            "18.0",
+            "1289",
+            "camptocamp",
+        )
+        # OCA remote must NOT be added (OCA/odoo-tools does not exist)
+        mock_ensure.assert_called_once_with(
+            "/cache/odoo-tools",
+            "camptocamp",
+            "git@github.com:camptocamp/odoo-tools.git",
+        )
+        mock_fetch.assert_called_once_with(
+            "/cache/odoo-tools",
+            "camptocamp",
+            "+refs/heads/merge-branch-1289-*:refs/remotes/camptocamp/merge-branch-1289-*",
+        )
+
+
+def test_setup_submodule_remotes_skips_missing_company_fork():
+    """A submodule without a company fork must not get a dangling company remote."""
+
+    def repo_exists(url):
+        return url.startswith("git@github.com:OCA/")
+
+    with (
+        mock.patch("odoo_tools.utils.git.remote_exists", return_value=False),
+        mock.patch("odoo_tools.utils.git.ensure_remote") as mock_ensure,
+        mock.patch("odoo_tools.utils.git.fetch_targeted") as mock_fetch,
+        mock.patch("odoo_tools.utils.git.remote_repo_exists", side_effect=repo_exists),
+    ):
+        git_utils.setup_submodule_remotes(
+            "/cache/account-payment",
+            "git@github.com:OCA/account-payment.git",
+            "18.0",
+            "1289",
+            "camptocamp",
+        )
+        # Only the OCA remote is set up; the missing company fork is skipped
+        mock_ensure.assert_called_once_with(
+            "/cache/account-payment", "OCA", "git@github.com:OCA/account-payment.git"
+        )
+        mock_fetch.assert_called_once_with(
+            "/cache/account-payment",
+            "OCA",
+            "+refs/heads/18.0:refs/remotes/OCA/18.0",
+        )
+
+
+def test_setup_submodule_remotes_skips_probe_when_remote_present():
+    """When the remotes are already configured locally, skip the network probe."""
+    with (
+        mock.patch("odoo_tools.utils.git.remote_exists", return_value=True),
+        mock.patch("odoo_tools.utils.git.ensure_remote") as mock_ensure,
+        mock.patch("odoo_tools.utils.git.fetch_targeted") as mock_fetch,
+        mock.patch("odoo_tools.utils.git.remote_repo_exists") as mock_probe,
+    ):
+        git_utils.setup_submodule_remotes(
+            "/cache/account-payment",
+            "git@github.com:camptocamp/account-payment.git",
+            "18.0",
+            "1289",
+            "camptocamp",
+        )
+        # No network probe when both remotes are already present
+        mock_probe.assert_not_called()
+        # Both remotes are still (idempotently) ensured and re-fetched
+        assert mock_ensure.call_count == 2
+        assert mock_fetch.call_count == 2
+
+
+# ── remote_repo_exists ────────────────────────────────────────────────────────
+
+
+def test_remote_repo_exists_true():
+    git_utils.remote_repo_exists.cache_clear()
+    with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)) as mock_run:
+        assert git_utils.remote_repo_exists("git@github.com:OCA/account-payment.git")
+        mock_run.assert_called_once_with(
+            ["git", "ls-remote", "git@github.com:OCA/account-payment.git"],
+            capture_output=True,
+        )
+
+
+def test_remote_repo_exists_false():
+    git_utils.remote_repo_exists.cache_clear()
+    with mock.patch("subprocess.run", return_value=mock.Mock(returncode=128)):
+        assert not git_utils.remote_repo_exists("git@github.com:OCA/odoo-tools.git")
 
 
 # ── get_pinned_sha ────────────────────────────────────────────────────────────
