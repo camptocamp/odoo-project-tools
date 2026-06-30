@@ -43,7 +43,7 @@ def run(cmd, drop_trailing_spaces=True, check=False, with_env=None, verbose=Fals
     if isinstance(cmd, str):
         cmd = shlex.split(cmd)
     if verbose:
-        click.echo(f"Running: {shlex.join(cmd)}")
+        click.echo(click.style(f"Running: {shlex.join(cmd)}", fg="bright_black"))
     env = get_venv()
     if with_env:
         env.update(with_env)
