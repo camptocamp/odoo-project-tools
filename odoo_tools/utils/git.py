@@ -327,6 +327,24 @@ def get_current_branch():
         return None
 
 
+def tag_signing_enabled(repo):
+    """Return True if git is configured to sign tags.
+
+    ``tag.gpgsign`` is authoritative when set (so an explicit ``false`` disables
+    signing even if a signing key exists); otherwise we fall back to the
+    presence of a ``user.signingkey``.
+    """
+    with repo.config_reader() as reader:
+        try:
+            return bool(reader.get_value("tag", "gpgsign"))
+        except Exception:
+            pass
+        try:
+            return bool(reader.get_value("user", "signingkey"))
+        except Exception:
+            return False
+
+
 def delete_branch(branch_name):
     run(["git", "branch", "-D", branch_name])
 
