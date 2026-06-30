@@ -174,6 +174,7 @@ def test_bump_update_without_marabunta_file(project):
 def test_bump_without_version_file_and_no_bundle_addon(project):
     # run init to get all files ready
     project.invoke(init, catch_exceptions=False)
+    git_commit_all()
     # check that the version file is not present
     assert config.version_file_rel_path is None
     # bump should fail because there are no files to bump
