@@ -4,11 +4,12 @@
 import click
 from git import Repo as GitRepo
 from rich.console import Console
+from rich.prompt import Confirm
 
 from ..exceptions import ProjectConfigException
 from ..utils.click import global_command_decorators
 from ..utils.config import config
-from ..utils.git import get_current_branch
+from ..utils.git import get_current_branch, tag_signing_enabled
 from ..utils.marabunta import MarabuntaFileHandler
 from ..utils.os_exec import run
 from ..utils.path import build_path
@@ -18,15 +19,24 @@ from ..utils.proj import get_current_version, get_project_bundle_addon_name
 console = Console()
 
 
-END_TIPS = [
-    "Please continue with the release by:",
-    " * Checking the diff",
-    " * Running:",
-    '\tgit commit -m "Release {version}"',
-    "\tgit tag -a {version}  # optionally -s to sign the tag",
-    "\t# copy-paste the content of the release from HISTORY.rst in the annotation of the tag",
-    "\tgit push --tags && git push origin {branch}",
-]
+def get_new_release_notes(repo, history_path):
+    """Return the release notes towncrier just added to HISTORY.rst.
+
+    Reads the diff of HISTORY.rst against HEAD (towncrier only inserts lines)
+    and drops the title (the ``<version> (<date>)`` line and its underline).
+    """
+    diff = repo.git.diff("HEAD", "--", history_path.as_posix())
+    added = []
+    in_hunk = False
+    for line in diff.splitlines():
+        if line.startswith("@@"):
+            in_hunk = True
+        elif in_hunk and line.startswith("+"):
+            added.append(line[1:])
+    # Drop blank seam lines, then the title line and its underline
+    while added and not added[0].strip():
+        added.pop(0)
+    return "\n".join(added[2:]).strip()
 
 
 def get_bumpversion_files():
@@ -99,8 +109,38 @@ def cli():
     "rel_type", type=click.Choice(["major", "minor", "patch"], case_sensitive=False)
 )
 @click.option("--new-version", "new_version", help="explicit new version to create")
-def bump(rel_type, new_version=None):
+@click.option(
+    "--commit/--no-commit",
+    "do_commit",
+    default=None,
+    help="Create the release commit",
+)
+@click.option(
+    "--tag/--no-tag",
+    "do_tag",
+    default=None,
+    help="Create the <VERSION> tag. Implies commit.",
+)
+@click.option(
+    "--push-aggregated-branches/--no-push-aggregated-branches",
+    "push_aggregated_branches",
+    default=None,
+    help="Push the aggregated (pending-merge) branches to upstream.",
+)
+def bump(  # noqa: C901
+    rel_type,
+    new_version=None,
+    do_commit=None,
+    do_tag=None,
+    push_aggregated_branches=None,
+):
     """Prepare a new release"""
+    # --tag requires --commit (only the explicit conflict is an error here;
+    # the undecided None cases are resolved by prompting later)
+    if do_tag is True and do_commit is False:
+        raise click.UsageError(
+            "--tag requires --commit; --tag --no-commit is not allowed."
+        )
     repo = GitRepo(".")
     # Warn about deprecated .bumpversion.cfg file
     bumpversion_cfg = build_path(".bumpversion.cfg")
@@ -117,6 +157,12 @@ def bump(rel_type, new_version=None):
         raise click.ClickException(
             "No files to bump. Configure a VERSION file or create a bundle addon."
         )
+    # Fail early on a dirty tree when we (likely) intend to commit
+    if do_commit is not False and repo.is_dirty(untracked_files=True):
+        raise click.ClickException(
+            "There are uncommitted changes in the working tree. "
+            "Commit or stash them before running `bump`."
+        )
     # Bump the version
     current_version = get_current_version()
     cmd = make_bumpversion_cmd(
@@ -126,25 +172,74 @@ def bump(rel_type, new_version=None):
         new_version=new_version,
     )
     run(cmd, check=True, verbose=True)
+    # Stage the version files
     repo.index.add(files)
     # Obtain the new version after the bump
     new_version = get_current_version()
     # Run towncrier to transform changelog into release notes
     cmd = make_towncrier_cmd(new_version)
     run(cmd, check=True, verbose=True)
+    # Stage the changelog changes towncrier produced (HISTORY.rst + consumed fragments)
+    history_path = build_path("HISTORY.rst")
+    repo.index.add([history_path.as_posix(), build_path("changes.d").as_posix()])
+    # Obtain the release notes from the HISTORY.rst diff
+    release_notes = get_new_release_notes(repo, history_path)
     # Update the marabunta migration file with the new version
     if config.marabunta_mig_file_rel_path:
-        click.echo("Updating marabunta migration file")
         update_marabunta_file(new_version)
-        repo.index.add([build_path(config.marabunta_mig_file_rel_path)])
-    # Push local branches to upstream
-    if click.confirm("Push local branches?"):
+        repo.index.add([build_path(config.marabunta_mig_file_rel_path).as_posix()])
+    # Push the aggregated (pending-merge) branches to upstream
+    if push_aggregated_branches is None:
+        push_aggregated_branches = Confirm.ask(
+            "Push aggregated branches?", default=True
+        )
+    if push_aggregated_branches:
         push_branches(version=new_version, force=True)
-    # Print the manual actions to perform
-    branch = get_current_branch()
-    if branch and new_version:
-        end_tips = "\n".join(END_TIPS).format(branch=branch, version=new_version)
-        click.echo(end_tips)
+    # Resolve the commit decision now that the release files are ready to review
+    if do_commit is None:
+        do_commit = Confirm.ask("Create the release commit?", default=True)
+    if do_commit:
+        # Everything modified by the release process must be staged at this point
+        if repo.is_dirty(index=False, untracked_files=True):
+            raise click.ClickException(
+                "Unexpected changes left in the working tree after staging the "
+                "release files; aborting."
+            )
+        repo.index.commit(f"Release {new_version}")
+        click.echo(f'✅ Committed "Release {new_version}"')
+        # Resolve the tag decision
+        if do_tag is None:
+            do_tag = Confirm.ask("Create the release tag?", default=True)
+        if do_tag:
+            # If the tag already exists, ask before replacing it
+            recreate = True
+            if new_version in [tag.name for tag in repo.tags]:
+                recreate = Confirm.ask(
+                    f'Tag "{new_version}" already exists. Re-create it?',
+                    default=True,
+                )
+            if recreate:
+                repo.create_tag(
+                    new_version,
+                    message=release_notes,
+                    sign=tag_signing_enabled(repo),
+                    force=True,
+                )
+                click.echo(f'✅ Created tag "{new_version}"')
+    # Print manual instructions for pending steps
+    steps = []
+    if not do_commit:
+        steps.append(f'git commit -m "Release {new_version}"')
+    if not do_tag:
+        steps.append(
+            f"git tag -a {new_version}  "
+            "# add -s to sign; use the HISTORY.rst notes as the message"
+        )
+    # bump never pushes the commit/tag itself
+    steps.append(f"git push --tags && git push origin {get_current_branch() or ''}")
+    click.echo("Please continue the release by running:")
+    for step in steps:
+        click.echo(f"\t{step}")
 
 
 if __name__ == "__main__":

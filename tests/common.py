@@ -128,6 +128,10 @@ def make_fake_project_root(
         with repo.config_writer() as cfg:
             cfg.set_value("user", "email", "test@test.com")
             cfg.set_value("user", "name", "Test")
+            # Disable signing so tests never invoke GPG, regardless of the
+            # developer's global git configuration.
+            cfg.set_value("tag", "gpgsign", "false")
+            cfg.set_value("commit", "gpgsign", "false")
         repo.index.add(repo.untracked_files)
         repo.index.commit("initial commit")
 
