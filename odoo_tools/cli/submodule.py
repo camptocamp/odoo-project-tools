@@ -1,4 +1,5 @@
 from itertools import chain
+from pathlib import Path
 
 import click
 
@@ -50,24 +51,34 @@ def ls(dockerfile=False):
     """
     submodules = (submodule.path for submodule in git.iter_gitmodules())
     if dockerfile:
-        blacklist = {"odoo/src"}
+        blacklist = {str(config.odoo_src_rel_path)}
         lines = (f"odoo/{line}" for line in submodules if line not in blacklist)
+        odoo_src = str(config.odoo_src_rel_path)
+        local_src = str(config.local_src_rel_path)
+        external_src = str(config.ext_src_rel_path)
+        paid_modules_search = [
+            Path(config.local_src_rel_path).parent / "paid-modules",
+            Path(external_src) / "paid-modules",
+            Path(external_src) / "3rd-party",
+        ]
         if config.template_version == 1:
             base_addons_paths = [
-                "odoo/src/odoo/odoo/addons",
-                "odoo/src/odoo/addons",
-                "odoo/local-src",
+                f"{odoo_src}/odoo/odoo/addons",
+                f"{odoo_src}/odoo/addons",
+                local_src,
             ]
         else:
             base_addons_paths = [
-                "odoo/src/odoo/odoo/addons",
-                "odoo/src/odoo/addons",
-                "odoo/src/enterprise",
-                "odoo/odoo/addons",
+                f"{odoo_src}/odoo/odoo/addons",
+                f"{odoo_src}/odoo/addons",
+                f"{odoo_src}/enterprise",
+                local_src,
             ]
         trailing_addons_paths = []
-        if path.build_path("odoo/odoo/paid-modules").exists():
-            trailing_addons_paths.append("odoo/odoo/paid-modules")
+
+        for paid_modules in paid_modules_search:
+            if path.build_path(str(paid_modules)).exists():
+                trailing_addons_paths.append(str(paid_modules))
         lines = chain(
             base_addons_paths,
             lines,
