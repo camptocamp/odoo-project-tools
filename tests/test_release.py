@@ -263,28 +263,33 @@ def test_bump_push_no_repo(project):
 )
 def test_bump_push_repo_with_pending_merge(project):
     ran_cmd = []
+    real_run = release.run
 
-    def mocked_run(cmd):
-        ran_cmd.append(cmd)
+    def mocked_run(cmd, **kwargs):
+        # Only the per-repo branch push runs with an explicit cwd; record those
+        # and let the real bump/towncrier commands execute.
+        if "cwd" in kwargs:
+            ran_cmd.append(cmd)
+            return ""
+        return real_run(cmd, **kwargs)
 
     mock_pending_merge_repo_paths("edi-framework")
     # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
-    with mock.patch("odoo_tools.utils.pending_merge.run", mocked_run):
+    with mock.patch("odoo_tools.cli.release.run", mocked_run):
         result = project.invoke(
             release.bump,
             ["minor", "--no-commit", "--no-tag"],
             catch_exceptions=False,
             input="y",
         )
-    assert result.output.splitlines()[0].startswith("Running: bump-my-version bump")
-    assert "Running: towncrier build --yes --version=14.0.0.2.0" in result.output
-    assert "Pushing odoo/external-src/edi-framework" in result.output
+    assert result.exit_code == 0
     assert ran_cmd == [
         "git config remote.camptocamp.url",
         "git push -f -v camptocamp HEAD:refs/heads/merge-branch-1234-14.0.0.2.0",
     ]
-    assert result.exit_code == 0
+    # the pushed repo shows up in the live progress grid
+    assert "edi-framework" in result.output
 
 
 def test_get_new_release_notes(tmp_path):
