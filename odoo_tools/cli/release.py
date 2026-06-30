@@ -109,6 +109,43 @@ def _warn_deprecated_bumpversion_cfg():
         )
 
 
+def _do_bump(rel_type, new_version=None):
+    """Run the file-modifying release steps.
+
+    Bumps the version, regenerates the changelog (towncrier) and updates the
+    marabunta migration file. Does not touch git: staging, commit, tag and push
+    are left to the caller. Returns the new version and the list of files the
+    release process modified.
+    """
+    # Obtain the list of files where a version is written
+    files = get_bumpversion_files()
+    if not files:
+        raise click.ClickException(
+            "No files to bump. Configure a VERSION file or create a bundle addon."
+        )
+    modified = []
+    # Run bumpversion
+    current_version = get_current_version()
+    cmd = make_bumpversion_cmd(
+        rel_type, current_version, files, new_version=new_version
+    )
+    run(cmd, check=True, verbose=True)
+    modified.extend(files)
+    new_version = get_current_version()
+    # Run towncrier. It rewrites HISTORY.rst and consumes the fragments in changes.d
+    run(make_towncrier_cmd(new_version), check=True, verbose=True)
+    modified.extend(
+        [
+            build_path("HISTORY.rst").as_posix(),
+            build_path("changes.d").as_posix(),
+        ]
+    )
+    if config.marabunta_mig_file_rel_path:
+        update_marabunta_file(new_version)
+        modified.append(build_path(config.marabunta_mig_file_rel_path).as_posix())
+    return new_version, modified
+
+
 @click.group()
 @global_command_decorators
 def cli():
@@ -138,7 +175,7 @@ def cli():
     default=None,
     help="Push the aggregated (pending-merge) branches to upstream.",
 )
-def bump(  # noqa: C901
+def bump(
     rel_type,
     new_version=None,
     do_commit=None,
@@ -155,43 +192,18 @@ def bump(  # noqa: C901
     repo = GitRepo(".")
     # Warn about deprecated .bumpversion.cfg file
     _warn_deprecated_bumpversion_cfg()
-    # Obtain the list files where a version is written
-    files = get_bumpversion_files()
-    if not files:
-        raise click.ClickException(
-            "No files to bump. Configure a VERSION file or create a bundle addon."
-        )
     # Fail early on a dirty tree when we (likely) intend to commit
     if do_commit is not False and repo.is_dirty(untracked_files=True):
         raise click.ClickException(
             "There are uncommitted changes in the working tree. "
             "Commit or stash them before running `bump`."
         )
-    # Bump the version
-    current_version = get_current_version()
-    cmd = make_bumpversion_cmd(
-        rel_type,
-        current_version,
-        files,
-        new_version=new_version,
-    )
-    run(cmd, check=True, verbose=True)
-    # Stage the version files
-    repo.index.add(files)
-    # Obtain the new version after the bump
-    new_version = get_current_version()
-    # Run towncrier to transform changelog into release notes
-    cmd = make_towncrier_cmd(new_version)
-    run(cmd, check=True, verbose=True)
-    # Stage the changelog changes towncrier produced (HISTORY.rst + consumed fragments)
-    history_path = build_path("HISTORY.rst")
-    repo.index.add([history_path.as_posix(), build_path("changes.d").as_posix()])
+    # Run the file-modifying release steps (version, changelog, marabunta)
+    new_version, modified_files = _do_bump(rel_type, new_version=new_version)
+    # Stage everything the release process touched
+    repo.index.add(modified_files)
     # Obtain the release notes from the HISTORY.rst diff
-    release_notes = get_new_release_notes(repo, history_path)
-    # Update the marabunta migration file with the new version
-    if config.marabunta_mig_file_rel_path:
-        update_marabunta_file(new_version)
-        repo.index.add([build_path(config.marabunta_mig_file_rel_path).as_posix()])
+    release_notes = get_new_release_notes(repo, build_path("HISTORY.rst"))
     # Push the aggregated (pending-merge) branches to upstream
     if push_aggregated_branches is None:
         push_aggregated_branches = Confirm.ask(
