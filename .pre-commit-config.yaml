@@ -26,3 +26,11 @@ repos:
     rev: v2.4.2
     hooks:
     - id: codespell
+
+  - repo: local
+    hooks:
+      - id: skills-ref-validate
+        name: Validate Agent Skills
+        language: system
+        files: ^skills/[^/]+/SKILL\.md$
+        entry: bash -ec 'for file in "$@"; do skills-ref validate "$(dirname "$file")"; done' --
