@@ -189,11 +189,61 @@ def test_ls_dockerfile(project):
     assert result.output.splitlines() == [
         'ENV ADDONS_PATH="/odoo/src/odoo/odoo/addons, \\',
         "/odoo/src/odoo/addons, \\",
-        "/odoo/src/enterprise, \\",
-        "/odoo/odoo/addons, \\",
+        "/odoo/local-src, " + "\\",
         "/odoo/odoo/external-src/account-closing, \\",
-        "/odoo/odoo/external-src/account-financial-reporting, \\",
-        '/odoo/odoo/paid-modules" \\',
+        '/odoo/odoo/external-src/account-financial-reporting" \\',
+        "",
+    ]
+
+
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
+    proj_tmpl_ver=2,
+    extra_files={
+        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
+    },
+)
+def test_ls_dockerfile_v2(project):
+    result = project.invoke(
+        submodule.ls,
+        ["--dockerfile"],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    assert result.output.splitlines() == [
+        'ENV ADDONS_PATH="/src/odoo/odoo/addons, \\',
+        "/src/odoo/addons, " + "\\",
+        "/src/enterprise, " + "\\",
+        "/odoo/addons, " + "\\",
+        "/odoo/odoo/external-src/account-closing, " + "\\",
+        '/odoo/odoo/external-src/account-financial-reporting" \\',
+        "",
+    ]
+
+
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
+    extra_files={
+        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
+        "odoo/paid-modules/.gitkeep": "",
+    },
+)
+def test_ls_dockerfile_with_paid_modules(project):
+    result = project.invoke(
+        submodule.ls,
+        ["--dockerfile"],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    assert result.output.splitlines() == [
+        'ENV ADDONS_PATH="/odoo/src/odoo/odoo/addons, \\',
+        "/odoo/src/odoo/addons, " + "\\",
+        "/odoo/local-src, " + "\\",
+        "/odoo/odoo/external-src/account-closing, " + "\\",
+        "/odoo/odoo/external-src/account-financial-reporting, " + "\\",
+        '/odoo/paid-modules" \\',
         "",
     ]
 
