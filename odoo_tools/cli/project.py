@@ -138,19 +138,21 @@ def convert_history_to_towncrier(history_path):
     history_path.write_text("\n".join(new_content) + "\n")
 
 
-def get_init_template_files():
-    return (
+def get_init_template_files(opts):
+    template_version = str(
+        opts.get("template_version")
+        or get_proj_tmpl_ver()
+        or config.template_version
+        or "1"
+    )
+    template_files = [
         {
-            "source": f".proj.v{get_proj_tmpl_ver() or '1'}.cfg",
+            "source": f".proj.v{template_version}.cfg",
             "destination": build_path(f"./{PROJ_CFG_FILE}"),
             "check": lambda source_path, dest_path: not dest_path.exists(),
             "variables_getter": lambda opts: {
                 "project_id": _read_project_id_from_readme()
             },
-        },
-        {
-            "source": "docker-compose.override.tmpl.yml",
-            "destination": build_path("./docker-compose.override.yml"),
         },
         {
             "source": "towncrier.tmpl.toml",
@@ -170,7 +172,15 @@ def get_init_template_files():
                 dest_path
             ),
         },
-    )
+    ]
+    if template_version == "2":
+        template_files.append(
+            {
+                "source": "docker-compose.override.tmpl.yml",
+                "destination": build_path("./docker-compose.override.yml"),
+            },
+        )
+    return template_files
 
 
 def _backup(dest):
@@ -182,7 +192,7 @@ def _backup(dest):
 def bootstrap_files(opts):
     # Generate specific templated files
 
-    for item in get_init_template_files():
+    for item in get_init_template_files(opts):
         source = get_template_path(item["source"])
         dest = item["destination"]
         check = item.get("check", lambda *p: True)
