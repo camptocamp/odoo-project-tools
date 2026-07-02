@@ -227,8 +227,11 @@ def export(module_paths, languages, clean_db, init_db, export_pot):
                 local_volume_path = Path(tmp_dir)
                 container_volume_path = Path("/tmp/otools_i18n")
                 for language in export_languages:
+                    # We remove the suffix indicating the language variant, if any.
                     i18n_filename = (
-                        f"{module_name}.pot" if language is None else f"{language}.po"
+                        f"{module_name}.pot"
+                        if language is None
+                        else f"{language.split('_')[0]}.po"
                     )
                     i18n_rel_path = Path(module_name) / "i18n" / i18n_filename
                     status.update(f"({progress}) {i18n_rel_path}...")
