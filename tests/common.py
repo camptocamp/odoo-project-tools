@@ -161,6 +161,21 @@ def fake_bundle_addon(source_template_path=None, **kwargs):
         file.rename(file.with_suffix(""))
 
 
+def make_fake_addon(
+    path, depends=(), installable=True, manifest_filename="__manifest__.py"
+):
+    """Create a fake addon directory with a valid manifest file."""
+    path = Path(path)
+    path.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "name": path.name,
+        "depends": list(depends),
+        "installable": installable,
+    }
+    (path / manifest_filename).write_text(repr(manifest))
+    (path / "__init__.py").touch()
+
+
 def compare_line_by_line(content, expected, sort=False):
     content_lines = [x.strip() for x in content.splitlines() if x.strip()]
     expected_lines = [x.strip() for x in expected.splitlines() if x.strip()]

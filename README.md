@@ -112,8 +112,11 @@ Options:
   --help  Show this message and exit.
 
 Commands:
-  add-req  Generate a python requirement line.
-  where    Locate an addon by name across the project's addon directories.
+  add-req    Generate a python requirement line.
+  codepends  List the co-dependencies of the given addons.
+  depends    List the dependencies of the given addons.
+  list       List the project's local addons.
+  where      Locate an addon by name across the project's addon directories.
 ```
 
 #### otools-addon add-req
@@ -155,6 +158,67 @@ Usage: otools-addon where [OPTIONS] NAME
 
 Options:
   --help  Show this message and exit.
+```
+
+#### otools-addon list
+
+```
+Usage: otools-addon list [OPTIONS]
+
+  List the project's local addons.
+
+Options:
+  --separator TEXT  Separator to join the addon names with (by default, print
+                    one per line).
+  --help            Show this message and exit.
+```
+
+#### otools-addon depends
+
+```
+Usage: otools-addon depends [OPTIONS] [ADDONS]...
+
+  List the dependencies of the given addons.
+
+  Addons can be passed as multiple arguments or as comma separated lists. When
+  no addon is given, the project's local addons are selected.
+
+Options:
+  --transitive        Print all transitive dependencies.
+  --include-selected  Print the selected addons along with their dependencies.
+  --ignore-missing    Only warn about addons not found in the addons
+                      directories, instead of failing.
+  --quiet             Do not print warnings about missing addons.
+  --separator TEXT    Separator to join the addon names with (by default,
+                      print one per line).
+  --help              Show this message and exit.
+```
+
+For example, to list all the addons used by the project:
+
+    otools-addon depends --transitive --include-selected
+
+#### otools-addon codepends
+
+```
+Usage: otools-addon codepends [OPTIONS] ADDONS...
+
+  List the co-dependencies of the given addons.
+
+  Co-dependencies are the addons that depend on the given addons. Addons can
+  be passed as multiple arguments or as comma separated lists.
+
+Options:
+  --transitive / --no-transitive  Print all transitive co-dependencies.
+  --include-selected / --no-include-selected
+                                  Print the selected addons along with their
+                                  co-dependencies.
+  --ignore-missing                Only warn about addons not found in the
+                                  addons directories, instead of failing.
+  --quiet                         Do not print warnings about missing addons.
+  --separator TEXT                Separator to join the addon names with (by
+                                  default, print one per line).
+  --help                          Show this message and exit.
 ```
 
 ### otools-db
