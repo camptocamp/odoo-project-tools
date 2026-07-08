@@ -763,7 +763,6 @@ def test_cli_add_multiple_urls_aggregates_once_per_submodule(project):
     when several URLs target the same submodule (no intermediate aggregation)."""
     mock_pending_merge_repo_paths("edi")
     mock_pending_merge_repo_paths("web")
-    aggregator = mock.MagicMock()
     with responses.RequestsMock() as rsps:
         # match the project's odoo_version so no divergent-branch prompt
         for pull_id in (1470, 1471):
@@ -779,9 +778,10 @@ def test_cli_add_multiple_urls_aggregates_once_per_submodule(project):
             json={"base": {"ref": "14.0"}},
             status=200,
         )
-        with mock.patch.object(
-            pm_utils.Repo, "get_aggregator", return_value=aggregator
-        ) as get_aggregator:
+        with (
+            mock.patch.object(pm_utils.Repo, "run_aggregate") as run_aggregate,
+            mock.patch.object(pm_utils.Repo, "push_to_remote") as push_to_remote,
+        ):
             result = project.invoke(
                 pending.add_pending,
                 [
@@ -793,9 +793,40 @@ def test_cli_add_multiple_urls_aggregates_once_per_submodule(project):
             )
     assert result.exit_code == 0
     # edi is referenced twice but aggregated once: 2 unique submodules total.
-    assert get_aggregator.call_count == 2
-    assert aggregator.aggregate.call_count == 2
-    assert aggregator.push.call_count == 2
+    assert run_aggregate.call_count == 2
+    assert push_to_remote.call_count == 2
+
+
+def test_repo_run_aggregate_runs_gitaggregate_cli(project):
+    mock_pending_merge_repo_paths("edi")
+    repo = Repo("edi", path_check=False)
+    with mock.patch.object(pm_utils, "run") as run:
+        repo.run_aggregate()
+    run.assert_called_once_with(
+        ["gitaggregate", "--config", str(repo.abs_merges_path), "aggregate"],
+        cwd=repo.pending_merge_abs_path,
+        check=True,
+        verbose=True,
+    )
+
+
+def test_repo_push_to_remote(project):
+    mock_pending_merge_repo_paths("edi")
+    repo = Repo("edi", path_check=False)
+    with (
+        mock.patch.object(pm_utils, "run") as run,
+        mock.patch.object(pm_utils.git, "ensure_remote") as ensure_remote,
+    ):
+        repo.push_to_remote(target_branch="merge-branch-1234-master-abc12345")
+    ensure_remote.assert_called_once_with(
+        repo.abs_path, "camptocamp", "git@github.com:camptocamp/edi.git"
+    )
+    run.assert_called_once_with(
+        "git push -f camptocamp HEAD:refs/heads/merge-branch-1234-master-abc12345",
+        cwd=repo.abs_path,
+        check=True,
+        verbose=True,
+    )
 
 
 def test_iter_pending_pull_requests(project):

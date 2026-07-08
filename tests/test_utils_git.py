@@ -117,6 +117,27 @@ def test_ensure_remote_skips_when_present():
         mock_run.assert_not_called()
 
 
+# ── get_remotes ───────────────────────────────────────────────────────────────
+
+
+def test_get_remotes():
+    output = (
+        "OCA\tgit@github.com:OCA/edi.git (fetch)\n"
+        "OCA\tgit@github.com:OCA/edi.git (push)\n"
+        "camptocamp\tgit@github.com:camptocamp/edi.git (fetch)\n"
+        "camptocamp\tgit@github.com:camptocamp/edi.git (push)"
+    )
+    with mock.patch("odoo_tools.utils.git.run", return_value=output) as mock_run:
+        remotes = git_utils.get_remotes("/repo")
+        mock_run.assert_called_once_with(
+            ["git", "-C", "/repo", "remote", "-v"], check=True
+        )
+    assert remotes == {
+        "OCA": "git@github.com:OCA/edi.git",
+        "camptocamp": "git@github.com:camptocamp/edi.git",
+    }
+
+
 # ── fetch_targeted ────────────────────────────────────────────────────────────
 
 
