@@ -8,6 +8,7 @@ from unittest import mock
 import git
 import pytest
 
+from odoo_tools.exceptions import ProjectConfigException
 from odoo_tools.utils import git as git_utils
 from odoo_tools.utils import proj as proj_utils
 
@@ -27,20 +28,21 @@ def _make_autoshare_repo(repo_dir):
 
 
 @pytest.mark.project_setup(
-    manifest=dict(odoo_version="18.0"),
+    manifest=dict(odoo_version="18.0", project_id="1289"),
     proj_version="18.0.1.0.0",
-    proj_cfg={"project_id": "1289"},
 )
-def test_get_project_id_from_cfg(project):
+def test_get_project_id_from_manifest(project):
     assert proj_utils.get_project_id() == "1289"
 
 
 @pytest.mark.project_setup(
-    manifest=dict(odoo_version="18.0"),
+    manifest=dict(odoo_version="18.0", project_id=None),
     proj_version="18.0.1.0.0",
 )
-def test_get_project_id_returns_none_when_not_set(project):
-    assert proj_utils.get_project_id() is None
+def test_get_project_id_not_set(project):
+    assert proj_utils.get_project_id(raise_if_missing=False) is None
+    with pytest.raises(ProjectConfigException):
+        proj_utils.get_project_id()
 
 
 # ── _repo_name_from_url ───────────────────────────────────────────────────────
@@ -382,9 +384,8 @@ def test_pin_submodule_commit_not_in_store():
 
 
 @pytest.mark.project_setup(
-    manifest=dict(odoo_version="18.0"),
+    manifest=dict(odoo_version="18.0", project_id="1289"),
     proj_version="18.0.1.0.0",
-    proj_cfg={"project_id": "1289"},
     extra_files={
         ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
     },
@@ -435,9 +436,8 @@ def test_submodule_update_populates_autoshare_remotes(project, tmp_path):
 
 
 @pytest.mark.project_setup(
-    manifest=dict(odoo_version="18.0"),
+    manifest=dict(odoo_version="18.0", project_id="1289"),
     proj_version="18.0.1.0.0",
-    proj_cfg={"project_id": "1289"},
     extra_files={
         ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
     },

@@ -55,25 +55,6 @@ def test_init(project, version):
     os.environ["GIT_AUTOSHARE_CONFIG_DIR"] = str(autoshare_config_dir)
 
 
-@pytest.mark.project_setup(
-    proj_tmpl_ver=1,
-    extra_files={
-        "README.md": "# Proj\n\n**Our internal id for this project is: 1289.**\n",
-    },
-)
-def test_init_writes_project_id_from_readme(project):
-    Path(".proj.cfg").unlink()
-    config._reload()
-    with mock.patch.dict(os.environ, {"PROJ_TMPL_VER": "1"}, clear=True):
-        result = project.invoke(init, catch_exceptions=False)
-    assert result.exit_code == 0
-    content = Path(".proj.cfg").read_text()
-    assert "project_id = 1289" in content
-    # Reload and verify config picks up the value
-    config._reload()
-    assert config.project_id == "1289"
-
-
 @pytest.mark.project_setup(proj_tmpl_ver=1)
 def test_init_proj_conf_already_existing(project):
     orig_content = get_fixture("expected.proj.v1.cfg")

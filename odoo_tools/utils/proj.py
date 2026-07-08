@@ -5,6 +5,7 @@ import subprocess
 import venv
 from functools import cache
 
+from ..exceptions import ProjectConfigException
 from . import addon, ui
 from .config import config
 from .misc import get_template_path
@@ -34,14 +35,12 @@ def get_odoo_serie():
     return get_odoo_version().split(".")[0]
 
 
-def get_project_id() -> str | None:
-    """Return the project ID from the project config (.proj.cfg), or None.
-
-    The value is stored in .proj.cfg as ``project_id`` and written there
-    automatically by ``otools-project init`` when the README contains the
-    line ``Our internal id for this project is: <id>``.
-    """
-    return config.project_id
+def get_project_id(raise_if_missing=True) -> str | None:
+    """Return the internal company project ID from the project manifest."""
+    project_id = get_project_manifest().get("project_id")
+    if not project_id and raise_if_missing:
+        raise ProjectConfigException("project_id not found in the project manifest")
+    return str(project_id) if project_id else None
 
 
 def get_current_version():

@@ -110,15 +110,6 @@ class ProjectConfig(BaseModel):
     marabunta_mig_file_rel_path: OptionalPath = None
     """The path to the Marabunta migration file."""
 
-    project_id: Annotated[str | None, BeforeValidator(falsy_to_none)] = None
-    """The internal company's project ID.
-
-    Set automatically by ``otools-project init`` from the README when the line
-    ``Our internal id for this project is: <id>`` is present.  Used by
-    ``otools-submodule`` to configure targeted fetch refspecs for OCA and
-    company remotes.
-    """
-
     otools_min_version: Annotated[str | None, BeforeValidator(falsy_to_none)] = None
     """The minimum required version of odoo-tools to operate on this project.
 
