@@ -4,6 +4,7 @@
 
 import click
 
+from ..utils import manifestoo as manifestoo_utils
 from ..utils import req as req_utils
 from ..utils import ui
 from ..utils.click import global_command_decorators
@@ -103,6 +104,125 @@ def where(name):
         ui.exit_msg(f"Addon '{name}' not found")
     for path in found:
         click.echo(path)
+
+
+@cli.command(name="list")
+@click.option(
+    "--separator",
+    help="Separator to join the addon names with (by default, print one per line).",
+)
+def list_addons(separator):
+    """List the project's local addons."""
+    addons_set = manifestoo_utils.get_addons_set()
+    selection = manifestoo_utils.get_local_addons_selection()
+    addon_names = manifestoo_utils.list_addons(selection, addons_set)
+    if addon_names:
+        click.echo((separator or "\n").join(addon_names))
+
+
+@cli.command()
+@click.argument("addons", nargs=-1)
+@click.option(
+    "--transitive",
+    is_flag=True,
+    help="Print all transitive dependencies.",
+)
+@click.option(
+    "--include-selected",
+    is_flag=True,
+    help="Print the selected addons along with their dependencies.",
+)
+@click.option(
+    "--ignore-missing",
+    is_flag=True,
+    help="Only warn about addons not found in the addons directories, "
+    "instead of failing.",
+)
+@click.option(
+    "--quiet",
+    is_flag=True,
+    help="Do not print warnings about missing addons.",
+)
+@click.option(
+    "--separator",
+    help="Separator to join the addon names with (by default, print one per line).",
+)
+def depends(addons, transitive, include_selected, ignore_missing, quiet, separator):
+    """List the dependencies of the given addons.
+
+    Addons can be passed as multiple arguments or as comma separated lists.
+    When no addon is given, the project's local addons are selected.
+    """
+    addons_set = manifestoo_utils.get_addons_set()
+    if addons:
+        selection = manifestoo_utils.get_addons_selection(addons)
+    else:
+        selection = manifestoo_utils.get_local_addons_selection()
+    addon_names, missing = manifestoo_utils.list_depends(
+        selection,
+        addons_set,
+        transitive=transitive,
+        include_selected=include_selected,
+        ignore_missing=ignore_missing,
+    )
+    if missing and not quiet:
+        ui.err_console.print(
+            f"Warning: addon(s) not found: {', '.join(missing)}",
+            style="yellow",
+        )
+    if addon_names:
+        click.echo((separator or "\n").join(addon_names))
+
+
+@cli.command()
+@click.argument("addons", nargs=-1, required=True)
+@click.option(
+    "--transitive/--no-transitive",
+    default=True,
+    help="Print all transitive co-dependencies.",
+)
+@click.option(
+    "--include-selected/--no-include-selected",
+    default=True,
+    help="Print the selected addons along with their co-dependencies.",
+)
+@click.option(
+    "--ignore-missing",
+    is_flag=True,
+    help="Only warn about addons not found in the addons directories, "
+    "instead of failing.",
+)
+@click.option(
+    "--quiet",
+    is_flag=True,
+    help="Do not print warnings about missing addons.",
+)
+@click.option(
+    "--separator",
+    help="Separator to join the addon names with (by default, print one per line).",
+)
+def codepends(addons, transitive, include_selected, ignore_missing, quiet, separator):
+    """List the co-dependencies of the given addons.
+
+    Co-dependencies are the addons that depend on the given addons.
+    Addons can be passed as multiple arguments or as comma separated lists.
+    """
+    addons_set = manifestoo_utils.get_addons_set()
+    selection = manifestoo_utils.get_addons_selection(addons)
+    addon_names, missing = manifestoo_utils.list_codepends(
+        selection,
+        addons_set,
+        transitive=transitive,
+        include_selected=include_selected,
+        ignore_missing=ignore_missing,
+    )
+    if missing and not quiet:
+        ui.err_console.print(
+            f"Warning: addon(s) not found: {', '.join(missing)}",
+            style="yellow",
+        )
+    if addon_names:
+        click.echo((separator or "\n").join(addon_names))
 
 
 if __name__ == "__main__":
