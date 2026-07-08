@@ -49,6 +49,18 @@ def remote_repo_exists(url: str) -> bool:
     return result.returncode == 0
 
 
+def get_remotes(git_dir: str | Path) -> dict[str, str]:
+    """Return the repo's remotes as a mapping of remote name to fetch URL."""
+    output = run(["git", "-C", str(git_dir), "remote", "-v"], check=True)
+    remotes = {}
+    for line in output.splitlines():
+        name, url_and_kind = line.split("\t")
+        url, _, kind = url_and_kind.rpartition(" ")
+        if kind == "(fetch)":
+            remotes[name] = url
+    return remotes
+
+
 def ensure_remote(git_dir: str | Path, remote_name: str, url: str) -> bool:
     """Add a named remote if it doesn't already exist.
 

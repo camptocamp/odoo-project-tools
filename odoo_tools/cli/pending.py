@@ -208,9 +208,8 @@ def clean_pending(repo_paths=(), aggregate=True):
         if not repo.has_any_pr_left():
             repo._handle_empty_merges_file(delete_file=True)
         elif aggregate:
-            aggregator = repo.get_aggregator()
-            aggregator.aggregate()
-            aggregator.push()
+            repo.run_aggregate()
+            repo.push_to_remote()
 
 
 # TODO: add tests
@@ -232,10 +231,9 @@ def clean_pending(repo_paths=(), aggregate=True):
 def aggregate(repo_path, target_branch=None, push=None):
     """Perform a git aggregation on <repo_path>."""
     repo = pm_utils.Repo(repo_path)
-    aggregator = repo.get_aggregator(target_branch=target_branch)
-    aggregator.aggregate()
+    repo.run_aggregate()
     if push:
-        aggregator.push()
+        repo.push_to_remote(target_branch=target_branch)
 
 
 @cli.command(name="add")
@@ -278,10 +276,9 @@ def add_pending(entity_urls, aggregate=True, patch=False, push=True):
     # Then aggregate each affected submodule once.
     if aggregate:
         for repo in repos.values():
-            aggregator = repo.get_aggregator()
-            aggregator.aggregate()
+            repo.run_aggregate()
             if push:
-                aggregator.push()
+                repo.push_to_remote()
 
 
 @cli.command(name="remove")

@@ -9,9 +9,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import click
-import git_aggregator.config
-import git_aggregator.main
-import git_aggregator.repo
 import requests
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
@@ -19,6 +16,7 @@ from ..exceptions import PathNotFound
 from ..utils.misc import SmartDict, get_docker_image_commit_hashes
 from . import gh, git, ui
 from .config import config
+from .os_exec import run
 from .path import build_path, cd
 from .proj import get_project_manifest_key
 from .yaml import (
@@ -30,8 +28,6 @@ from .yaml import (
 )
 
 logger = logging.getLogger(__name__)
-
-git_aggregator.main.setup_logger()
 
 
 @dataclass(kw_only=True)
@@ -487,17 +483,26 @@ class Repo:
         self.update_merges_config(conf)
 
     # aggregator API
-    # TODO: add tests
-    def get_aggregator(self, target_remote=None, target_branch=None, **extra_config):
-        if "target" not in extra_config:
-            extra_config["target"] = {}
-        target_branch = target_branch or gh.get_target_branch()
-        if target_branch and "branch" not in extra_config["target"]:
-            extra_config["target"]["branch"] = target_branch
-        target_remote = target_remote or self.company_git_remote
-        if target_remote and "remote" not in extra_config["target"]:
-            extra_config["target"]["remote"] = target_remote
-        return RepoAggregator(self, **extra_config)
+    def run_aggregate(self, **kwargs):
+        """Aggregate the pending merges using the git-aggregator CLI.
+
+        The aggregation happens on the local branch declared as ``target`` in
+        the merges file, which acts as a local scratch branch: pushing the
+        result to a permanent, dynamically named remote branch is handled
+        separately by :meth:`push_to_remote`.
+
+        Extra keyword arguments are passed through to :func:`run`.
+        """
+        # The merges file keys are paths relative to the pending-merges
+        # folder (e.g. ``../odoo/external-src/<name>``), and gitaggregate
+        # resolves them against the process working directory.
+        kwargs.setdefault("cwd", self.pending_merge_abs_path)
+        kwargs.setdefault("check", True)
+        kwargs.setdefault("verbose", True)
+        run(
+            ["gitaggregate", "--config", str(self.abs_merges_path), "aggregate"],
+            **kwargs,
+        )
 
     def _iter_pending_pull_requests(self) -> Iterator[PendingPR]:
         merges_config = self.merges_config()
@@ -607,8 +612,7 @@ class Repo:
             choice = ui.ask_question(msg, default=default_choice)
         opt = next(opt for opt in sorted_options if opt.choice == choice)
         if opt.remote:
-            # FIXME: use an internal util to get remotes
-            remotes = self.get_aggregator()._get_remotes()
+            remotes = git.get_remotes(self.abs_path)
             new_remote_url = get_new_remote_url(repo=self, force_remote=opt.remote)
             if opt.remote not in remotes:
                 ui.echo(f"Adding missing remote: {opt.remote} -> {new_remote_url}")
@@ -628,26 +632,29 @@ class Repo:
             self.abs_merges_path.unlink()
 
     def push_to_remote(self, target_branch=None):
+        """Push the aggregated HEAD to the company remote as ``target_branch``.
+
+        The branch name embeds the project commit hash, giving the aggregated
+        commit a permanent ref on the fork so that submodule pins referencing
+        it always stay fetchable.
+        """
         target_branch = target_branch or gh.get_target_branch()
-        aggregator = self.get_aggregator(target_branch=target_branch)
-        with cd(self.abs_path):
-            aggregator._switch_to_branch(target_branch)
-            aggregator.push()
+        git.ensure_remote(
+            self.abs_path,
+            self.company_git_remote,
+            self.ssh_url(self.company_git_remote),
+        )
+        run(
+            f"git push -f {self.company_git_remote} HEAD:refs/heads/{target_branch}",
+            cwd=self.abs_path,
+            check=True,
+            verbose=True,
+        )
 
     def rebuild_consolidation_branch(self, push=False):
-        aggregator = self.get_aggregator()
-        aggregator.aggregate()
+        self.run_aggregate()
         if push:
-            aggregator.push()
-
-
-class RepoAggregator(git_aggregator.repo.Repo):
-    def __init__(self, repo, **extra_config):
-        self.pm_repo = repo
-        config = git_aggregator.config.load_config(self.pm_repo.abs_merges_path)[0]
-        config.update(extra_config)
-        super().__init__(**config)
-        self.cwd = self.pm_repo.abs_path
+            self.push_to_remote()
 
 
 def add_pending(entity_url, aggregate=True, patch=False, push=True):
@@ -689,10 +696,9 @@ def add_pending(entity_url, aggregate=True, patch=False, push=True):
     elif entity_type in ("commit", "tree"):
         repo.add_pending_commit(upstream, entity_id)
     if aggregate:
-        aggregator = repo.get_aggregator()
-        aggregator.aggregate()
+        repo.run_aggregate()
         if push:
-            aggregator.push()
+            repo.push_to_remote()
     return repo
 
 
@@ -714,8 +720,7 @@ def remove_pending(entity_url, aggregate=True):
     if not repo.has_any_pr_left():
         repo._handle_empty_merges_file(delete_file=True)
     elif aggregate:
-        aggregator = repo.get_aggregator()
-        aggregator.aggregate()
+        repo.run_aggregate()
     return repo
 
 
