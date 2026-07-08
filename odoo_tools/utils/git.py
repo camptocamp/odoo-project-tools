@@ -298,7 +298,7 @@ def submodule_update(path: str | PathLike):
     company_remote = proj_config.company_git_remote
     if submodule:
         ui.echo(f"Updating submodule {submodule.path}")
-        project_id = get_project_id()
+        project_id = get_project_id(raise_if_missing=False)
         base_branch = submodule.branch or base_branch
         __, autoshare_repo = find_autoshare_repository([submodule.url])
         if autoshare_repo:

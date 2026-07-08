@@ -18,7 +18,7 @@ from . import gh, git, ui
 from .config import config
 from .os_exec import run
 from .path import build_path, cd
-from .proj import get_project_manifest_key
+from .proj import get_project_id, get_project_manifest_key
 from .yaml import (
     append_seq_item_with_comments,
     remove_seq_item_with_comments,
@@ -234,9 +234,7 @@ class Repo:
         remote_upstream_url = self.ssh_url(upstream)
         remote_company_url = self.ssh_url()
         odoo_version = get_project_manifest_key("odoo_version")
-        default_target = "merge-branch-{}-master".format(
-            get_project_manifest_key("project_id")
-        )
+        default_target = f"merge-branch-{get_project_id()}-master"
         remotes = CommentedMap()
         remotes.insert(0, upstream, remote_upstream_url)
 
@@ -725,7 +723,7 @@ def remove_pending(entity_url, aggregate=True):
 
 
 def make_merge_branch_name(version):
-    project_id = get_project_manifest_key("project_id")
+    project_id = get_project_id()
     branch_name = f"merge-branch-{project_id}-{version}"
     return branch_name
 

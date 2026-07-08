@@ -7,7 +7,7 @@ from pathlib import Path
 
 from . import git, ui
 from .os_exec import run
-from .proj import get_project_manifest_key
+from .proj import get_project_id
 
 RE_GH_REMOTE_URL = re.compile(
     r"^(?:https?://github\.com/|git@github\.com:)"
@@ -99,7 +99,7 @@ def get_target_branch(target_branch=None):
     current_branch = get_current_rebase_branch()
     if not current_branch:
         current_branch = git.get_current_branch()
-    project_id = get_project_manifest_key("project_id")
+    project_id = get_project_id()
     if not target_branch:
         commit = run("git rev-parse HEAD")[:8]
         target_branch = f"merge-branch-{project_id}-{current_branch}-{commit}"
