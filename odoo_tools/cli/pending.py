@@ -9,6 +9,7 @@ import click
 from rich.console import Console
 from rich.live import Live
 from rich.markup import escape
+from rich.prompt import Confirm
 from rich.spinner import Spinner
 from rich.table import Table
 
@@ -137,10 +138,11 @@ def show_pending(repo_paths=(), check=True, as_json=False):
     "--aggregate/--no-aggregate",
     "aggregate",
     is_flag=True,
-    default=True,
-    help="Run git aggregate (and push) on each touched repo after purging",
+    default=None,
+    help="Run git aggregate (and push) on each touched repo after purging. "
+    "If not set, you will be prompted for each touched repo.",
 )
-def clean_pending(repo_paths=(), aggregate=True):
+def clean_pending(repo_paths=(), aggregate=None):
     """Remove merged pull requests from pending-merge files."""
     repos = _resolve_repos(repo_paths)
     all_prs = [pr for repo in repos for pr in repo._iter_pending_pull_requests()]
@@ -207,7 +209,18 @@ def clean_pending(repo_paths=(), aggregate=True):
     for repo in touched_repos:
         if not repo.has_any_pr_left():
             repo._handle_empty_merges_file(delete_file=True)
-        elif aggregate:
+            continue
+        # Re-aggregating performs an upgrade of the submodule, potentially
+        # pulling breaking changes from the remaining pending merges, so
+        # unless the choice was made explicit via the flag, ask first.
+        do_aggregate = aggregate
+        if do_aggregate is None:
+            do_aggregate = Confirm.ask(
+                f"Re-aggregate {repo.path}? This may pull new changes "
+                "from the remaining pending merges",
+                default=True,
+            )
+        if do_aggregate:
             repo.run_aggregate()
             repo.push_to_remote()
 

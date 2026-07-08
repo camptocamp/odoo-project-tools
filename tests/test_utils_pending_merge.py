@@ -829,6 +829,72 @@ def test_repo_push_to_remote(project):
     )
 
 
+def _mock_clean_github_responses(rsps, merged_prs=(773,), open_prs=(774, 663, 759)):
+    """Register GitHub API responses for the PRs of the default merges file."""
+    for pull_id in merged_prs:
+        rsps.add(
+            responses.GET,
+            f"https://api.github.com/repos/OCA/edi/pulls/{pull_id}",
+            json={"state": "closed", "merged": True, "number": pull_id},
+            status=200,
+        )
+    for pull_id in open_prs:
+        rsps.add(
+            responses.GET,
+            f"https://api.github.com/repos/OCA/edi/pulls/{pull_id}",
+            json={"state": "open", "merged": False, "number": pull_id},
+            status=200,
+        )
+
+
+@pytest.mark.parametrize(("answer", "aggregated"), [("y", True), ("n", False)])
+def test_cli_clean_prompts_for_aggregate(project, answer, aggregated):
+    """Without an explicit --aggregate/--no-aggregate flag, `otools-pending
+    clean` asks before re-aggregating each touched submodule."""
+    mock_pending_merge_repo_paths("edi")
+    repo = Repo("edi", path_check=False)
+    with responses.RequestsMock() as rsps:
+        _mock_clean_github_responses(rsps)
+        with (
+            mock.patch.object(pm_utils.Repo, "run_aggregate") as run_aggregate,
+            mock.patch.object(pm_utils.Repo, "push_to_remote") as push_to_remote,
+        ):
+            result = project.invoke(
+                pending.clean_pending,
+                catch_exceptions=False,
+                input=answer,
+            )
+    assert result.exit_code == 0
+    assert "Re-aggregate" in result.output
+    # The merged PR is removed regardless of the aggregation answer
+    assert "OCA refs/pull/773/head" not in repo.merges_config()["merges"]
+    assert run_aggregate.called is aggregated
+    assert push_to_remote.called is aggregated
+
+
+@pytest.mark.parametrize(
+    ("flag", "aggregated"), [("--aggregate", True), ("--no-aggregate", False)]
+)
+def test_cli_clean_explicit_aggregate_flag_skips_prompt(project, flag, aggregated):
+    """An explicit --aggregate/--no-aggregate flag is honored without asking."""
+    mock_pending_merge_repo_paths("edi")
+    with responses.RequestsMock() as rsps:
+        _mock_clean_github_responses(rsps)
+        with (
+            mock.patch.object(pm_utils.Repo, "run_aggregate") as run_aggregate,
+            mock.patch.object(pm_utils.Repo, "push_to_remote") as push_to_remote,
+        ):
+            result = project.invoke(
+                pending.clean_pending,
+                [flag],
+                catch_exceptions=False,
+            )
+    assert result.exit_code == 0
+    assert "Re-aggregate" not in result.output
+    assert run_aggregate.called is aggregated
+    assert push_to_remote.called is aggregated
+
+
 def test_iter_pending_pull_requests(project):
     name = "edi"
     mock_pending_merge_repo_paths(
