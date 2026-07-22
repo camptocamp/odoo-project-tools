@@ -22,6 +22,14 @@ You may need to have some build dependencies installed:
 
     sudo apt install pipx git libpq-dev gcc python3-dev
 
+  ## Shell completion
+
+  Pre-generated shell completion scripts are shipped in the package for bash,
+  zsh, and fish.
+
+  Run `otools-setup shell-completion` after installing to configure your shell
+  automatically.  See `docs/shell-completions.md` for manual setup instructions.
+
 ## Usage
 
 Note: information below is subject to change.
@@ -51,6 +59,8 @@ The package brings the following commands.
 `otools-i18n`: tools to manage internationalization (i18n)
 
 `otools-password`: tools to manage admin passwords and LastPass entries
+
+`otools-setup`: post-install configuration (shell completion setup, …)
 
 Use `--help` to get the list of subcommands.
 
