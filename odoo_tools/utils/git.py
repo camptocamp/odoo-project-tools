@@ -18,7 +18,6 @@ from . import ui
 from .config import config as proj_config
 from .os_exec import run
 from .path import build_path, root_path
-from .proj import get_project_manifest
 
 
 def git_toplevel() -> Path:
@@ -353,14 +352,14 @@ def preload_submodule_state() -> None:
     * git-autoshare ``print()``s when it cannot find its ``repos.yml``, and it
       does it in-process, where no capture can reach it. From a worker that
       line lands in the middle of the live display.
-    * the project manifest is parsed with a shared YAML parser (see
+    * the project configuration is loaded on first read, on legacy projects
+      by parsing the manifest with a shared YAML parser (see
       :mod:`~odoo_tools.utils.yaml`), so every worker missing the cache at once
       means doing the same parse N times, one after another, for one answer.
 
     Call it before fanning out. It is cheap, and doing it twice does nothing.
     """
     autoshare_config()
-    get_project_manifest()
     proj_config.company_git_remote  # noqa: B018 -- a cached_property, filled by reading
 
 

@@ -4,7 +4,7 @@ from itertools import chain
 import click
 from rich.console import Console
 
-from ..utils import gh, git, path, proj, ui
+from ..utils import gh, git, path, ui
 from ..utils import pending_merge as pm_utils
 from ..utils.click import (
     DEFAULT_MAX_WORKERS,
@@ -235,7 +235,7 @@ def sync_remote(submodule_path=None, repo=None, force_remote=False):
         repo.rebuild_consolidation_branch(push=push)
 
     else:
-        odoo_version = proj.get_project_manifest_key("odoo_version")
+        odoo_version = config.odoo_version
         if ui.ask_confirmation(
             f"Submodule {repo.name} has no pending merges. Update it to {odoo_version}?"
         ):
@@ -337,7 +337,7 @@ def upgrade(
         # A submodule tracking something other than the project's Odoo version
         # is usually a mistake and occasionally deliberate, so it is asked
         # about; naming a branch outright is already the answer.
-        odoo_version = proj.get_project_manifest_key("odoo_version")
+        odoo_version = config.odoo_version
         confirmed = []
         for submodule in upgrading:
             if submodule.branch and submodule.branch != odoo_version:

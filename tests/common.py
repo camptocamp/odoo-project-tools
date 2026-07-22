@@ -15,9 +15,9 @@ import pytest
 from rich.console import Console
 
 from odoo_tools.utils import pending_merge as pm_utils
-from odoo_tools.utils.config import config
-from odoo_tools.utils.path import build_path, get_root_marker
-from odoo_tools.utils.proj import get_project_bundle_addon_name, get_project_manifest
+from odoo_tools.utils.config import DEPRECATED_MANIFEST_PATH, config
+from odoo_tools.utils.path import build_path, root_path
+from odoo_tools.utils.proj import get_project_bundle_addon_name
 from odoo_tools.utils.yaml import update_yml_file
 
 Repo = pm_utils.Repo
@@ -149,20 +149,37 @@ FAKE_PROJ_CFG_V2 = dict(
 FAKE_PROJ_CFG_BY_VER = {"1": FAKE_PROJ_CFG_V1, "2": FAKE_PROJ_CFG_V2}
 
 
+def _toml_value(value):
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    return '"{}"'.format(str(value).replace('"', '\\"'))
+
+
 def make_fake_project_root(
     proj_tmpl_ver="1",
     proj_cfg=None,
     manifest=None,
-    marker_file=None,
     req_file="requirements.txt",
     proj_version="14.0.0.1.0",
     mock_marabunta_file=False,
     mock_bundle_addon=False,
     extra_files=None,
-    git_init=False,
+    legacy=False,
 ):
-    if marker_file is None:
-        marker_file = get_root_marker()
+    """Create a fake project root in the current directory.
+
+    A git repository is always initialized (and an initial commit created)
+    because the project root is located via git. By default the configuration
+    is written to the unified ``[tool.odoo-project]`` section of
+    ``pyproject.toml``. Pass ``legacy=True`` to instead write the deprecated
+    ``.proj.cfg`` + ``.cookiecutter.context.yml`` layout, which is only kept
+    around to test the transition-period fallback.
+    """
+    # The project root is located via git, so a repository is always required.
+    repo = init_test_repo(".")
+    root_path.cache_clear()
     proj_cfg_data = FAKE_PROJ_CFG_BY_VER[str(proj_tmpl_ver)].copy()
     if proj_cfg is not None:
         to_update = {k: v for k, v in proj_cfg.items() if v is not None}
@@ -170,20 +187,28 @@ def make_fake_project_root(
         proj_cfg_data.update(to_update)
         for k in to_delete:
             proj_cfg_data.pop(k, None)
-    content = ["[conf]"]
-    for k, v in proj_cfg_data.items():
-        content.append(f"{k} = {v}")
-    Path(".proj.cfg").write_text("\n".join(content))
-    config._reload()
-    # Generate the project manifest
+    # Compute the project manifest data
     data = FAKE_MANIFEST_DATA.copy()
     data.update(manifest or {})
     if not data.get("odoo_version"):
         data["odoo_version"] = ".".join(proj_version.split(".")[:2])
-    Path(marker_file).parent.mkdir(parents=True, exist_ok=True)
-    Path(marker_file).touch()
-    update_yml_file(marker_file, data)
-    get_project_manifest.cache_clear()
+    if legacy:
+        # Deprecated layout: .proj.cfg (INI) + .cookiecutter.context.yml (YAML)
+        content = ["[conf]"]
+        for k, v in proj_cfg_data.items():
+            content.append(f"{k} = {v}")
+        Path(".proj.cfg").write_text("\n".join(content))
+        Path(DEPRECATED_MANIFEST_PATH).parent.mkdir(parents=True, exist_ok=True)
+        Path(DEPRECATED_MANIFEST_PATH).touch()
+        update_yml_file(DEPRECATED_MANIFEST_PATH, data)
+    else:
+        # Unified [tool.odoo-project] section in pyproject.toml
+        section = dict(proj_cfg_data)
+        section.update({k: v for k, v in data.items() if v is not None})
+        lines = ["[tool.odoo-project]"]
+        lines += [f"{k} = {_toml_value(v)}" for k, v in section.items()]
+        Path("pyproject.toml").write_text("\n".join(lines) + "\n")
+    config._reload()
     # Create the requirements.txt file
     Path(req_file).parent.mkdir(parents=True, exist_ok=True)
     Path(req_file).touch()
@@ -202,11 +227,9 @@ def make_fake_project_root(
         for path, content in extra_files.items():
             Path(path).parent.mkdir(parents=True, exist_ok=True)
             Path(path).write_text(content)
-    # Initialize a git repository
-    if git_init:
-        repo = init_test_repo(".")
-        repo.index.add(repo.untracked_files)
-        repo.index.commit("initial commit")
+    # Create an initial commit (some tests inspect git history)
+    repo.index.add(repo.untracked_files)
+    repo.index.commit("initial commit")
 
 
 def init_test_repo(path, **kwargs):

@@ -10,6 +10,7 @@ from .. import utils
 from ..utils import lpass as lpass_utils
 from ..utils import password as password_utils
 from ..utils import ui
+from ..utils.config import config
 from ..utils.path import build_path
 
 console = Console()
@@ -61,9 +62,9 @@ def _build_project_url(shortname, country, prefix=None) -> str:
 
 def _store_in_lastpass(password, username="admin"):
     """Store the password in LastPass for prod and integration environments."""
-    project_name = utils.proj.get_project_manifest_key("project_name")
-    shortname = utils.proj.get_project_manifest_key("customer_shortname")
-    country = utils.proj.get_project_manifest_key("country")
+    project_name = config.project_name
+    shortname = config.customer_shortname
+    country = config.country
 
     locations = [
         ("prod", _build_project_url(shortname, country)),

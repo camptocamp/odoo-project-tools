@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.table import Table
 
 from .. import utils
+from ..utils.config import config
 
 console = Console()
 
@@ -165,7 +166,7 @@ def addons():
 @utils.click.handle_exceptions()
 def addons_list(database, as_json):
     """List installed addons in the database."""
-    odoo_serie = int(utils.proj.get_odoo_serie())
+    odoo_serie = config.odoo_serie
     if odoo_serie >= 17:
         shortdesc_column = "shortdesc->>'en_US'"
     else:

@@ -20,11 +20,13 @@ from .common import MockSubprocessRun, compare_line_by_line, get_fixture
     [
         pytest.param(
             1,
-            marks=pytest.mark.project_setup(proj_tmpl_ver=1),
+            marks=pytest.mark.project_setup(proj_tmpl_ver=1, legacy=True),
         ),
         pytest.param(
             2,
-            marks=pytest.mark.project_setup(proj_tmpl_ver=2, proj_version="16.0.1.1.0"),
+            marks=pytest.mark.project_setup(
+                proj_tmpl_ver=2, proj_version="16.0.1.1.0", legacy=True
+            ),
         ),
     ],
 )
@@ -56,7 +58,7 @@ def test_init(project, version):
     os.environ["GIT_AUTOSHARE_CONFIG_DIR"] = str(autoshare_config_dir)
 
 
-@pytest.mark.project_setup(proj_tmpl_ver=1)
+@pytest.mark.project_setup(proj_tmpl_ver=1, legacy=True)
 def test_init_without_proj_cfg_nor_env_override(project):
     """`init` must work on a project that has no `.proj.cfg` yet.
 
@@ -72,6 +74,16 @@ def test_init_without_proj_cfg_nor_env_override(project):
 
 
 @pytest.mark.project_setup(proj_tmpl_ver=1)
+def test_init_skips_proj_cfg_with_pyproject_section(project):
+    """A project configured through [tool.odoo-project] gets no `.proj.cfg`."""
+    result = project.invoke(init, catch_exceptions=False)
+    assert result.exit_code == 0
+    assert not Path(".proj.cfg").exists()
+    # The rest of the project is still bootstrapped
+    assert Path("towncrier.toml").exists()
+
+
+@pytest.mark.project_setup(proj_tmpl_ver=1, legacy=True)
 def test_init_proj_conf_already_existing(project):
     orig_content = get_fixture("expected.proj.v1.cfg")
     expected = orig_content + "\nfoo = baz"
@@ -147,7 +159,7 @@ def test_init_history_file_already_existing_but_already_converted(project):
     assert result.exit_code == 0
 
 
-@pytest.mark.project_setup(proj_tmpl_ver=1)
+@pytest.mark.project_setup(proj_tmpl_ver=1, legacy=True)
 def test_init_version_option_takes_precedence(project):
     """`--version` selects the template version, over the `PROJ_TMPL_VER` env var."""
     Path(".proj.cfg").unlink()

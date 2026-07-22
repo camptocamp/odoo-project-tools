@@ -16,10 +16,9 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 from ..exceptions import PathNotFound
 from ..utils.misc import get_docker_image_commit_hashes
 from . import gh, git, ui
-from .config import config
+from .config import config as proj_config
 from .os_exec import run
 from .path import build_path
-from .proj import get_project_id, get_project_manifest_key
 from .yaml import (
     append_seq_item_with_comments,
     remove_seq_item_with_comments,
@@ -123,11 +122,11 @@ class Repo:
     """Handle checked out repositories and their pending merges."""
 
     def __init__(self, name_or_path, path_check=True):
-        self.template_version = config.template_version or 1
-        self.company_git_remote = config.company_git_remote
-        self.odoo_src_rel_path = config.odoo_src_rel_path
-        self.ext_src_rel_path = config.ext_src_rel_path
-        self.pending_merge_rel_path = config.pending_merge_rel_path
+        self.template_version = proj_config.template_version or 1
+        self.company_git_remote = proj_config.company_git_remote
+        self.odoo_src_rel_path = proj_config.odoo_src_rel_path
+        self.ext_src_rel_path = proj_config.ext_src_rel_path
+        self.pending_merge_rel_path = proj_config.pending_merge_rel_path
         self.pending_merge_abs_path = build_path(self.pending_merge_rel_path)
         self.path = self.make_repo_path(name_or_path)
         self.abs_path = build_path(self.path)
@@ -179,7 +178,7 @@ class Repo:
 
     @classmethod
     def repositories_from_pending_folder(cls, path=None, path_check=True):
-        pending_merge_abs_path = build_path(config.pending_merge_rel_path)
+        pending_merge_abs_path = build_path(proj_config.pending_merge_rel_path)
         path = Path(path or pending_merge_abs_path)
         return [cls(pth.stem, path_check=path_check) for pth in path.rglob("*.yml")]
 
@@ -261,8 +260,9 @@ class Repo:
 
         remote_upstream_url = self.ssh_url(upstream)
         remote_company_url = self.ssh_url()
-        odoo_version = get_project_manifest_key("odoo_version")
-        default_target = f"merge-branch-{get_project_id()}-master"
+        odoo_version = proj_config.odoo_version
+        project_id = proj_config.require("project_id")
+        default_target = f"merge-branch-{project_id}-master"
         remotes = CommentedMap()
         remotes.insert(0, upstream, remote_upstream_url)
 
@@ -354,7 +354,7 @@ class Repo:
             )
             return []
         base_branch = data.get("base", {}).get("ref")
-        if base_branch and base_branch != get_project_manifest_key("odoo_version"):
+        if base_branch and base_branch != proj_config.odoo_version:
             ui.ask_or_abort(
                 "Requested PR targets branch different from"
                 " current project's major version. Proceed?"
@@ -647,7 +647,7 @@ class Repo:
         branch is not needed anymore, so the submodule goes back to tracking
         the upstream branch of the project's Odoo version.
         """
-        odoo_version = get_project_manifest_key("odoo_version")
+        odoo_version = proj_config.odoo_version
         # The first ``merges`` entry is the base ref the consolidation branch is
         # built on (e.g. ``odoo 19.0``): its remote is the upstream to go back to,
         # be it OCA, odoo or the company itself for a repository it owns.
@@ -755,7 +755,7 @@ def remove_pending(entity_url, aggregate=True):
 
 
 def make_merge_branch_name(version):
-    project_id = get_project_id()
+    project_id = proj_config.require("project_id")
     branch_name = f"merge-branch-{project_id}-{version}"
     return branch_name
 

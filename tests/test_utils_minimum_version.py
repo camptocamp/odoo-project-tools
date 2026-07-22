@@ -2,6 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 from pathlib import Path
+from textwrap import dedent
 from unittest.mock import patch
 
 import click
@@ -19,6 +20,8 @@ def _fake_config(otools_min_version: str = "") -> ProjectConfig:
         ext_src_rel_path=Path("odoo/external-src"),
         local_src_rel_path=Path("odoo/local-src"),
         pending_merge_rel_path=Path("pending-merges.d"),
+        odoo_version="16.0",
+        customer_shortname="acme",
         otools_min_version=otools_min_version,
     )
 
@@ -41,12 +44,62 @@ def _mock_config(**attrs):
 
 
 def test_malformed_config_is_noop():
-    with patch.object(
-        type(minimum_version.config),
-        "__getattr__",
-        side_effect=ProjectConfigException("malformed .proj.cfg"),
+    with (
+        patch.object(
+            type(minimum_version.config),
+            "__getattr__",
+            side_effect=ProjectConfigException("malformed .proj.cfg"),
+        ),
+        patch.object(
+            minimum_version,
+            "read_config_sources",
+            side_effect=ProjectConfigException("malformed .proj.cfg"),
+        ),
     ):
         minimum_version.check_minimum_version()
+
+
+@pytest.mark.project_setup(
+    extra_files={
+        "pyproject.toml": dedent(
+            """\
+            [tool.odoo-project]
+            odoo_version = "18.0"
+            otools_min_version = "999.0"
+            """
+        ),
+    }
+)
+@pytest.mark.usefixtures("project")
+def test_invalid_config_still_enforces_minimum_version():
+    """An outdated odoo-tools is stopped even when the rest of the
+    configuration does not validate (customer_shortname is missing)."""
+    with pytest.raises(click.ClickException, match="requires odoo-tools 999.0"):
+        minimum_version.check_minimum_version()
+
+
+@pytest.mark.project_setup(
+    extra_files={
+        "pyproject.toml": dedent(
+            """\
+            [tool.odoo-project]
+            odoo_version = "18.0"
+            otools_min_version = "not-a-version"
+            """
+        ),
+    }
+)
+@pytest.mark.usefixtures("project")
+def test_invalid_config_with_invalid_minimum_version_is_noop():
+    minimum_version.check_minimum_version()
+
+
+@pytest.mark.project_setup(
+    extra_files={"pyproject.toml": "[tool.odoo-project\n"},
+)
+@pytest.mark.usefixtures("project")
+def test_unparseable_config_is_noop():
+    minimum_version.check_minimum_version()
 
 
 def test_outside_project_root_is_noop():

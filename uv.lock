@@ -729,6 +729,7 @@ dependencies = [
     { name = "requirements-parser" },
     { name = "rich" },
     { name = "ruamel-yaml" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "towncrier" },
 ]
 
@@ -738,6 +739,7 @@ test = [
     { name = "pytest-cov" },
     { name = "pytest-ty" },
     { name = "responses" },
+    { name = "tomli" },
 ]
 
 [package.metadata]
@@ -764,6 +766,8 @@ requires-dist = [
     { name = "responses", marker = "extra == 'test'" },
     { name = "rich" },
     { name = "ruamel-yaml" },
+    { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=1.1.0" },
+    { name = "tomli", marker = "extra == 'test'" },
     { name = "towncrier" },
 ]
 provides-extras = ["test"]

@@ -10,7 +10,7 @@ from rich.console import Console
 
 from .. import utils
 from ..utils import ui
-from ..utils.proj import get_odoo_serie
+from ..utils.config import config
 
 console = Console()
 
@@ -19,7 +19,7 @@ def _build_odoo_i18n_export_cmd(module_name, language, database, export_path):
     """Build the odoo command to export i18n files."""
     # Starting from Odoo 19.0, the --i18n-export flag was replaced by a
     # dedicated `odoo i18n export` subcommand.
-    odoo_serie = int(get_odoo_serie())
+    odoo_serie = config.odoo_serie
     if odoo_serie >= 19:
         odoo_cmd = [
             "odoo",
@@ -104,9 +104,9 @@ def export(module_paths, languages, clean_db, init_db, export_pot):
         languages = languages.split(",")
     else:
         languages = []
-        if main_lang := utils.proj.get_project_manifest_key("odoo_main_lang"):
+        if main_lang := config.odoo_main_lang:
             languages.append(main_lang)
-        if aux_langs := utils.proj.get_project_manifest_key("odoo_aux_langs"):
+        if aux_langs := config.odoo_aux_langs:
             languages.extend(aux_langs.split(","))
     # Prepare the languages for export. We ignore en_US because it requires no
     # translations, and we add None for the pot files, if needed.
@@ -130,7 +130,7 @@ def export(module_paths, languages, clean_db, init_db, export_pot):
         with console.status(
             f"Initializing Odoo database for i18n export: {', '.join(module_names)}"
         ):
-            odoo_serie = int(get_odoo_serie())
+            odoo_serie = config.odoo_serie
             if odoo_serie >= 19:
                 # Odoo 19+ — the boot-time `--load-language=<codes>` flag still
                 # exists (see odoo/tools/config.py and modules/loading.py) but
