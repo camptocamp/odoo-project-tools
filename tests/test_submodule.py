@@ -354,6 +354,52 @@ def test_upgrade_with_pending_merges(project):
         ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
     },
 )
+def test_upgrade_pending_merges_all_purged(project):
+    # Regression test for #252: when purging removes the last pending PR,
+    # purge_merged_prs() already deletes the pending-merges file. The upgrade
+    # command must NOT call _handle_empty_merges_file() again, otherwise it
+    # reads the now-deleted file and crashes with FileNotFoundError.
+    # True the first time (enter purge branch), False afterwards because
+    # purge_merged_prs() deleted the now-empty pending-merges file.
+    pending_merges = iter([True])
+
+    def fake_has_pending_merges(self):
+        return next(pending_merges, False)
+
+    with (
+        mock.patch.object(
+            submodule.pm_utils.Repo,
+            "has_pending_merges",
+            autospec=True,
+            side_effect=fake_has_pending_merges,
+        ),
+        mock.patch.object(
+            submodule.pm_utils.Repo, "purge_merged_prs", return_value=[]
+        ) as mock_purge,
+        mock.patch.object(
+            submodule.pm_utils.Repo, "_handle_empty_merges_file"
+        ) as mock_handle,
+        mock.patch.object(submodule.git, "submodule_update"),
+        mock.patch.object(submodule.git, "submodule_upgrade"),
+    ):
+        result = project.invoke(
+            submodule.upgrade,
+            ["odoo/external-src/account-closing"],
+            catch_exceptions=False,
+        )
+    assert result.exit_code == 0
+    mock_purge.assert_called_once_with()
+    # The caller must not re-handle the empty file; purge_merged_prs() owns it.
+    mock_handle.assert_not_called()
+
+
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
+    extra_files={
+        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
+    },
+)
 def test_upgrade_force_branch(project):
     commit_before = "aaa111"
     commit_after = "bbb222"

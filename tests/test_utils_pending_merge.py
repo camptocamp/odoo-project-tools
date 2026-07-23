@@ -461,6 +461,25 @@ def test_remove_pending_last_pr():
 
 
 @pytest.mark.project_setup(manifest=dict(odoo_version="16.0"))
+def test_handle_empty_merges_file_unlink_is_idempotent(project):
+    """Deleting the merges file stays safe if it is already gone (#252)."""
+    name = "edi"
+    mock_pending_merge_repo_paths(name, pending=False)  # no merges file on disk
+    repo = Repo(name, path_check=False)
+    assert not repo.abs_merges_path.exists()
+    with (
+        mock.patch.object(
+            Repo, "merges_config", return_value={"remotes": {"OCA": "url"}}
+        ),
+        # "9" == "no update", so no remote/checkout git calls are triggered.
+        mock.patch.object(pm_utils.ui, "ask_question", return_value="9"),
+        mock.patch.object(pm_utils.ui, "ask_confirmation", return_value=True),
+    ):
+        # The unlink must not raise FileNotFoundError for the missing file.
+        repo._handle_empty_merges_file(delete_file=False)
+
+
+@pytest.mark.project_setup(manifest=dict(odoo_version="16.0"))
 def __test_add_pending_commit_from_scratch(project):
     name = "edi"
     mock_pending_merge_repo_paths(name, pending=False)

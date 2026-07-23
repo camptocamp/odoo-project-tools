@@ -627,7 +627,7 @@ class Repo:
         if delete_file or ui.ask_confirmation(
             f"Delete pending merge file {self.abs_merges_path}?"
         ):
-            self.abs_merges_path.unlink()
+            self.abs_merges_path.unlink(missing_ok=True)
 
     def push_to_remote(self, target_branch=None):
         """Push the aggregated HEAD to the company remote as ``target_branch``.
