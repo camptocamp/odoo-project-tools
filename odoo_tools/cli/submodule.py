@@ -168,8 +168,6 @@ def upgrade(submodule_path, force_branch):
                 ui.echo(f"Purging merged PRs for {submodule.path}")
                 for pr in repo.purge_merged_prs():
                     ui.echo(f"  removed {pr.shortcut}")
-                if not repo.has_any_pr_left():
-                    repo._handle_empty_merges_file(delete_file=True)
             if repo.has_pending_merges():
                 ui.echo(f"Rebuilding consolidation branch for {submodule.path}")
                 repo.rebuild_consolidation_branch(push=True)
