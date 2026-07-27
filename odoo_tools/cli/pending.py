@@ -140,7 +140,7 @@ def show_pending(repo_paths=(), check=True, as_json=False):
     is_flag=True,
     default=None,
     help="Run git aggregate (and push) on each touched repo after purging. "
-    "If not set, you will be prompted for each touched repo.",
+    "If not set, you will be prompted once.",
 )
 def clean_pending(repo_paths=(), aggregate=None):
     """Remove merged pull requests from pending-merge files."""
@@ -198,31 +198,35 @@ def clean_pending(repo_paths=(), aggregate=None):
                 live.update(build_grid())
                 continue
             if pr.merged:
-                if pr.is_patch:
-                    pr._repo.remove_pending_pull_from_patches(pr.owner, pr.pr)
-                else:
-                    pr._repo.remove_pending_pull(pr.owner, pr.pr)
+                pr.remove_from_merges_file()
                 touched_repos.add(pr._repo)
                 removed.add(id(pr))
             live.update(build_grid())
-    # Per-repo post-processing: clean up an empty merges file or re-aggregate.
-    for repo in touched_repos:
-        if not repo.has_any_pr_left():
+    # Dispose of the merges files left without any pending merge, and keep the
+    # rest for re-aggregation.
+    to_aggregate = []
+    for repo in sorted(touched_repos, key=lambda repo: repo.name):
+        if repo.has_any_pr_left():
+            to_aggregate.append(repo)
+        else:
             repo._handle_empty_merges_file(delete_file=True)
-            continue
-        # Re-aggregating performs an upgrade of the submodule, potentially
-        # pulling breaking changes from the remaining pending merges, so
-        # unless the choice was made explicit via the flag, ask first.
-        do_aggregate = aggregate
-        if do_aggregate is None:
-            do_aggregate = Confirm.ask(
-                f"Re-aggregate {repo.path}? This may pull new changes "
-                "from the remaining pending merges",
-                default=True,
-            )
-        if do_aggregate:
-            repo.run_aggregate()
-            repo.push_to_remote()
+    if not to_aggregate:
+        return
+    # Re-aggregating performs an upgrade of the submodules, potentially pulling
+    # breaking changes from the remaining pending merges, so unless the choice
+    # was made explicit via the flag, ask first -- once for all of them.
+    if aggregate is None:
+        names = ", ".join(repo.name for repo in to_aggregate)
+        aggregate = Confirm.ask(
+            f"Re-aggregate {names}? This may pull new changes "
+            "from the remaining pending merges",
+            default=True,
+        )
+    if not aggregate:
+        return
+    for repo in to_aggregate:
+        repo.run_aggregate()
+        repo.push_to_remote()
 
 
 # TODO: add tests
