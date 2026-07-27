@@ -15,7 +15,11 @@ from odoo_tools.exceptions import Exit, PathNotFound
 from odoo_tools.utils import pending_merge as pm_utils
 from odoo_tools.utils.config import config
 
-from .common import mock_pending_merge_repo_paths
+from .common import (
+    MockSubprocessRun,
+    assert_no_chdir,
+    mock_pending_merge_repo_paths,
+)
 
 Repo = pm_utils.Repo
 
@@ -846,6 +850,24 @@ def test_repo_push_to_remote(project):
         check=True,
         verbose=True,
     )
+
+
+def test_repo_aggregate_and_push_do_not_chdir(project):
+    """Aggregating and pushing must not change the process working directory:
+    they run concurrently, and chdir would corrupt the other threads' paths."""
+    mock_pending_merge_repo_paths("edi")
+    repo = Repo("edi", path_check=False)
+    subprocess_run = MockSubprocessRun(
+        [
+            {"args": None},  # gitaggregate
+            {"args": None},  # git remote get-url (remote_exists)
+            {"args": None},  # git push
+        ]
+    )
+    with mock.patch("subprocess.run", subprocess_run), assert_no_chdir():
+        repo.run_aggregate()
+        repo.push_to_remote(target_branch="merge-branch-1234-master-abc12345")
+    subprocess_run.assert_completed_calls()
 
 
 def _mock_clean_github_responses(

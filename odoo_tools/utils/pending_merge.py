@@ -17,7 +17,7 @@ from ..utils.misc import SmartDict, get_docker_image_commit_hashes
 from . import gh, git, ui
 from .config import config
 from .os_exec import run
-from .path import build_path, cd
+from .path import build_path
 from .proj import get_project_id, get_project_manifest_key
 from .yaml import (
     append_seq_item_with_comments,
@@ -625,8 +625,7 @@ class Repo:
                 # Sync submodule conf
                 ui.echo(f"Updating submodule conf: {opt.remote} -> {new_remote_url}")
                 git.submodule_set_url(self.path, new_remote_url, remote=opt.remote)
-            with cd(self.abs_path):
-                git.checkout(odoo_version, remote=opt.remote)
+            git.checkout(odoo_version, remote=opt.remote, cwd=self.abs_path)
         ui.echo("")
         if delete_file or ui.ask_confirmation(
             f"Delete pending merge file {self.abs_merges_path}?"

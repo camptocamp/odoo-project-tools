@@ -11,8 +11,9 @@ import pytest
 from odoo_tools.exceptions import ProjectConfigException
 from odoo_tools.utils import git as git_utils
 from odoo_tools.utils import proj as proj_utils
+from odoo_tools.utils.path import build_path, root_path
 
-from .common import MockSubprocessRun, get_fixture_path
+from .common import MockSubprocessRun, assert_no_chdir, get_fixture_path
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -512,3 +513,45 @@ class TestGetCurrentBranch:
         repo = git.Repo(".")
         repo.create_head("my-feature").checkout()
         assert git_utils.get_current_branch() == "my-feature"
+
+
+# ── working directory safety ─────────────────────────────────────────────────
+#
+# These helpers run on submodules from code that may be executed concurrently
+# (e.g. the parallel aggregation of `otools-pending clean`), so they must
+# target a repository through `cwd=` rather than chdir'ing the whole process.
+
+
+def test_checkout_runs_in_given_cwd():
+    with mock.patch("odoo_tools.utils.git.run") as mock_run, assert_no_chdir():
+        git_utils.checkout("14.0", remote="OCA", cwd="/repo")
+    assert mock_run.call_args_list == [
+        mock.call(["git", "fetch", "OCA", "14.0"], cwd="/repo"),
+        mock.call(["git", "checkout", "OCA/14.0"], cwd="/repo"),
+    ]
+
+
+def test_submodule_set_url_runs_in_project_root(project):
+    with mock.patch("odoo_tools.utils.git.run") as mock_run, assert_no_chdir():
+        git_utils.submodule_set_url("odoo/external-src/edi", "git@github.com:OCA/edi")
+    mock_run.assert_called_once_with(
+        [
+            "git",
+            "config",
+            "--file=.gitmodules",
+            "submodule.odoo/external-src/edi.url",
+            "git@github.com:OCA/edi",
+        ],
+        cwd=root_path(),
+        check=True,
+    )
+
+
+def test_set_remote_url_runs_in_submodule(project):
+    with mock.patch("odoo_tools.utils.git.run") as mock_run, assert_no_chdir():
+        git_utils.set_remote_url("odoo/external-src/edi", "git@github.com:OCA/edi")
+    mock_run.assert_called_with(
+        ["git", "remote", "set-url", "origin", "git@github.com:OCA/edi"],
+        cwd=build_path("odoo/external-src/edi"),
+        check=True,
+    )
