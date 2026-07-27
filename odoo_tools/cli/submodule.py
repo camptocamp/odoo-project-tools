@@ -152,22 +152,46 @@ def push(submodule_path, target_branch=None):
 @click.option(
     "--force-branch", default=None, help="Force checkout of a specific branch"
 )
-def upgrade(submodule_path, force_branch):
+@click.option(
+    "--clean-pending/--no-clean-pending",
+    "clean_pending",
+    is_flag=True,
+    default=True,
+    help="Purge merged PRs from the pending merges of the submodules that have"
+    " some. This is the default behavior.",
+)
+@click.option(
+    "--aggregate/--no-aggregate",
+    "aggregate",
+    is_flag=True,
+    default=True,
+    help="Rebuild the consolidation branch of the submodules that still have"
+    " pending merges. This is the default behavior. With --no-aggregate, those"
+    " submodules are skipped.",
+)
+def upgrade(submodule_path, force_branch, clean_pending, aggregate):
     """Upgrade submodules to their latest remote commit.
 
     For submodules with pending merges, purge merged PRs first and
     re-aggregate if needed.
+
+    Both behaviors can be disabled independently: with --no-clean-pending the
+    pending merges are left as they are, and with --no-aggregate the submodules
+    that still have pending merges are skipped instead of being re-aggregated.
     """
     odoo_version = proj.get_project_manifest_key("odoo_version")
     ui.warn_missing_github_token()
     with path.cd(path.root_path()):
         for submodule in git.iter_gitmodules(filter_path=submodule_path):
             repo = pm_utils.Repo(submodule.path, path_check=False)
-            if repo.has_pending_merges():
+            if repo.has_pending_merges() and clean_pending:
                 ui.echo(f"Purging merged PRs for {submodule.path}")
                 for pr in repo.purge_merged_prs():
                     ui.echo(f"  removed {pr.shortcut}")
             if repo.has_pending_merges():
+                if not aggregate:
+                    ui.echo(f"Skipping {submodule.path}: it has pending merges")
+                    continue
                 ui.echo(f"Rebuilding consolidation branch for {submodule.path}")
                 repo.rebuild_consolidation_branch(push=True)
                 continue
