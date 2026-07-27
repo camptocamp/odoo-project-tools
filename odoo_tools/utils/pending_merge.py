@@ -86,6 +86,13 @@ class PendingPR:
             "url": self.url,
         }
 
+    def remove_from_merges_file(self) -> None:
+        """Drop this pull request from its repo's pending-merges file."""
+        if self.is_patch:
+            self._repo.remove_pending_pull_from_patches(self.owner, self.pr)
+        else:
+            self._repo.remove_pending_pull(self.owner, self.pr)
+
     def enrich_with_github(self) -> None:
         """Fetch the PR's GitHub state and update this instance in place.
 
@@ -563,10 +570,7 @@ class Repo:
                 continue
             if not pr.merged:
                 continue
-            if pr.is_patch:
-                self.remove_pending_pull_from_patches(pr.owner, pr.pr)
-            else:
-                self.remove_pending_pull(pr.owner, pr.pr)
+            pr.remove_from_merges_file()
             yield pr
         if not self.has_any_pr_left():
             self._handle_empty_merges_file(delete_file=True)

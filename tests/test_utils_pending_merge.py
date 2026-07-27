@@ -848,19 +848,21 @@ def test_repo_push_to_remote(project):
     )
 
 
-def _mock_clean_github_responses(rsps, merged_prs=(773,), open_prs=(774, 663, 759)):
+def _mock_clean_github_responses(
+    rsps, repo_name="edi", merged_prs=(773,), open_prs=(774, 663, 759)
+):
     """Register GitHub API responses for the PRs of the default merges file."""
     for pull_id in merged_prs:
         rsps.add(
             responses.GET,
-            f"https://api.github.com/repos/OCA/edi/pulls/{pull_id}",
+            f"https://api.github.com/repos/OCA/{repo_name}/pulls/{pull_id}",
             json={"state": "closed", "merged": True, "number": pull_id},
             status=200,
         )
     for pull_id in open_prs:
         rsps.add(
             responses.GET,
-            f"https://api.github.com/repos/OCA/edi/pulls/{pull_id}",
+            f"https://api.github.com/repos/OCA/{repo_name}/pulls/{pull_id}",
             json={"state": "open", "merged": False, "number": pull_id},
             status=200,
         )
@@ -889,6 +891,30 @@ def test_cli_clean_prompts_for_aggregate(project, answer, aggregated):
     assert "OCA refs/pull/773/head" not in repo.merges_config()["merges"]
     assert run_aggregate.called is aggregated
     assert push_to_remote.called is aggregated
+
+
+def test_cli_clean_prompts_for_aggregate_once_for_all_repos(project):
+    """The re-aggregation question is asked once, listing every touched
+    submodule, rather than once per submodule."""
+    mock_pending_merge_repo_paths("edi")
+    mock_pending_merge_repo_paths("web")
+    with responses.RequestsMock() as rsps:
+        _mock_clean_github_responses(rsps, repo_name="edi")
+        _mock_clean_github_responses(rsps, repo_name="web")
+        with (
+            mock.patch.object(pm_utils.Repo, "run_aggregate") as run_aggregate,
+            mock.patch.object(pm_utils.Repo, "push_to_remote") as push_to_remote,
+        ):
+            result = project.invoke(
+                pending.clean_pending,
+                catch_exceptions=False,
+                input="y",
+            )
+    assert result.exit_code == 0
+    assert result.output.count("Re-aggregate") == 1
+    assert "Re-aggregate edi, web?" in result.output
+    assert run_aggregate.call_count == 2
+    assert push_to_remote.call_count == 2
 
 
 @pytest.mark.parametrize(
