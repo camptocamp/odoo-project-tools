@@ -14,7 +14,7 @@ from git_autoshare.core import find_autoshare_repository
 from . import ui
 from .config import config as proj_config
 from .os_exec import run
-from .path import build_path, cd, root_path
+from .path import build_path, root_path
 from .proj import get_odoo_version, get_project_id
 
 
@@ -339,11 +339,11 @@ def submodule_update(path: str | PathLike):
 
 
 def submodule_set_url(repo_path, url, remote="origin"):
-    with cd(root_path()):
-        run(
-            ["git", "config", "--file=.gitmodules", f"submodule.{repo_path}.url", url],
-            check=True,
-        )
+    run(
+        ["git", "config", "--file=.gitmodules", f"submodule.{repo_path}.url", url],
+        cwd=root_path(),
+        check=True,
+    )
 
 
 def set_remote_url(repo_path, url, remote="origin", add=False):
@@ -351,13 +351,12 @@ def set_remote_url(repo_path, url, remote="origin", add=False):
     cmd = ["git", "remote", "set-url", remote, url]
     if add:
         cmd = ["git", "remote", "add", remote, url]
-    with cd(build_path(repo_path)):
-        run(cmd, check=True)
+    run(cmd, cwd=build_path(repo_path), check=True)
 
 
-def checkout(branch_name, remote="origin"):
-    run(["git", "fetch", remote, branch_name])
-    run(["git", "checkout", f"{remote}/{branch_name}"])
+def checkout(branch_name, remote="origin", cwd=None):
+    run(["git", "fetch", remote, branch_name], cwd=cwd)
+    run(["git", "checkout", f"{remote}/{branch_name}"], cwd=cwd)
 
 
 def get_current_branch():

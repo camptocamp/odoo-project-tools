@@ -1,7 +1,9 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 import shutil
+from contextlib import contextmanager
 from pathlib import Path
+from unittest import mock
 
 import git
 import jinja2
@@ -23,6 +25,19 @@ def get_fixture_path(fname):
 
 def get_fixture(fname):
     return get_fixture_path(fname).read_text()
+
+
+@contextmanager
+def assert_no_chdir():
+    """Fail if the wrapped code changes the process working directory.
+
+    Anything that may run concurrently must pass ``cwd=`` to the commands it
+    runs rather than ``path.cd()``: the working directory is process-global,
+    so chdir'ing corrupts what ``root_path()`` resolves to for the other
+    threads. This guard makes such a regression fail loudly.
+    """
+    with mock.patch("os.chdir", side_effect=AssertionError("os.chdir() called")):
+        yield
 
 
 def mock_pypi_version_cache(pkg_name, version):

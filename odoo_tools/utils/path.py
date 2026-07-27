@@ -48,6 +48,13 @@ def build_path(path, from_root=True, from_file=None):
 
 @contextmanager
 def cd(path):
+    """Temporarily change the current working directory.
+
+    Beware: the working directory is process-global, so this is *not* safe to
+    use in code that may run concurrently -- it would change the directory
+    under the feet of the other threads, and with it what :func:`root_path`
+    resolves to. Pass ``cwd=`` to the command being run instead.
+    """
     prev = Path.cwd()
     os.chdir(Path(path).expanduser())
     try:
