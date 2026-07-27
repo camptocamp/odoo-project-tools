@@ -175,6 +175,94 @@ def test_push(project):
 @pytest.mark.project_setup(
     manifest=dict(odoo_version="16.0"),
     proj_version="16.0.1.2.3",
+)
+def test_sync_remote_no_pending_merges(project):
+    """A submodule without a pending-merges file is checked out on the version."""
+    new_remote_url = "git@github.com:OCA/some-repo.git"
+    mock_pending_merge_repo_paths("some-repo", src=True, pending=False)
+    mock_fn = MockSubprocessRun(
+        [
+            # set_remote_url -> submodule_set_url
+            {
+                "args": lambda args: (
+                    args[:2] == ["git", "config"] and args[-1] == new_remote_url
+                ),
+            },
+            # set_remote_url -> git remote set-url
+            {
+                "args": ["git", "remote", "set-url", "origin", new_remote_url],
+            },
+            # checkout -> git fetch
+            {
+                "args": ["git", "fetch", "origin", "16.0"],
+            },
+            # checkout -> git checkout
+            {
+                "args": ["git", "checkout", "origin/16.0"],
+            },
+        ]
+    )
+    with (
+        mock.patch("subprocess.run", mock_fn),
+        mock.patch.object(
+            submodule.pm_utils, "get_new_remote_url", return_value=new_remote_url
+        ),
+        mock.patch.object(submodule.ui, "ask_confirmation", return_value=True),
+    ):
+        result = project.invoke(
+            submodule.sync_remote,
+            ["odoo/external-src/some-repo"],
+            catch_exceptions=False,
+        )
+    assert result.exit_code == 0
+    mock_fn.assert_completed_calls()
+    assert f"is now being sourced from {new_remote_url}" in result.output
+
+
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
+)
+def test_sync_remote_with_pending_merges(project):
+    new_remote_url = "git@github.com:camptocamp/some-repo.git"
+    mock_pending_merge_repo_paths("some-repo", src=True, pending=True)
+    mock_fn = MockSubprocessRun(
+        [
+            # set_remote_url -> submodule_set_url
+            {
+                "args": lambda args: (
+                    args[:2] == ["git", "config"] and args[-1] == new_remote_url
+                ),
+            },
+            # set_remote_url -> git remote set-url
+            {
+                "args": ["git", "remote", "set-url", "origin", new_remote_url],
+            },
+        ]
+    )
+    with (
+        mock.patch("subprocess.run", mock_fn),
+        mock.patch.object(
+            submodule.pm_utils, "get_new_remote_url", return_value=new_remote_url
+        ),
+        mock.patch.object(submodule.ui, "ask_confirmation", return_value=True),
+        mock.patch.object(
+            submodule.pm_utils.Repo, "rebuild_consolidation_branch"
+        ) as mock_rebuild,
+    ):
+        result = project.invoke(
+            submodule.sync_remote,
+            ["odoo/external-src/some-repo"],
+            catch_exceptions=False,
+        )
+    assert result.exit_code == 0
+    mock_fn.assert_completed_calls()
+    mock_rebuild.assert_called_once_with(push=True)
+
+
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
     extra_files={
         ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
     },
