@@ -354,6 +354,60 @@ def test_upgrade_with_pending_merges(project):
         ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
     },
 )
+@pytest.mark.parametrize(
+    "options,expect_purge,expect_rebuild",
+    [
+        # re-aggregates without cleaning the pending merges
+        (["--no-clean-pending"], False, True),
+        # cleans the pending merges without re-aggregating
+        (["--no-aggregate"], True, False),
+        # completely ignores submodules with pending merges
+        (["--no-clean-pending", "--no-aggregate"], False, False),
+    ],
+)
+def test_upgrade_pending_merges_options(project, options, expect_purge, expect_rebuild):
+    with (
+        mock.patch.object(
+            submodule.pm_utils.Repo,
+            "has_pending_merges",
+            return_value=True,
+        ),
+        mock.patch.object(
+            submodule.pm_utils.Repo,
+            "has_any_pr_left",
+            return_value=True,
+        ),
+        mock.patch.object(
+            submodule.pm_utils.Repo, "purge_merged_prs", return_value=[]
+        ) as mock_purge,
+        mock.patch.object(
+            submodule.pm_utils.Repo, "rebuild_consolidation_branch"
+        ) as mock_rebuild,
+        mock.patch.object(submodule.git, "submodule_update") as mock_update,
+        mock.patch.object(submodule.git, "submodule_upgrade") as mock_upgrade,
+    ):
+        result = project.invoke(
+            submodule.upgrade,
+            ["odoo/external-src/account-closing", *options],
+            catch_exceptions=False,
+        )
+    assert result.exit_code == 0
+    assert mock_purge.called is expect_purge
+    assert mock_rebuild.called is expect_rebuild
+    # The submodule still has pending merges: it's never upgraded from remote.
+    mock_update.assert_not_called()
+    mock_upgrade.assert_not_called()
+    if not expect_rebuild:
+        assert "Skipping odoo/external-src/account-closing" in result.output
+
+
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
+    extra_files={
+        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
+    },
+)
 def test_upgrade_pending_merges_all_purged(project):
     # Regression test for #252: when purging removes the last pending PR,
     # purge_merged_prs() already deletes the pending-merges file. The upgrade
