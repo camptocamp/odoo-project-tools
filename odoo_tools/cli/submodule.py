@@ -109,7 +109,7 @@ def sync_remote(submodule_path=None, repo=None, force_remote=False):
     """
 
     assert submodule_path or repo
-    repo = repo or pm_utils.Repo(submodule_path)
+    repo = repo or pm_utils.Repo(submodule_path, path_check=False)
 
     new_remote_url = pm_utils.get_new_remote_url(repo=repo, force_remote=force_remote)
 
