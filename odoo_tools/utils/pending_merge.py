@@ -13,7 +13,7 @@ import requests
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from ..exceptions import PathNotFound
-from ..utils.misc import SmartDict, get_docker_image_commit_hashes
+from ..utils.misc import get_docker_image_commit_hashes
 from . import gh, git, ui
 from .config import config
 from .os_exec import run
@@ -573,64 +573,33 @@ class Repo:
             pr.remove_from_merges_file()
             yield pr
         if not self.has_any_pr_left():
-            self._handle_empty_merges_file(delete_file=True)
+            self._handle_empty_merges_file()
 
-    def _handle_empty_merges_file(self, delete_file=False):
+    def _handle_empty_merges_file(self):
+        """Reset the submodule to the upstream branch and drop the merges file.
+
+        Called once the submodule has no pending merge left: its consolidation
+        branch is not needed anymore, so the submodule goes back to tracking
+        the upstream branch of the project's Odoo version.
+        """
         odoo_version = get_project_manifest_key("odoo_version")
-        ui.echo("")
-        update_options = [
-            SmartDict(choice="9", label="no update", remote="", ref=""),
-        ]
-        default_remote = "OCA"
         avail_remotes = list(self.merges_config()["remotes"].keys())
-        if "OCA" not in avail_remotes:
-            if self.company_git_remote in avail_remotes:
-                default_remote = self.company_git_remote
-            else:
-                ui.exit_msg("No OCA or company remote found in merges config.")
-
-        for i, remote in enumerate(avail_remotes, start=1):
-            ref = f"{remote}/{odoo_version}"
-            update_options.append(
-                SmartDict(
-                    choice=str(i),
-                    label=ref,
-                    remote=remote,
-                    ref=ref,
-                    default=remote == default_remote,
-                )
-            )
-        sorted_options = sorted(update_options, key=lambda x: x.choice)
-        default_choice = next(opt for opt in sorted_options if opt.default).choice
-        msg = (
-            f"Submodule {self.name} has no pending merges. "
-            f"Choose if/how to update:\n"
-            + "\n".join([f"  {opt.choice}) {opt.label} " for opt in sorted_options])
-            + "\n"
-        )
-        if delete_file:
-            choice = default_choice
+        if "OCA" in avail_remotes:
+            remote = "OCA"
+        elif self.company_git_remote in avail_remotes:
+            remote = self.company_git_remote
         else:
-            choice = ui.ask_question(msg, default=default_choice)
-        opt = next(opt for opt in sorted_options if opt.choice == choice)
-        if opt.remote:
-            remotes = git.get_remotes(self.abs_path)
-            new_remote_url = get_new_remote_url(repo=self, force_remote=opt.remote)
-            if opt.remote not in remotes:
-                ui.echo(f"Adding missing remote: {opt.remote} -> {new_remote_url}")
-                git.set_remote_url(
-                    self.path, new_remote_url, remote=opt.remote, add=True
-                )
-            else:
-                # Sync submodule conf
-                ui.echo(f"Updating submodule conf: {opt.remote} -> {new_remote_url}")
-                git.submodule_set_url(self.path, new_remote_url, remote=opt.remote)
-            git.checkout(odoo_version, remote=opt.remote, cwd=self.abs_path)
-        ui.echo("")
-        if delete_file or ui.ask_confirmation(
-            f"Delete pending merge file {self.abs_merges_path}?"
-        ):
-            self.abs_merges_path.unlink(missing_ok=True)
+            ui.exit_msg("No OCA or company remote found in merges config.")
+        new_remote_url = get_new_remote_url(repo=self, force_remote=remote)
+        if remote not in git.get_remotes(self.abs_path):
+            ui.echo(f"Adding missing remote: {remote} -> {new_remote_url}")
+            git.set_remote_url(self.path, new_remote_url, remote=remote, add=True)
+        else:
+            # Sync submodule conf
+            ui.echo(f"Updating submodule conf: {remote} -> {new_remote_url}")
+            git.submodule_set_url(self.path, new_remote_url, remote=remote)
+        git.checkout(odoo_version, remote=remote, cwd=self.abs_path)
+        self.abs_merges_path.unlink(missing_ok=True)
 
     def push_to_remote(self, target_branch=None):
         """Push the aggregated HEAD to the company remote as ``target_branch``.
@@ -719,7 +688,7 @@ def remove_pending(entity_url, aggregate=True):
     # check if that file is useless since it has an empty `merges` section
     # if it does - drop it instead of writing a new file version
     if not repo.has_any_pr_left():
-        repo._handle_empty_merges_file(delete_file=True)
+        repo._handle_empty_merges_file()
     elif aggregate:
         repo.run_aggregate()
     return repo
