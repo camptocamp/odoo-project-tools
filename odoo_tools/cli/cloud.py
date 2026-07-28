@@ -82,9 +82,8 @@ def get_celebrimbor_dump_list(platform=None, customer=None, env="int"):
 
 
 @click.group()
-@click.option("--debug", is_flag=True)
 @global_command_decorators
-def cli(**kwargs):
+def cli():
     """Cloud platform commands."""
     pass
 
