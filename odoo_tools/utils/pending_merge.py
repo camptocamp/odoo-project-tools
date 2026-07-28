@@ -592,11 +592,11 @@ class Repo:
             ui.exit_msg("No OCA or company remote found in merges config.")
         new_remote_url = get_new_remote_url(repo=self, force_remote=remote)
         if remote not in git.get_remotes(self.abs_path):
-            ui.echo(f"Adding missing remote: {remote} -> {new_remote_url}")
+            logger.debug("Adding missing remote: %s -> %s", remote, new_remote_url)
             git.set_remote_url(self.path, new_remote_url, remote=remote, add=True)
         else:
             # Sync submodule conf
-            ui.echo(f"Updating submodule conf: {remote} -> {new_remote_url}")
+            logger.debug("Updating submodule conf: %s -> %s", remote, new_remote_url)
             git.submodule_set_url(self.path, new_remote_url, remote=remote)
         git.checkout(odoo_version, remote=remote, cwd=self.abs_path)
         self.abs_merges_path.unlink(missing_ok=True)
