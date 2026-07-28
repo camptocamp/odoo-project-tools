@@ -475,12 +475,13 @@ def test_handle_empty_merges_file_unlink_is_idempotent(project):
         mock.patch.object(
             Repo, "merges_config", return_value={"remotes": {"OCA": "url"}}
         ),
-        # "9" == "no update", so no remote/checkout git calls are triggered.
-        mock.patch.object(pm_utils.ui, "ask_question", return_value="9"),
-        mock.patch.object(pm_utils.ui, "ask_confirmation", return_value=True),
+        mock.patch.object(pm_utils, "get_new_remote_url", return_value="url"),
+        mock.patch.object(pm_utils.git, "get_remotes", return_value=["OCA"]),
+        mock.patch.object(pm_utils.git, "submodule_set_url"),
+        mock.patch.object(pm_utils.git, "checkout"),
     ):
         # The unlink must not raise FileNotFoundError for the missing file.
-        repo._handle_empty_merges_file(delete_file=False)
+        repo._handle_empty_merges_file()
 
 
 @pytest.mark.project_setup(manifest=dict(odoo_version="16.0"))

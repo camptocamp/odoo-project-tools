@@ -209,7 +209,7 @@ def clean_pending(repo_paths=(), aggregate=None):
         if repo.has_any_pr_left():
             to_aggregate.append(repo)
         else:
-            repo._handle_empty_merges_file(delete_file=True)
+            repo._handle_empty_merges_file()
     if not to_aggregate:
         return
     # Re-aggregating performs an upgrade of the submodules, potentially pulling
