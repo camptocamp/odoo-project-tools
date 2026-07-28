@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable
 from functools import wraps
 
@@ -8,6 +9,7 @@ from .minimum_version import with_minimum_version_check
 from .update_check import with_update_check
 
 __all__ = [
+    "debug_option",
     "deprecated_option",
     "handle_exceptions",
     "global_command_decorators",
@@ -15,6 +17,11 @@ __all__ = [
     "with_minimum_version_check",
     "with_update_check",
 ]
+
+#: Key under which the ``--debug`` flag is stored in the click context meta.
+#: ``Context.meta`` is shared by the whole context tree, so a nested command
+#: can read the flag whether it was passed to the group or to the command.
+DEBUG_META_KEY = "odoo_tools.debug"
 
 
 def deprecated_option(*param_decls, message: str | None = None, **kwargs):
@@ -53,17 +60,47 @@ version_option = click.version_option(
 )
 
 
+def _enable_debug(ctx, param, value):
+    """Turn debug mode on as soon as the flag is parsed.
+
+    Debug mode both shows full stack traces (see `handle_exceptions`) and
+    routes the ``odoo_tools`` debug logs to stderr. The level is raised on our
+    own logger rather than on the root one, to keep third-party debug output
+    (urllib3 & friends) out of the way.
+    """
+    ctx.meta[DEBUG_META_KEY] = value
+    if value:
+        logging.basicConfig(format="%(levelname)s %(name)s: %(message)s")
+        logging.getLogger("odoo_tools").setLevel(logging.DEBUG)
+    return value
+
+
+#: The flag is eager so that logging is ready before any other callback runs,
+#: and unexposed so that it does not reach the command callbacks, which mostly
+#: take no argument at all.
+debug_option = click.option(
+    "--debug",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=_enable_debug,
+    help="Show full stack traces and log debug messages.",
+)
+
+
 def global_command_decorators(func):
     """Apply the standard ``otools-*`` pre-invoke hooks.
 
     Bundles (in order): update-available check, project ``otools_min_version``
-    enforcement, and the ``-V`` / ``--version`` flag. Place it right above
-    ``def cli(...):`` so it wraps the callback; ``@click.group()`` /
-    ``@click.command()`` and any CLI-specific options stay where they are.
+    enforcement, the ``-V`` / ``--version`` flag and the ``--debug`` flag.
+    Place it right above ``def cli(...):`` so it wraps the callback;
+    ``@click.group()`` / ``@click.command()`` and any CLI-specific options stay
+    where they are.
     """
     func = with_update_check(func)
     func = with_minimum_version_check(func)
     func = version_option(func)
+    func = debug_option(func)
     return func
 
 
@@ -74,12 +111,13 @@ def handle_exceptions() -> Callable:
     exceptions so that the full stack trace is shown.
     Otherwise, the exception is caught and a short error message is printed.
 
-    It can be used to wrap any click.command, e.g:
+    The flag comes from `global_command_decorators`, so it only needs to wrap
+    the command itself, e.g:
 
     .. code-block:: python
 
         @click.group()
-        @click.option("--debug", is_flag=True)
+        @global_command_decorators
         def cli():
             ...
 
@@ -96,6 +134,8 @@ def handle_exceptions() -> Callable:
             debug = (
                 # If ctx is None, it may be an early stage so we treat as debug mode
                 (ctx := click.get_current_context(silent=True)) is None
+                # Set by the global `--debug` flag, wherever it was passed
+                or ctx.meta.get(DEBUG_META_KEY)
                 # Check the current context (e.g: command options)
                 or ctx.params.get("debug")
                 # Check the root context (e.g: global options)
