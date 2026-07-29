@@ -846,6 +846,28 @@ def test_cli_aggregate(project):
     assert push_to_remote.called
 
 
+def test_cli_aggregate_multiple_repos(project):
+    """`otools-pending aggregate` accepts several repos at once, aggregating
+    each of them once, and skips the ones without pending merges."""
+    mock_pending_merge_repo_paths("edi")
+    mock_pending_merge_repo_paths("web")
+    mock_pending_merge_repo_paths("stock", pending=False)
+    with (
+        mock.patch.object(pm_utils.Repo, "run_aggregate") as run_aggregate,
+        mock.patch.object(pm_utils.Repo, "push_to_remote") as push_to_remote,
+    ):
+        result = project.invoke(
+            pending.aggregate,
+            ["edi", "odoo/external-src/web", "stock", "edi"],
+            catch_exceptions=False,
+        )
+    assert result.exit_code == 0
+    assert "Warning: stock has no pending merges, skipping." in result.output
+    # edi is given twice but aggregated once, stock is left out
+    assert run_aggregate.call_count == 2
+    assert push_to_remote.call_count == 2
+
+
 @pytest.mark.parametrize("repo_path", ["edi", "odoo/external-src/edi"])
 def test_cli_aggregate_repo_without_pending_merges(project, repo_path):
     """A repo without a pending-merges file has nothing to aggregate: it is
