@@ -28,10 +28,27 @@ def cli():
     pass
 
 
-def _resolve_repos(repo_paths, path_check=True):
+def _resolve_repos(repo_paths):
+    """Return the repos with a pending-merges file, among ``repo_paths`` if given.
+
+    Each given repo can be designated either by its path or by its name.
+    """
+    pending_repos = pm_utils.Repo.repositories_from_pending_folder(path_check=False)
     if not repo_paths:
-        return pm_utils.Repo.repositories_from_pending_folder(path_check=path_check)
-    return [pm_utils.Repo(repo_path, path_check=path_check) for repo_path in repo_paths]
+        return pending_repos
+    pending_repos_by_path = {repo.path: repo for repo in pending_repos}
+    repos = {}
+    for repo_path in repo_paths:
+        # Accept both a bare repo name and a submodule path
+        path = pm_utils.Repo(repo_path, path_check=False).path
+        if path not in pending_repos_by_path:
+            ui.err_console.print(
+                f"Warning: {repo_path} has no pending merges, skipping.",
+                style="yellow",
+            )
+            continue
+        repos[path] = pending_repos_by_path[path]
+    return list(repos.values())
 
 
 @cli.command(name="show")
@@ -61,7 +78,7 @@ def _resolve_repos(repo_paths, path_check=True):
 )
 def show_pending(repo_paths=(), check=True, as_json=False):
     """List pull requests on <repo_path>."""
-    repos = _resolve_repos(repo_paths, path_check=False)
+    repos = _resolve_repos(repo_paths)
     all_prs = [pr for repo in repos for pr in repo._iter_pending_pull_requests()]
     if check:
         ui.warn_missing_github_token()
@@ -247,10 +264,10 @@ def clean_pending(repo_paths=(), aggregate=None):
 )
 def aggregate(repo_path, target_branch=None, push=None):
     """Perform a git aggregation on <repo_path>."""
-    repo = pm_utils.Repo(repo_path)
-    repo.run_aggregate()
-    if push:
-        repo.push_to_remote(target_branch=target_branch)
+    for repo in _resolve_repos([repo_path]):
+        repo.run_aggregate()
+        if push:
+            repo.push_to_remote(target_branch=target_branch)
 
 
 @cli.command(name="add")
