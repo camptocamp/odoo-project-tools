@@ -834,6 +834,34 @@ def test_repo_run_aggregate_runs_gitaggregate_cli(project):
     )
 
 
+def test_cli_aggregate(project):
+    mock_pending_merge_repo_paths("edi")
+    with (
+        mock.patch.object(pm_utils.Repo, "run_aggregate") as run_aggregate,
+        mock.patch.object(pm_utils.Repo, "push_to_remote") as push_to_remote,
+    ):
+        result = project.invoke(pending.aggregate, ["edi"], catch_exceptions=False)
+    assert result.exit_code == 0
+    assert run_aggregate.called
+    assert push_to_remote.called
+
+
+@pytest.mark.parametrize("repo_path", ["edi", "odoo/external-src/edi"])
+def test_cli_aggregate_repo_without_pending_merges(project, repo_path):
+    """A repo without a pending-merges file has nothing to aggregate: it is
+    reported and skipped instead of blowing up."""
+    mock_pending_merge_repo_paths("edi", pending=False)
+    with (
+        mock.patch.object(pm_utils.Repo, "run_aggregate") as run_aggregate,
+        mock.patch.object(pm_utils.Repo, "push_to_remote") as push_to_remote,
+    ):
+        result = project.invoke(pending.aggregate, [repo_path], catch_exceptions=False)
+    assert result.exit_code == 0
+    assert f"Warning: {repo_path} has no pending merges, skipping." in result.output
+    assert not run_aggregate.called
+    assert not push_to_remote.called
+
+
 def test_repo_push_to_remote(project):
     mock_pending_merge_repo_paths("edi")
     repo = Repo("edi", path_check=False)

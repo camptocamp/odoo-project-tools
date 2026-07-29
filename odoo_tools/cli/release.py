@@ -181,11 +181,7 @@ def _push_aggregated_branches(version=None, force=False):
             "Your repository has local changes, are you sure you want to continue?"
         )
     company_git_remote = config.company_git_remote
-    repos = [
-        repo
-        for repo in Repo.repositories_from_pending_folder()
-        if repo.has_pending_merges()
-    ]
+    repos = Repo.repositories_from_pending_folder()
     if not repos:
         ui.echo("No repo to push")
         return
