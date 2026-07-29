@@ -246,9 +246,8 @@ def clean_pending(repo_paths=(), aggregate=None):
         repo.push_to_remote()
 
 
-# TODO: add tests
 @cli.command(name="aggregate")
-@click.argument("repo_path")
+@click.argument("repo_paths", nargs=-1, required=True)
 @click.option(
     "-t",
     "--target-branch",
@@ -262,9 +261,9 @@ def clean_pending(repo_paths=(), aggregate=None):
     default=True,
     help="push the result of the aggregation to a remote branch",
 )
-def aggregate(repo_path, target_branch=None, push=None):
-    """Perform a git aggregation on <repo_path>."""
-    for repo in _resolve_repos([repo_path]):
+def aggregate(repo_paths, target_branch=None, push=None):
+    """Perform a git aggregation on each <repo_path>."""
+    for repo in _resolve_repos(repo_paths):
         repo.run_aggregate()
         if push:
             repo.push_to_remote(target_branch=target_branch)
