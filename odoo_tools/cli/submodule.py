@@ -181,6 +181,8 @@ def upgrade(submodule_path, force_branch, clean_pending, aggregate):
     """
     odoo_version = proj.get_project_manifest_key("odoo_version")
     ui.warn_missing_github_token()
+    # Resolved lazily on the first push, then reused for the other submodules.
+    target_branch = None
     with path.cd(path.root_path()):
         for submodule in git.iter_gitmodules(filter_path=submodule_path):
             repo = pm_utils.Repo(submodule.path, path_check=False)
@@ -193,7 +195,10 @@ def upgrade(submodule_path, force_branch, clean_pending, aggregate):
                     ui.echo(f"Skipping {submodule.path}: it has pending merges")
                     continue
                 ui.echo(f"Rebuilding consolidation branch for {submodule.path}")
-                repo.rebuild_consolidation_branch(push=True)
+                target_branch = target_branch or pm_utils.gh.get_target_branch()
+                repo.rebuild_consolidation_branch(
+                    push=True, target_branch=target_branch
+                )
                 continue
             # No pending merges: upgrade to latest remote
             branch = force_branch

@@ -424,6 +424,9 @@ def test_upgrade_with_pending_merges(project):
         mock.patch.object(
             submodule.pm_utils.Repo, "rebuild_consolidation_branch"
         ) as mock_rebuild,
+        mock.patch.object(
+            submodule.pm_utils.gh, "get_target_branch", return_value="merge-branch"
+        ),
     ):
         result = project.invoke(
             submodule.upgrade,
@@ -432,7 +435,86 @@ def test_upgrade_with_pending_merges(project):
         )
     assert result.exit_code == 0
     mock_purge.assert_called_once_with()
-    mock_rebuild.assert_called_once_with(push=True)
+    mock_rebuild.assert_called_once_with(push=True, target_branch="merge-branch")
+
+
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
+    extra_files={
+        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
+    },
+)
+def test_upgrade_pending_merges_target_branch_resolved_once(project):
+    # The target branch depends on the project and its HEAD only, so it must be
+    # resolved once and reused, otherwise get_target_branch() asks to confirm
+    # the override once per submodule with pending merges.
+    with (
+        mock.patch.object(
+            submodule.pm_utils.Repo,
+            "has_pending_merges",
+            return_value=True,
+        ),
+        mock.patch.object(
+            submodule.pm_utils.Repo,
+            "has_any_pr_left",
+            return_value=True,
+        ),
+        mock.patch.object(submodule.pm_utils.Repo, "purge_merged_prs", return_value=[]),
+        mock.patch.object(
+            submodule.pm_utils.Repo, "rebuild_consolidation_branch"
+        ) as mock_rebuild,
+        mock.patch.object(
+            submodule.pm_utils.gh, "get_target_branch", return_value="merge-branch"
+        ) as mock_get_target_branch,
+    ):
+        result = project.invoke(
+            submodule.upgrade,
+            [],
+            catch_exceptions=False,
+        )
+    assert result.exit_code == 0
+    mock_get_target_branch.assert_called_once_with()
+    # The fixture has 2 submodules: both are re-aggregated with the same branch.
+    assert mock_rebuild.call_args_list == [
+        mock.call(push=True, target_branch="merge-branch"),
+        mock.call(push=True, target_branch="merge-branch"),
+    ]
+
+
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
+    extra_files={
+        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
+    },
+)
+def test_upgrade_no_aggregate_never_resolves_target_branch(project):
+    # Nothing gets re-aggregated: the target branch must never be resolved, so
+    # that such a run never asks to confirm a branch override.
+    with (
+        mock.patch.object(
+            submodule.pm_utils.Repo,
+            "has_pending_merges",
+            return_value=True,
+        ),
+        mock.patch.object(
+            submodule.pm_utils.Repo,
+            "has_any_pr_left",
+            return_value=True,
+        ),
+        mock.patch.object(submodule.pm_utils.Repo, "purge_merged_prs", return_value=[]),
+        mock.patch.object(
+            submodule.pm_utils.gh, "get_target_branch"
+        ) as mock_get_target_branch,
+    ):
+        result = project.invoke(
+            submodule.upgrade,
+            ["--no-aggregate"],
+            catch_exceptions=False,
+        )
+    assert result.exit_code == 0
+    mock_get_target_branch.assert_not_called()
 
 
 @pytest.mark.project_setup(
@@ -471,6 +553,9 @@ def test_upgrade_pending_merges_options(project, options, expect_purge, expect_r
         mock.patch.object(
             submodule.pm_utils.Repo, "rebuild_consolidation_branch"
         ) as mock_rebuild,
+        mock.patch.object(
+            submodule.pm_utils.gh, "get_target_branch", return_value="merge-branch"
+        ),
         mock.patch.object(submodule.git, "submodule_update") as mock_update,
         mock.patch.object(submodule.git, "submodule_upgrade") as mock_upgrade,
     ):

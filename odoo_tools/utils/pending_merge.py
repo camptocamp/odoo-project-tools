@@ -621,10 +621,10 @@ class Repo:
             verbose=True,
         )
 
-    def rebuild_consolidation_branch(self, push=False):
+    def rebuild_consolidation_branch(self, push=False, target_branch=None):
         self.run_aggregate()
         if push:
-            self.push_to_remote()
+            self.push_to_remote(target_branch=target_branch)
 
 
 def add_pending(entity_url, aggregate=True, patch=False, push=True):
