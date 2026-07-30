@@ -7,10 +7,10 @@ import click
 from git import Repo as GitRepo
 from rich.console import Console
 from rich.live import Live
-from rich.markup import escape
 from rich.prompt import Confirm
 from rich.spinner import Spinner
 from rich.table import Table
+from rich.text import Text
 
 from ..exceptions import ProjectConfigException
 from ..utils import gh, ui
@@ -186,20 +186,25 @@ def _push_aggregated_branches(version=None, force=False):
         ui.echo("No repo to push")
         return
     states = {}  # repo -> "done" | error message
+    # Shared by every row: a new one per rebuild would restart the animation
+    spinner = Spinner("dots")
 
     def build_grid():
         grid = Table.grid(padding=(0, 1))
         grid.add_column(no_wrap=True)  # state dot / spinner
-        grid.add_column(no_wrap=True, overflow="ellipsis")  # repo + outcome
+        grid.add_column()  # repo + outcome
         for repo in repos:
             state = states.get(repo)
-            path = repo.path.as_posix()
+            outcome = Text(repo.path.as_posix(), no_wrap=True, overflow="ellipsis")
             if state is None:
-                grid.add_row(Spinner("dots"), path)
+                state_cell = spinner
             elif state == "done":
-                grid.add_row("[green]●[/]", f"{path} [green]pushed {branch_name}[/]")
+                state_cell = "[green]●[/]"
+                outcome.append(f" pushed {branch_name}", style="green")
             else:
-                grid.add_row("[red]?[/]", f"{path} [red]{escape(state)}[/]")
+                state_cell = "[red]?[/]"
+                outcome.append(f" {state}", style="red")
+            grid.add_row(state_cell, outcome)
         return grid
 
     with (
