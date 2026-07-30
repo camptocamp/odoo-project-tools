@@ -282,14 +282,19 @@ def test_bump_push_repo_with_pending_merge(project):
             ["minor", "--no-commit", "--no-tag"],
             catch_exceptions=False,
             input="y",
+            # Narrow enough that the grid rows overflow
+            env={"COLUMNS": "60"},
         )
     assert result.exit_code == 0
     assert ran_cmd == [
         "git config remote.camptocamp.url",
         "git push -f -v camptocamp HEAD:refs/heads/merge-branch-1234-14.0.0.2.0",
     ]
-    # the pushed repo shows up in the live progress grid
-    assert "edi-framework" in result.output
+    # the pushed repo shows up in the live progress grid, keeping its state
+    # indicator: an overflowing row must ellipsize instead of squeezing it out
+    assert "● odoo/external-src/edi-framework pushed merge-branch-1234-…" in (
+        result.output
+    )
 
 
 def test_get_new_release_notes(tmp_path):
