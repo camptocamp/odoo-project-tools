@@ -9,11 +9,13 @@ from .minimum_version import with_minimum_version_check
 from .update_check import with_update_check
 
 __all__ = [
+    "DEFAULT_MAX_WORKERS",
     "debug_option",
     "deprecated_option",
     "handle_exceptions",
     "global_command_decorators",
     "is_debug",
+    "jobs_option",
     "version_option",
     "with_minimum_version_check",
     "with_update_check",
@@ -82,6 +84,21 @@ def deprecated_option(*param_decls, message: str | None = None, **kwargs):
 
 version_option = click.version_option(
     __version__, "-V", "--version", package_name="odoo-tools"
+)
+
+#: How much concurrency this project considers reasonable, by default.
+DEFAULT_MAX_WORKERS = 8
+
+#: Shared ``--jobs`` option for the commands that fan their work out over a
+#: thread pool. Pass it as ``max_workers``; ``--jobs 1`` runs everything
+#: sequentially, which is handy to get readable output or to debug a failure.
+jobs_option = click.option(
+    "--jobs",
+    "jobs",
+    type=click.IntRange(min=1),
+    default=DEFAULT_MAX_WORKERS,
+    show_default=True,
+    help="Number of operations to run in parallel.",
 )
 
 

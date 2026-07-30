@@ -14,7 +14,7 @@ from rich.text import Text
 
 from ..exceptions import ProjectConfigException
 from ..utils import gh, ui
-from ..utils.click import global_command_decorators
+from ..utils.click import DEFAULT_MAX_WORKERS, global_command_decorators, jobs_option
 from ..utils.config import config
 from ..utils.git import get_current_branch, tag_signing_enabled
 from ..utils.marabunta import MarabuntaFileHandler
@@ -167,12 +167,14 @@ def _push_repo_branch(repo, branch_name, company_git_remote):
     )
 
 
-def _push_aggregated_branches(version=None, force=False):
+def _push_aggregated_branches(
+    version=None, force=False, max_workers=DEFAULT_MAX_WORKERS
+):
     """Push the local aggregated (pending-merge) branches to the company remote.
 
     The branch name is composed of the project id and the version number. It is
     done when closing a release, so a new patch branch can be rebuilt from the
-    same commits if required. Repos are pushed in parallel.
+    same commits if required. Repos are pushed ``max_workers`` at a time.
     """
     version = version or get_current_version()
     branch_name = make_merge_branch_name(version)
@@ -209,7 +211,7 @@ def _push_aggregated_branches(version=None, force=False):
 
     with (
         Live(build_grid(), console=console, refresh_per_second=10) as live,
-        ThreadPoolExecutor(max_workers=8) as pool,
+        ThreadPoolExecutor(max_workers=max_workers) as pool,
     ):
         futures = {
             pool.submit(_push_repo_branch, repo, branch_name, company_git_remote): repo
@@ -254,12 +256,14 @@ def cli():
     default=None,
     help="Push the aggregated (pending-merge) branches to upstream.",
 )
+@jobs_option
 def bump(
     rel_type,
     new_version=None,
     do_commit=None,
     do_tag=None,
     push_aggregated_branches=None,
+    jobs=DEFAULT_MAX_WORKERS,
 ):
     """Prepare a new release"""
     # --tag requires --commit (only the explicit conflict is an error here;
@@ -289,7 +293,7 @@ def bump(
             "Push aggregated branches?", default=True
         )
     if push_aggregated_branches:
-        _push_aggregated_branches(version=new_version, force=True)
+        _push_aggregated_branches(version=new_version, force=True, max_workers=jobs)
     # Resolve the commit decision now that the release files are ready to review
     if do_commit is None:
         do_commit = Confirm.ask("Create the release commit?", default=True)

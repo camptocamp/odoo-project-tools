@@ -15,7 +15,12 @@ from rich.text import Text
 
 from ..utils import pending_merge as pm_utils
 from ..utils import ui
-from ..utils.click import deprecated_option, global_command_decorators
+from ..utils.click import (
+    DEFAULT_MAX_WORKERS,
+    deprecated_option,
+    global_command_decorators,
+    jobs_option,
+)
 
 console = Console()
 
@@ -71,12 +76,13 @@ def _resolve_repos(repo_paths):
     default=False,
     help="Output as JSON",
 )
+@jobs_option
 @deprecated_option(
     "--purge",
     message="`--purge` has been removed from `otools-pending show`. "
     "Use `otools-pending clean` instead.",
 )
-def show_pending(repo_paths=(), check=True, as_json=False):
+def show_pending(repo_paths=(), check=True, as_json=False, jobs=DEFAULT_MAX_WORKERS):
     """List pull requests on <repo_path>."""
     repos = _resolve_repos(repo_paths)
     all_prs = [pr for repo in repos for pr in repo._iter_pending_pull_requests()]
@@ -89,7 +95,7 @@ def show_pending(repo_paths=(), check=True, as_json=False):
     # In case of --json, output directly
     if as_json:
         if check:
-            with ThreadPoolExecutor(max_workers=8) as pool:
+            with ThreadPoolExecutor(max_workers=jobs) as pool:
                 futures = {pool.submit(pr.enrich_with_github): pr for pr in all_prs}
                 for future in as_completed(futures):
                     try:
@@ -134,7 +140,7 @@ def show_pending(repo_paths=(), check=True, as_json=False):
     if check and all_prs:
         with (
             Live(build_grid(), console=console, refresh_per_second=10) as live,
-            ThreadPoolExecutor(max_workers=8) as pool,
+            ThreadPoolExecutor(max_workers=jobs) as pool,
         ):
             futures = {pool.submit(pr.enrich_with_github): pr for pr in all_prs}
             for future in as_completed(futures):
@@ -162,7 +168,8 @@ def show_pending(repo_paths=(), check=True, as_json=False):
     help="Run git aggregate (and push) on each touched repo after purging. "
     "If not set, you will be prompted once.",
 )
-def clean_pending(repo_paths=(), aggregate=None):
+@jobs_option
+def clean_pending(repo_paths=(), aggregate=None, jobs=DEFAULT_MAX_WORKERS):
     """Remove merged pull requests from pending-merge files."""
     repos = _resolve_repos(repo_paths)
     all_prs = [pr for repo in repos for pr in repo._iter_pending_pull_requests()]
@@ -209,7 +216,7 @@ def clean_pending(repo_paths=(), aggregate=None):
     # (so concurrent yaml edits stay race-free).
     with (
         Live(build_grid(), console=console, refresh_per_second=10) as live,
-        ThreadPoolExecutor(max_workers=8) as pool,
+        ThreadPoolExecutor(max_workers=jobs) as pool,
     ):
         futures = {pool.submit(pr.enrich_with_github): pr for pr in all_prs}
         for future in as_completed(futures):
