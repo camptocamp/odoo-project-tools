@@ -8,10 +8,10 @@ import arrow
 import click
 from rich.console import Console
 from rich.live import Live
-from rich.markup import escape
 from rich.prompt import Confirm
 from rich.spinner import Spinner
 from rich.table import Table
+from rich.text import Text
 
 from ..utils import pending_merge as pm_utils
 from ..utils import ui
@@ -84,6 +84,8 @@ def show_pending(repo_paths=(), check=True, as_json=False):
         ui.warn_missing_github_token()
     # ids of PRs whose enrichment failed -> error message
     errors: dict[int, str] = {}
+    # Shared by every row: a new one per rebuild would restart the animation
+    spinner = Spinner("dots")
     # In case of --json, output directly
     if as_json:
         if check:
@@ -103,22 +105,23 @@ def show_pending(repo_paths=(), check=True, as_json=False):
         grid.add_column(no_wrap=True)  # state dot / spinner
         grid.add_column(no_wrap=True)  # shortcut (linked)
         grid.add_column(no_wrap=True, style="dim")  # patch marker
-        grid.add_column(no_wrap=True, overflow="ellipsis")  # title
+        grid.add_column()  # title
         grid.add_column(no_wrap=True, justify="right", style="dim")  # last updated
         for pr in all_prs:
             if not check:
                 state_cell, updated, title = "-", "", ""
             elif id(pr) in errors:
-                state_cell = "[red]?[/]"
-                updated = ""
-                title = f"[red]{escape(errors[id(pr)])}[/]"
+                state_cell, updated = "[red]?[/]", ""
+                title = Text(
+                    errors[id(pr)], style="red", no_wrap=True, overflow="ellipsis"
+                )
             elif not pr.is_enriched:
-                state_cell, updated, title = Spinner("dots"), "", ""
+                state_cell, updated, title = spinner, "", ""
             else:
                 state = "merged" if pr.merged else pr.state
                 state_cell = f"[{PR_STATE_STYLES.get(state, 'white')}]●[/]"
                 updated = arrow.get(pr.updated_at).humanize() if pr.updated_at else ""
-                title = pr.title or ""
+                title = Text(pr.title or "", no_wrap=True, overflow="ellipsis")
             grid.add_row(
                 state_cell,
                 f"[link={pr.url}]{pr.shortcut}[/link]",
@@ -170,23 +173,27 @@ def clean_pending(repo_paths=(), aggregate=None):
     removed: set[int] = set()  # ids of PRs removed from their merges file
     # ids of PRs whose enrichment failed -> error message
     errors: dict[int, str] = {}
+    # Shared by every row: a new one per rebuild would restart the animation
+    spinner = Spinner("dots")
 
     def build_grid():
         grid = Table.grid(padding=(0, 1))
         grid.add_column(no_wrap=True)  # state dot / spinner
         grid.add_column(no_wrap=True)  # shortcut (linked)
         grid.add_column(no_wrap=True, style="dim")  # patch marker
-        grid.add_column(no_wrap=True, overflow="ellipsis")  # outcome
+        grid.add_column()  # outcome
         for pr in all_prs:
             if id(pr) in errors:
                 state_cell = "[red]?[/]"
-                outcome = f"[red]{escape(errors[id(pr)])}[/]"
+                outcome = Text(
+                    errors[id(pr)], style="red", no_wrap=True, overflow="ellipsis"
+                )
             elif not pr.is_enriched:
-                state_cell, outcome = Spinner("dots"), ""
+                state_cell, outcome = spinner, ""
             elif id(pr) in removed:
                 state = "merged" if pr.merged else pr.state
                 state_cell = f"[{PR_STATE_STYLES.get(state, 'white')}]●[/]"
-                outcome = "[green]removed[/]"
+                outcome = Text("removed", style="green")
             else:
                 continue  # enriched but not removed — nothing to do here
             grid.add_row(
