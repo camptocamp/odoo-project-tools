@@ -13,6 +13,7 @@ __all__ = [
     "deprecated_option",
     "handle_exceptions",
     "global_command_decorators",
+    "is_debug",
     "version_option",
     "with_minimum_version_check",
     "with_update_check",
@@ -22,6 +23,30 @@ __all__ = [
 #: ``Context.meta`` is shared by the whole context tree, so a nested command
 #: can read the flag whether it was passed to the group or to the command.
 DEBUG_META_KEY = "odoo_tools.debug"
+
+
+def is_debug() -> bool:
+    """Tell whether debug mode is currently on.
+
+    Debug mode shows full stack traces (see `handle_exceptions`) and routes the
+    ``odoo_tools`` debug logs to stderr.
+
+    With no click context at all, debug mode is reported: we are then running
+    outside of a command, early enough that the flag could not have been parsed
+    yet, and being verbose about whatever goes wrong is the more useful default
+    there.
+    """
+    ctx = click.get_current_context(silent=True)
+    if ctx is None:
+        return True
+    return bool(
+        # Set by the global `--debug` flag, wherever it was passed
+        ctx.meta.get(DEBUG_META_KEY)
+        # Check the current context (e.g: command options)
+        or ctx.params.get("debug")
+        # Check the root context (e.g: global options)
+        or ctx.find_root().params.get("debug")
+    )
 
 
 def deprecated_option(*param_decls, message: str | None = None, **kwargs):
@@ -131,18 +156,8 @@ def handle_exceptions() -> Callable:
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            debug = (
-                # If ctx is None, it may be an early stage so we treat as debug mode
-                (ctx := click.get_current_context(silent=True)) is None
-                # Set by the global `--debug` flag, wherever it was passed
-                or ctx.meta.get(DEBUG_META_KEY)
-                # Check the current context (e.g: command options)
-                or ctx.params.get("debug")
-                # Check the root context (e.g: global options)
-                or ctx.find_root().params.get("debug")
-            )
             # If debug mode is enabled, run the function without catching exceptions
-            if debug:
+            if is_debug():
                 return func(*args, **kwargs)
             # Otherwise, catch the exception and print a short error message
             try:

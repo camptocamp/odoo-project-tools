@@ -6,7 +6,11 @@ import logging
 import click
 import pytest
 
-from odoo_tools.utils.click import global_command_decorators, handle_exceptions
+from odoo_tools.utils.click import (
+    global_command_decorators,
+    handle_exceptions,
+    is_debug,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -44,7 +48,41 @@ def cli():
     def boom():
         raise ValueError("kaboom")
 
+    @cli.command()
+    def probe():
+        click.echo(f"debug={is_debug()}")
+
     return cli
+
+
+def test_is_debug_without_a_context():
+    """Outside of any command the flag could not have been parsed yet."""
+    assert is_debug() is True
+
+
+def test_is_debug_is_false_by_default(cli, runner):
+    result = runner.invoke(cli, ["probe"], catch_exceptions=False)
+    assert result.exit_code == 0
+    assert "debug=False" in result.output
+
+
+def test_is_debug_reads_the_global_flag(cli, runner):
+    result = runner.invoke(cli, ["--debug", "probe"], catch_exceptions=False)
+    assert result.exit_code == 0
+    assert "debug=True" in result.output
+
+
+def test_is_debug_reads_a_command_option(runner):
+    """A command exposing its own `debug` param is honoured too."""
+
+    @click.command()
+    @click.option("--debug", is_flag=True)
+    def probe(debug):
+        click.echo(f"debug={is_debug()}")
+
+    result = runner.invoke(probe, ["--debug"], catch_exceptions=False)
+    assert result.exit_code == 0
+    assert "debug=True" in result.output
 
 
 def test_debug_option_is_available(cli, runner):
