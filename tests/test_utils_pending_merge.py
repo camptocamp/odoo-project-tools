@@ -713,33 +713,110 @@ def test_remove_pending_patch_v1():
 @pytest.mark.usefixtures("project")
 @pytest.mark.project_setup(proj_tmpl_ver=1)
 def test_add_pending_pull_request_patch():
+    """A patch is appended at the end of `shell_command_after`, either from a
+    `.patch` URL or with `patch=True`, with its PR title and URL on the comment
+    lines above it, just like a regular pending merge."""
     name = "edi"
-    tmpl = """
-    ../{ext_src_rel_path}/{repo_name}:
-        remotes:
-            camptocamp: git@github.com:camptocamp/{repo_name}.git
-            {org_name}: git@github.com:{org_name}/{repo_name}.git
-        target: camptocamp merge-branch-{pid}-master
-        merges:
-        - {org_name} 14.0
-        shell_command_after:
-        - curl -sSL https://github.com/OCA/edi/pull/1469.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'"
-    """
+    tmpl = """\
+../{ext_src_rel_path}/{repo_name}:
+  remotes:
+    camptocamp: git@github.com:camptocamp/{repo_name}.git
+    {org_name}: git@github.com:{org_name}/{repo_name}.git
+  target: camptocamp merge-branch-{pid}-master
+  merges:
+    - {org_name} 14.0
+  shell_command_after:
+    # [14.0] [FIX] edi: fix 1469
+    # https://github.com/OCA/edi/pull/1469
+    - curl -sSL https://github.com/OCA/edi/pull/1469.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
+"""
     mock_pending_merge_repo_paths(name, tmpl=tmpl)
     repo = Repo(name, path_check=False)
-    pm_utils.add_pending(
-        "https://github.com/OCA/edi/pull/1470.patch",
-        aggregate=False,
+    with responses.RequestsMock() as rsps:
+        for pid in (1470, 1471):
+            rsps.add(
+                responses.GET,
+                f"https://api.github.com/repos/OCA/edi/pulls/{pid}",
+                json={
+                    "title": f"[14.0] [FIX] edi: fix {pid}",
+                    "html_url": f"https://github.com/OCA/edi/pull/{pid}",
+                    # match the project's odoo_version so no divergent-branch prompt
+                    "base": {"ref": "14.0"},
+                },
+                status=200,
+            )
+        pm_utils.add_pending(
+            "https://github.com/OCA/edi/pull/1470.patch",
+            aggregate=False,
+        )
+        pm_utils.add_pending(
+            "https://github.com/OCA/edi/pull/1471",
+            patch=True,
+            aggregate=False,
+        )
+    expected = dedent(
+        """\
+        ../odoo/external-src/edi:
+          remotes:
+            camptocamp: git@github.com:camptocamp/edi.git
+            OCA: git@github.com:OCA/edi.git
+          target: camptocamp merge-branch-1234-master
+          merges:
+            - OCA 14.0
+          shell_command_after:
+            # [14.0] [FIX] edi: fix 1469
+            # https://github.com/OCA/edi/pull/1469
+            - curl -sSL https://github.com/OCA/edi/pull/1469.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
+            # [14.0] [FIX] edi: fix 1470
+            # https://github.com/OCA/edi/pull/1470
+            - curl -sSL https://github.com/OCA/edi/pull/1470.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
+            # [14.0] [FIX] edi: fix 1471
+            # https://github.com/OCA/edi/pull/1471
+            - curl -sSL https://github.com/OCA/edi/pull/1471.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
+        """
     )
-    pm_utils.add_pending(
-        "https://github.com/OCA/edi/pull/1471",
-        patch=True,
-        aggregate=False,
+    assert repo.abs_merges_path.read_text() == expected
+
+
+@pytest.mark.usefixtures("project")
+@pytest.mark.project_setup(proj_tmpl_ver=1)
+def test_add_pending_pull_request_patch_without_title_no_comment():
+    """When the GitHub call fails, the patch is still appended at the end but
+    with no comment block (graceful degradation)."""
+    name = "edi"
+    tmpl = """\
+../{ext_src_rel_path}/{repo_name}:
+  remotes:
+    camptocamp: git@github.com:camptocamp/{repo_name}.git
+    {org_name}: git@github.com:{org_name}/{repo_name}.git
+  target: camptocamp merge-branch-{pid}-master
+  merges:
+    - {org_name} 14.0
+"""
+    mock_pending_merge_repo_paths(name, tmpl=tmpl)
+    repo = Repo(name, path_check=False)
+    with responses.RequestsMock() as rsps:
+        rsps.add(
+            responses.GET,
+            "https://api.github.com/repos/OCA/edi/pulls/1470",
+            json={"message": "Not Found"},
+            status=404,
+        )
+        repo.add_pending_pull_request("OCA", "1470", patch=True)
+    expected = dedent(
+        """\
+        ../odoo/external-src/edi:
+          remotes:
+            camptocamp: git@github.com:camptocamp/edi.git
+            OCA: git@github.com:OCA/edi.git
+          target: camptocamp merge-branch-1234-master
+          merges:
+            - OCA 14.0
+          shell_command_after:
+            - curl -sSL https://github.com/OCA/edi/pull/1470.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
+        """
     )
-    shell_command_after = repo.merges_config().get("shell_command_after", [])
-    line_tmpl = "curl -sSL https://github.com/OCA/edi/pull/{}.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'"
-    for pid in (1470, 1471):
-        assert line_tmpl.format(pid) in shell_command_after, shell_command_after
+    assert repo.abs_merges_path.read_text() == expected
 
 
 def test_cli_add_multiple_urls(project):

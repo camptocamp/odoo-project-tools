@@ -506,6 +506,41 @@ class TestAppendSeqItemWithComments:
         expected = "items:\n- a\n    # title\n- b\n"
         assert result == expected
 
+    def test_append_keeps_leading_comment_indentation(self):
+        """The block comment above the *first* item keeps its indentation: it is
+        the only one whose column ruamel stores on the token's mark rather than
+        inside its value, so it has to be restored by hand."""
+        src = dedent(
+            """\
+            pending:
+              items:
+                # comment for a
+                - a
+            """
+        )
+        loader = YAML()
+        loader.indent(mapping=2, sequence=4, offset=2)
+        data = loader.load(src)
+        append_seq_item_with_comments(
+            data["pending"]["items"],
+            "b",
+            comment=["comment for b"],
+            comment_indent="    ",
+        )
+        buf = io.StringIO()
+        loader.dump(data, buf)
+        expected = dedent(
+            """\
+            pending:
+              items:
+                # comment for a
+                - a
+                # comment for b
+                - b
+            """
+        )
+        assert buf.getvalue() == expected
+
     def test_append_without_comment_unchanged(self):
         """``comment=None`` still appends with no comment block."""
         src = dedent(

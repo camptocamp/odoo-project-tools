@@ -10,6 +10,11 @@ from ruamel.yaml.tokens import CommentToken
 
 yaml = YAML()
 
+# Never fold long scalars: the `curl ... | git am` patch commands of the
+# pending-merges files are way past the default width, and wrapping them
+# rewrites lines we did not touch, for a noisy diff.
+yaml.width = 2**16
+
 
 def yaml_load(stream):
     return yaml.load(stream)
@@ -64,7 +69,15 @@ def _normalize_seq_comments(seq):
             above[i + 1] = rest
     start = seq.ca.comment
     if start and start[1]:
-        above[0] = "".join(token.value for token in start[1] if token is not None)
+        # Unlike the per-item tokens, whose block part carries its own
+        # indentation inside the value, a start comment holds the plain ``#``
+        # line and keeps its column in the token's mark: bring it back into the
+        # value so the block is rebuilt at the same indentation.
+        above[0] = "".join(
+            " " * token.start_mark.column + token.value
+            for token in start[1]
+            if token is not None
+        )
     return eol, above
 
 

@@ -100,15 +100,9 @@ class PendingPR:
         403, or a timeout/connection error) on failure; callers are expected to
         catch and decide how to surface it.
         """
-        api_url = (
-            f"https://api.github.com/repos/{self.owner}/{self.repo}/pulls/{self.pr}"
+        data = self._repo.api_get(
+            f"/pulls/{self.pr}", upstream=self.owner, repo=self.repo
         )
-        headers = {}
-        if token := os.environ.get("GITHUB_TOKEN"):
-            headers["Authorization"] = f"token {token}"
-        response = requests.get(api_url, headers=headers, timeout=30)
-        response.raise_for_status()
-        data = response.json()
         self.state = data.get("state") or ""
         self.merged = bool(data.get("merged"))
         self.labels = [label["name"] for label in data.get("labels") or []]
@@ -211,8 +205,27 @@ class Repo:
         with self.abs_merges_path.open("w") as fobj:
             yaml_dump(data, fobj)
 
-    def api_url(self, upstream=None):
-        return f"https://api.github.com/repos/{upstream or self.company_git_remote}/{self.name}"
+    def api_url(self, upstream=None, repo=None):
+        return f"https://api.github.com/repos/{upstream or self.company_git_remote}/{repo or self.name}"
+
+    def api_get(self, path="", upstream=None, repo=None) -> dict:
+        """Get ``path`` (eg. ``/pulls/1234``) under this repo's GitHub API
+        endpoint and return the decoded JSON.
+
+        Raises ``requests.RequestException`` (eg. ``HTTPError`` on a missing PR
+        or a rate-limit 403, or a timeout/connection error) on failure; callers
+        are expected to catch and decide how to surface it.
+        """
+        headers = {}
+        if token := os.environ.get("GITHUB_TOKEN"):
+            headers["Authorization"] = f"token {token}"
+        response = requests.get(
+            self.api_url(upstream=upstream, repo=repo) + path,
+            headers=headers,
+            timeout=30,
+        )
+        response.raise_for_status()
+        return response.json()
 
     def ssh_url(self, namespace=None):
         namespace = namespace or self.company_git_remote
@@ -303,15 +316,50 @@ class Repo:
         config["merges"][0] = f"{upstream} {hashes[self.name.lower()]}"
         self.update_merges_config(config)
 
-    def add_pending_pull_request(self, upstream, pull_id):
+    def add_pending_pull_request(self, upstream, pull_id, patch=False):
+        """Add a pending pull request"""
         # TODO: proj_tmpl_ver=2 is deprecated
         if self.template_version == 2 and self.name.lower() in ("odoo", "enterprise"):
             ui.exit_msg(
                 "Sorry, adding a pending Pull Request to Odoo repositories is not "
                 "supported. Please add a pending commit instead."
             )
+        if patch:
+            return self._add_pending_pull_request_patch(upstream, pull_id)
+        return self._add_pending_pull_request(upstream, pull_id)
+
+    def _prepare_pending_pull_request_comment_lines(
+        self, upstream, pull_id
+    ) -> list[str]:
+        """Return the comment lines describing a pending pull request.
+
+        The PR title and URL are fetched from GitHub to be written on the
+        comment lines above the pending merge entry. The same call validates
+        that the PR targets the project's major version; when it fails we
+        simply skip the comment (and the branch validation).
+        """
+        try:
+            data = self.api_get(f"/pulls/{pull_id}", upstream=upstream)
+        except requests.RequestException as exc:
+            ui.echo(
+                f"Github API call failed ({exc}): skipping target branch validation."
+            )
+            return []
+        base_branch = data.get("base", {}).get("ref")
+        if base_branch and base_branch != get_project_manifest_key("odoo_version"):
+            ui.ask_or_abort(
+                "Requested PR targets branch different from"
+                " current project's major version. Proceed?"
+            )
+        comment = []
+        if title := data.get("title"):
+            comment.append(title)
+        if pr_url := data.get("html_url"):
+            comment.append(pr_url)
+        return comment
+
+    def _add_pending_pull_request(self, upstream, pull_id):
         conf = self.merges_config()
-        odoo_version = get_project_manifest_key("odoo_version")
         pending_mrg_line = f"{upstream} refs/pull/{pull_id}/head"
         if pending_mrg_line in conf.get("merges", {}):
             ui.echo(
@@ -319,30 +367,7 @@ class Repo:
             )
             return True
 
-        response = requests.get(f"{self.api_url(upstream=upstream)}/pulls/{pull_id}")
-
-        # TODO: auth
-        data = response.json()
-        base_branch = data.get("base", {}).get("ref")
-        # Describe the new pending merge with its title + URL on the comment
-        # lines above it, fetched from GitHub. When the call fails we simply skip
-        # the comment (and the branch validation).
-        comment = []
-        if response.ok:
-            if base_branch and base_branch != odoo_version:
-                ui.ask_or_abort(
-                    "Requested PR targets branch different from"
-                    " current project's major version. Proceed?"
-                )
-            if title := data.get("title"):
-                comment.append(title)
-            if pr_url := data.get("html_url"):
-                comment.append(pr_url)
-        else:
-            ui.echo(
-                f"Github API call failed ({response.status_code}):"
-                " skipping target branch validation."
-            )
+        comment = self._prepare_pending_pull_request_comment_lines(upstream, pull_id)
 
         known_remotes = conf["remotes"]
         if upstream not in known_remotes:
@@ -359,19 +384,32 @@ class Repo:
         self.update_merges_config(conf)
         return True
 
-    def add_pending_pull_request_patch(self, upstream, entity_url):
+    def _add_pending_pull_request_patch(self, upstream, pull_id):
         conf = self.merges_config()
-        line = f"curl -sSL {entity_url} | git am -3 --keep-non-patch --exclude '*requirements.txt'"
-        patches = self.merges_config().get("shell_command_after") or []
+        patch_url = f"https://github.com/{upstream}/{self.name}/pull/{pull_id}.patch"
+        line = f"curl -sSL {patch_url} | git am -3 --keep-non-patch --exclude '*requirements.txt'"
+        patches = conf.get("shell_command_after") or CommentedSeq()
         if line in patches:
             ui.echo(
-                f"{self.abs_merges_path} already contains a reference to {entity_url}"
+                f"{self.abs_merges_path} already contains a reference to {patch_url}"
             )
-            return
-        patches.append(line)
+            return True
+
+        comment = self._prepare_pending_pull_request_comment_lines(upstream, pull_id)
+
+        # Append the new patch at the end of the list, keeping the comment
+        # blocks of the existing entries anchored to them, and aligning the new
+        # comment with the shell command items.
+        append_seq_item_with_comments(
+            patches,
+            line,
+            comment=comment,
+            comment_indent=sequence_item_indent(),
+        )
         conf["shell_command_after"] = patches
         self.update_merges_config(conf)
-        ui.echo(f"📋 patch {entity_url} has been added")
+        ui.echo(f"📋 patch {patch_url} has been added")
+        return True
 
     def _get_pending_commit_lines(self, upstream: str, commit_sha: str):
         """Return the lines to add to the merges file for a given commit."""
@@ -655,14 +693,11 @@ def add_pending(entity_url, aggregate=True, patch=False, push=True):
         repo.update_pending_merges_file_base_merge()
 
     if entity_type == "pull":
-        if entity_url.endswith(".patch"):
+        # A ``.patch`` URL implies --patch, and is stripped to get the bare PR id
+        if entity_id.endswith(".patch"):
             patch = True
-        elif patch and not entity_url.endswith(".patch"):
-            entity_url += ".patch"
-        if patch:
-            repo.add_pending_pull_request_patch(upstream, entity_url)
-        else:
-            repo.add_pending_pull_request(upstream, entity_id)
+            entity_id = entity_id.removesuffix(".patch")
+        repo.add_pending_pull_request(upstream, entity_id, patch=patch)
     elif entity_type in ("commit", "tree"):
         repo.add_pending_commit(upstream, entity_id)
     if aggregate:
@@ -723,16 +758,9 @@ def get_new_remote_url(repo: Repo, force_remote: str | bool = False):
     else:
         # resolve what's the parent repository
         # from which company remote consolidation was forked
-        response = requests.get(repo.api_url())
-        if response.ok:
-            info = response.json()
-            parent = info.get("parent", {})
-            if parent:
-                new_remote_url = parent.get("ssh_url")
-            else:
-                # not a forked repo (eg: camptocamp/connector-jira)
-                new_remote_url = info.get("ssh_url")
-        else:
+        try:
+            info = repo.api_get()
+        except requests.RequestException:
             ui.echo(
                 "Couldn't reach Github API to resolve submodule upstream."
                 " Please provide it manually."
@@ -741,5 +769,12 @@ def get_new_remote_url(repo: Repo, force_remote: str | bool = False):
             new_namespace = input("Namespace [OCA]: ") or "OCA"
             new_repo = input(f"Repo name [{default_repo}]: ") or default_repo
             new_remote_url = Repo.build_ssh_url(new_namespace, new_repo)
+        else:
+            parent = info.get("parent", {})
+            if parent:
+                new_remote_url = parent.get("ssh_url")
+            else:
+                # not a forked repo (eg: camptocamp/connector-jira)
+                new_remote_url = info.get("ssh_url")
 
     return new_remote_url
