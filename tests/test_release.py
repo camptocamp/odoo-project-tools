@@ -545,3 +545,27 @@ def test_bump_fails_on_unstaged_changes(project):
     assert "uncommitted changes" in result.output.lower()
     # The release did not proceed
     assert ver_file.read_text() == "14.0.0.1.0"
+
+
+@pytest.mark.project_setup(
+    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
+)
+def test_bump_ignores_untracked_files(project):
+    project.invoke(init, catch_exceptions=False)
+    git_commit_all()
+    # Untracked files never end up in the release commit, so they must not block it
+    Path("AGENTS.md").write_text("Some local notes\n")
+    Path("tmp").mkdir()
+    (Path("tmp") / "scratch.txt").write_text("scratch\n")
+    result = project.invoke(
+        release.bump,
+        ["minor", "--commit", "--no-tag"],
+        catch_exceptions=False,
+        input="n",
+    )
+    assert result.exit_code == 0
+    assert '✅ Committed "Release 14.0.0.2.0"' in result.output
+    repo = git.Repo(".")
+    # The untracked files were left alone, not swept into the release commit
+    assert "AGENTS.md" not in repo.head.commit.stats.files
+    assert set(repo.untracked_files) == {"AGENTS.md", "tmp/scratch.txt"}
