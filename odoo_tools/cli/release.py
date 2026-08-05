@@ -276,7 +276,7 @@ def bump(
     # Warn about deprecated .bumpversion.cfg file
     _warn_deprecated_bumpversion_cfg()
     # Fail early on a dirty tree when we (likely) intend to commit
-    if do_commit is not False and repo.is_dirty(untracked_files=True):
+    if do_commit is not False and repo.is_dirty(untracked_files=False):
         raise click.ClickException(
             "There are uncommitted changes in the working tree. "
             "Commit or stash them before running `bump`."
@@ -299,7 +299,7 @@ def bump(
         do_commit = Confirm.ask("Create the release commit?", default=True)
     if do_commit:
         # Everything modified by the release process must be staged at this point
-        if repo.is_dirty(index=False, untracked_files=True):
+        if repo.is_dirty(index=False, untracked_files=False):
             raise click.ClickException(
                 "Unexpected changes left in the working tree after staging the "
                 "release files; aborting."
