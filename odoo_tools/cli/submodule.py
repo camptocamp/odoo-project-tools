@@ -1,10 +1,12 @@
 from itertools import chain
+from pathlib import Path
 
 import click
 
 from ..utils import git, path, proj, ui
 from ..utils import pending_merge as pm_utils
 from ..utils.click import global_command_decorators
+from ..utils.config import config
 
 
 @click.group()
@@ -49,17 +51,38 @@ def ls(dockerfile=False):
     """
     submodules = (submodule.path for submodule in git.iter_gitmodules())
     if dockerfile:
-        blacklist = {"odoo/src"}
+        blacklist = {str(config.odoo_src_rel_path)}
         lines = (f"odoo/{line}" for line in submodules if line not in blacklist)
+        odoo_src = str(config.odoo_src_rel_path)
+        local_src = str(config.local_src_rel_path)
+        external_src = str(config.ext_src_rel_path)
+        paid_modules_search = [
+            Path(config.local_src_rel_path).parent / "paid-modules",
+            Path(external_src) / "paid-modules",
+            Path(external_src) / "3rd-party",
+        ]
+        if config.template_version == 1:
+            base_addons_paths = [
+                f"{odoo_src}/odoo/odoo/addons",
+                f"{odoo_src}/odoo/addons",
+                local_src,
+            ]
+        else:
+            base_addons_paths = [
+                f"{odoo_src}/odoo/odoo/addons",
+                f"{odoo_src}/odoo/addons",
+                f"{odoo_src}/enterprise",
+                local_src,
+            ]
+        trailing_addons_paths = []
+
+        for paid_modules in paid_modules_search:
+            if path.build_path(str(paid_modules)).exists():
+                trailing_addons_paths.append(str(paid_modules))
         lines = chain(
-            [
-                "odoo/src/odoo/odoo/addons",
-                "odoo/src/odoo/addons",
-                "odoo/src/enterprise",
-                "odoo/odoo/addons",
-            ],
+            base_addons_paths,
             lines,
-            ["odoo/odoo/paid-modules"],
+            trailing_addons_paths,
         )
         lines = (f"/{line}" for line in lines)
         joined = ", \\\n".join(lines)
