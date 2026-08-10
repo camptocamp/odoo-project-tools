@@ -56,6 +56,22 @@ def test_init(project, version):
 
 
 @pytest.mark.project_setup(proj_tmpl_ver=1)
+def test_init_without_proj_cfg_nor_env_override(project):
+    """`init` must work on a project that has no `.proj.cfg` yet.
+
+    Reading the config in that situation raises, so the template version has to
+    be resolved without it. Defaults to v1.
+    """
+    Path(".proj.cfg").unlink()
+    config._reload()
+    with mock.patch.dict(os.environ, {}, clear=True):
+        result = project.invoke(init, catch_exceptions=False)
+    assert result.exit_code == 0
+    assert "template_version = 1" in Path(".proj.cfg").read_text()
+    assert not Path("docker-compose.override.yml").exists()
+
+
+@pytest.mark.project_setup(proj_tmpl_ver=1)
 def test_init_proj_conf_already_existing(project):
     orig_content = get_fixture("expected.proj.v1.cfg")
     expected = orig_content + "\nfoo = baz"
@@ -109,18 +125,16 @@ def test_init_history_file_already_existing_but_already_converted(project):
     assert result.exit_code == 0
 
 
-@pytest.mark.project_setup(proj_tmpl_ver=2)
-def test_init_custom_version(project):
-    result = project.invoke(
-        init,
-        [
-            "--version",
-            "16.0.1.1.0",
-        ],
-        catch_exceptions=False,
-    )
-    assert Path("docker-compose.override.yml").exists()
+@pytest.mark.project_setup(proj_tmpl_ver=1)
+def test_init_version_option_takes_precedence(project):
+    """`--version` selects the template version, over the `PROJ_TMPL_VER` env var."""
+    Path(".proj.cfg").unlink()
+    config._reload()
+    with mock.patch.dict(os.environ, {"PROJ_TMPL_VER": "1"}, clear=True):
+        result = project.invoke(init, ["--version", "2"], catch_exceptions=False)
     assert result.exit_code == 0
+    assert "template_version = 2" in Path(".proj.cfg").read_text()
+    assert Path("docker-compose.override.yml").exists()
 
 
 @pytest.mark.usefixtures("project")
