@@ -125,6 +125,29 @@ def dump(db_name, output_path, format):
     utils.db.dump_db(db_name, output_path, format)
 
 
+@cli.command()
+@click.argument("prefix")
+@click.option("-y", "--yes", is_flag=True, help="Skip the confirmation prompt.")
+@utils.click.handle_exceptions()
+def drop(prefix, yes):
+    """Drop all databases whose name starts with PREFIX."""
+    matching = sorted(
+        name for name in utils.db.get_db_list() if name.startswith(prefix)
+    )
+    if not matching:
+        click.echo(f"No databases found matching prefix {prefix!r}")
+        return
+    table = Table("Name")
+    for db_name in matching:
+        table.add_row(db_name)
+    console.print(table)
+    if not yes:
+        utils.ui.ask_or_abort(f"Drop the {len(matching)} database(s) above?")
+    for db_name in matching:
+        utils.ui.echo(f"🗑️  Dropping {db_name}")
+        utils.os_exec.run(utils.docker_compose.drop_db(db_name), check=True)
+
+
 @cli.group()
 def addons():
     """Addons management commands."""
