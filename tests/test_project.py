@@ -177,7 +177,7 @@ def test_checkout_local_odoo(runner):
                     "advice.detachedHead=false",
                     "checkout",
                     "--force",
-                    "12345",
+                    "FETCH_HEAD",
                 ],
                 # "sim_call": sim_touch,
                 # "sim_call_args": ["foo"],
@@ -216,7 +216,7 @@ def test_checkout_local_odoo(runner):
                     "advice.detachedHead=false",
                     "checkout",
                     "--force",
-                    "56789",
+                    "FETCH_HEAD",
                 ],
                 # "sim_call": sim_touch,
                 # "sim_call_args": ["foo"],
@@ -276,7 +276,7 @@ def test_local_odoo_venv(runner):
                     "advice.detachedHead=false",
                     "checkout",
                     "--force",
-                    "12345",
+                    "FETCH_HEAD",
                 ],
                 # "sim_call": sim_touch,
                 # "sim_call_args": ["foo"],
@@ -315,7 +315,7 @@ def test_local_odoo_venv(runner):
                     "advice.detachedHead=false",
                     "checkout",
                     "--force",
-                    "56789",
+                    "FETCH_HEAD",
                 ],
                 # "sim_call": sim_touch,
                 # "sim_call_args": ["foo"],
@@ -366,3 +366,54 @@ def test_local_odoo_venv(runner):
             ],
             catch_exceptions=False,
         )
+
+
+def capture_checkout_refs(count=6):
+    """Mock `subprocess.run`, capturing the last argument of the next `count` calls
+
+    Returns a ``(refs, mock)`` tuple, where ``refs`` gets filled in as the mock
+    is called.
+    """
+    refs = []
+
+    def record(args):
+        refs.append(args[-1])
+        return True
+
+    return refs, MockSubprocessRun([{"args": record} for __ in range(count)])
+
+
+@pytest.mark.usefixtures("project")
+@pytest.mark.project_setup(proj_tmpl_ver=2, proj_version="16.0.1.1.0")
+def test_checkout_local_odoo_from_env(runner):
+    """The hashes can be passed through the environment."""
+    odoo_src_path = build_path(config.odoo_src_rel_path)
+    refs, mock_fn = capture_checkout_refs()
+    with (
+        mock.patch("subprocess.run", mock_fn),
+        mock.patch.dict(os.environ, {"ODOO_HASH": "12345", "ENTERPRISE_HASH": "56789"}),
+    ):
+        result = runner.invoke(checkout_local_odoo, [], catch_exceptions=False)
+    assert result.exit_code == 0
+    assert str(odoo_src_path / "odoo") in refs[0]  # clone
+    assert refs[1] == "12345"  # fetch odoo
+    assert refs[4] == "56789"  # fetch enterprise
+
+
+@pytest.mark.usefixtures("project")
+@pytest.mark.project_setup(proj_tmpl_ver=2, proj_version="16.0.1.1.0")
+def test_checkout_local_odoo_fallback_to_branch(runner):
+    """Without hashes, and with no usable image, fall back to the version branch."""
+    refs, mock_fn = capture_checkout_refs()
+    with (
+        mock.patch("subprocess.run", mock_fn),
+        mock.patch(
+            "odoo_tools.cli.project.get_docker_image_commit_hashes",
+            return_value=(None, None),
+        ),
+    ):
+        result = runner.invoke(checkout_local_odoo, [], catch_exceptions=False)
+    assert result.exit_code == 0
+    # both repositories are fetched on the project's odoo version branch
+    assert refs[1] == "16.0"
+    assert refs[4] == "16.0"

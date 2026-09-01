@@ -189,12 +189,12 @@ class SubmoduleInfo(NamedTuple):
     cloned: bool
 
 
-def get_odoo_core(hash, dest="src/odoo", org="odoo"):
-    _checkout_repo(org, "odoo", build_path(dest), hash)
+def get_odoo_core(ref, dest="src/odoo", org="odoo"):
+    _checkout_repo(org, "odoo", build_path(dest), ref)
 
 
-def get_odoo_enterprise(hash, dest="src/enterprise", org="odoo"):
-    _checkout_repo(org, "enterprise", build_path(dest), hash)
+def get_odoo_enterprise(ref, dest="src/enterprise", org="odoo"):
+    _checkout_repo(org, "enterprise", build_path(dest), ref)
 
 
 def _checkout_repo(org, repo, dest, ref, depth=None):
@@ -225,13 +225,16 @@ def _checkout_repo(org, repo, dest, ref, depth=None):
     subprocess.run(["git", "-C", str(dest), "fetch", *args], check=True)
     # Checkout
     ui.echo(f"Checking out {org}/{repo} {ref}..")
+    # Check out `FETCH_HEAD` rather than `ref`: for a commit hash both are the
+    # same, but a branch name would resolve to the local branch left behind by a
+    # previous run instead of the revision we've just fetched.
     git_args = [
         "-C",
         str(dest),
         "-c",
         "advice.detachedHead=false",
     ]
-    subprocess.run(["git", *git_args, "checkout", "--force", ref], check=True)
+    subprocess.run(["git", *git_args, "checkout", "--force", "FETCH_HEAD"], check=True)
 
 
 def _get_gitmodules():

@@ -17,6 +17,11 @@ def exit_msg(msg):
     raise Exit(msg)
 
 
+def warn(msg):
+    """Print a warning on stderr, so it doesn't pollute a command's output."""
+    err_console.print(f"Warning: {msg}", style="yellow")
+
+
 def warn_missing_github_token():
     """Warn (on stderr) when no GITHUB_TOKEN is set.
 
@@ -24,10 +29,9 @@ def warn_missing_github_token():
     start failing; commands that hit the API should call this up front.
     """
     if not os.environ.get("GITHUB_TOKEN"):
-        err_console.print(
-            "Warning: GITHUB_TOKEN is not set; GitHub API requests "
-            "are unauthenticated and may hit rate limits.",
-            style="yellow",
+        warn(
+            "GITHUB_TOKEN is not set; GitHub API requests "
+            "are unauthenticated and may hit rate limits."
         )
 
 
