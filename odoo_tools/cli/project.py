@@ -21,6 +21,7 @@ from ..utils.misc import (
 from ..utils.path import build_path
 from ..utils.proj import (
     generate_odoo_config_file,
+    get_odoo_version,
     setup_venv,
 )
 
@@ -232,12 +233,18 @@ def init(version, backup, **kw):
 @click.option(
     "--odoo-hash",
     type=str,
-    help="the commit hash to use for Odoo core. If not provided the docker image will be introspected.",
+    envvar="ODOO_HASH",
+    show_envvar=True,
+    help="the commit hash to use for Odoo core. If not provided the docker image will "
+    "be introspected, falling back to the head of the project's Odoo version branch.",
 )
 @click.option(
     "--enterprise-hash",
     type=str,
-    help="the commit hash to use for Odoo Enterprise. If not provided the docker image will be introspected.",
+    envvar="ENTERPRISE_HASH",
+    show_envvar=True,
+    help="the commit hash to use for Odoo Enterprise. If not provided the docker image "
+    "will be introspected, falling back to the head of the project's Odoo version branch.",
 )
 @click.option(
     "--venv/--no-venv",
@@ -276,15 +283,22 @@ def checkout_local_odoo(
         image_odoo_hash, image_enterprise_hash = get_docker_image_commit_hashes()
         odoo_hash = odoo_hash or image_odoo_hash
         enterprise_hash = enterprise_hash or image_enterprise_hash
-    if odoo_hash:
-        git.get_odoo_core(odoo_hash, dest=odoo_src_dest)
-    else:
-        ui.exit_msg("Unable to find the commit hash of odoo core")
 
-    if enterprise_hash:
-        git.get_odoo_enterprise(enterprise_hash, dest=enterprise_src_dest)
-    else:
-        ui.exit_msg("Unable to find the commit hash of odoo enterprise")
+    # Fall back to the head of the project's odoo version branch
+    odoo_version = get_odoo_version()
+    fallback_warning = (
+        "Unable to find the commit hash of %s; falling back to the head "
+        f"of the {odoo_version} branch, which might not match the image."
+    )
+    if not odoo_hash:
+        ui.warn(fallback_warning % "odoo core")
+        odoo_hash = odoo_version
+    if not enterprise_hash:
+        ui.warn(fallback_warning % "odoo enterprise")
+        enterprise_hash = odoo_version
+
+    git.get_odoo_core(odoo_hash, dest=odoo_src_dest)
+    git.get_odoo_enterprise(enterprise_hash, dest=enterprise_src_dest)
 
     # Apply odoo/enterprise patches
     # This matches the behavior of the `001_apply_patches` script in the odoo-template
