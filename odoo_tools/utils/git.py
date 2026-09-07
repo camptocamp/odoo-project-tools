@@ -401,6 +401,33 @@ def get_submodule_commit(path):
         return None
 
 
+def get_out_of_sync_submodules() -> set[str]:
+    """Return submodules whose checked-out commit differs from HEAD.
+
+    Git's ``submodule status`` uses a leading character to describe the
+    relationship between the checked-out submodule commit and the commit
+    recorded by the current parent repository:
+
+    * `` `` - checked out at the recorded commit
+    * ``+`` - checked out at a different commit
+    * ``-`` - submodule is not initialized
+    * ``U`` - submodule has merge conflicts
+
+    Uninitialized submodules are considered out of sync because
+    ``submodule_update()`` is responsible for initializing them.
+
+    A submodule with merge conflicts is deliberately not considered out of sync:
+    ``git submodule update`` should not silently interfere with a conflicted
+    working tree.
+    """
+    output = run(["git", "submodule", "status"], check=True)
+    out_of_sync = set()
+    for line in output.splitlines():
+        if line and line[0] in {"+", "-"} and len(parts := line[1:].split()) > 1:
+            out_of_sync.add(parts[1])
+    return out_of_sync
+
+
 def submodule_upgrade(path, url, branch=None):
     """Upgrade a submodule to the latest remote commit.
 
