@@ -95,7 +95,12 @@ def ls(dockerfile=False):
 
 @cli.command()
 @click.argument("submodule_path", default="")
-def update(submodule_path=None):
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Force-update all submodules.",
+)
+def update(submodule_path=None, force: bool = False):
     """Initialize or update submodules
 
     Synchronize submodules and then launch `git submodule update --init`
@@ -104,13 +109,20 @@ def update(submodule_path=None):
     If `git-autoshare` is configured locally, it will add `--reference` to
     fetch data from local cache.
 
-    :param submodule_path: submodule path for a precise sync & update
+    By default, only submodules whose checked-out commit differs from the commit
+    recorded by the current parent repository HEAD are updated, even when a specific
+    submodule path is provided.
+    To change this behavior, use the `--force` option.
 
+    :param submodule_path: submodule path for a precise sync & update
+    :param force: force-update submodules
     """
     with path.cd(path.root_path()):
+        out_of_sync_paths = None if force else git.get_out_of_sync_submodules()
         for submodule in git.iter_gitmodules(filter_path=submodule_path):
-            git.submodule_sync(submodule.path)
-            git.submodule_update(submodule.path)
+            if out_of_sync_paths is None or submodule.path in out_of_sync_paths:
+                git.submodule_sync(submodule.path)
+                git.submodule_update(submodule.path)
 
 
 @cli.command()

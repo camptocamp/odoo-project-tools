@@ -5,7 +5,12 @@ import pytest
 
 from odoo_tools.cli import submodule
 
-from .common import MockSubprocessRun, get_fixture_path, mock_pending_merge_repo_paths
+from .common import (
+    MockSubprocessRun,
+    convert_mock_specs,
+    get_fixture_path,
+    mock_pending_merge_repo_paths,
+)
 
 
 @pytest.mark.project_setup(
@@ -69,6 +74,33 @@ def test_init_missing_gitmodules(project):
     assert result.exit_code == 0
 
 
+MOCKED_GIT_SUBMODULE_STATUS = {
+    "args": [
+        "git",
+        "submodule",
+        "status",
+    ],
+    "stdout": (
+        # Prefix "+" => submodule needs syncing and updating
+        b"+111 odoo/external-src/account-closing\n"
+        # Prefix "-" => submodule not initialized
+        b"-222 odoo/external-src/account-financial-reporting\n"
+        # Prefix " " => submodule is aligned w/ parent repo HEAD
+        b" 333 odoo/external-src/repo-aligned\n"
+        # Prefix "U" => submodule has merge conflicts
+        b"U444 odoo/external-src/repo-merge-conflicts\n"
+    ),
+}
+
+
+def mocked_git_submodule_sync(repo_path: str | Path) -> dict:
+    return {"args": ["git", "submodule", "sync", "--", str(repo_path)]}
+
+
+def mocked_git_submodule_update(repo_path: str | Path) -> dict:
+    return {"args": ["git", "submodule", "update", "--init", str(repo_path)]}
+
+
 @pytest.mark.project_setup(
     manifest=dict(odoo_version="16.0"),
     proj_version="16.0.1.2.3",
@@ -77,44 +109,60 @@ def test_init_missing_gitmodules(project):
     },
 )
 def test_update(project):
+    # Mock 9 commands:
+    # - 1 command before everything else: ``git submodule status``
+    # - 2 commands per each submodule with "+" or "-" status prefix:
+    #   - git submodule sync -- <submodule_path>
+    #   - git submodule update --init <submodule_path>
+    # - 2 commands per each submodule with " " or "U" status prefix:
+    #   - git submodule sync -- <submodule_path>
+    #   - git submodule update --init <submodule_path>
+    mock_specs = [MOCKED_GIT_SUBMODULE_STATUS]
+    for repo in (
+        "account-closing",
+        "account-financial-reporting",
+        "repo-aligned",
+        "repo-merge-conflicts",
+    ):
+        submodule_path = f"odoo/external-src/{repo}"
+        mock_specs.append(mocked_git_submodule_sync(submodule_path))
+        mock_specs.append(mocked_git_submodule_update(submodule_path))
+    mock_fn = MockSubprocessRun(mock_specs)
+    with (
+        mock.patch("subprocess.run", mock_fn),
+        mock.patch(
+            "odoo_tools.utils.git.find_autoshare_repository", return_value=(None, None)
+        ),
+    ):
+        result = project.invoke(
+            submodule.update,
+            [],
+            catch_exceptions=False,
+        )
+    assert result.exit_code == 0
+
+    # No call to sync/update ``repo-aligned`` and ``repo-merge-conflicts``
+    mock_fn.assert_incomplete_calls(convert_mock_specs(mock_specs)[-4:])
+
+
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
+    extra_files={
+        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
+    },
+)
+def test_update_submodule_path(project):
+    # Mock 3 commands:
+    # - git submodule status
+    # - git submodule sync -- odoo/external-src/account-closing
+    # - git submodule update --init odoo/external-src/account-closing
+    submodule_path = "odoo/external-src/account-closing"
     mock_fn = MockSubprocessRun(
         [
-            {
-                "args": [
-                    "git",
-                    "submodule",
-                    "sync",
-                    "--",
-                    "odoo/external-src/account-closing",
-                ],
-            },
-            {
-                "args": [
-                    "git",
-                    "submodule",
-                    "update",
-                    "--init",
-                    "odoo/external-src/account-closing",
-                ],
-            },
-            {
-                "args": [
-                    "git",
-                    "submodule",
-                    "sync",
-                    "--",
-                    "odoo/external-src/account-financial-reporting",
-                ],
-            },
-            {
-                "args": [
-                    "git",
-                    "submodule",
-                    "update",
-                    "--init",
-                    "odoo/external-src/account-financial-reporting",
-                ],
-            },
+            MOCKED_GIT_SUBMODULE_STATUS,
+            mocked_git_submodule_sync(submodule_path),
+            mocked_git_submodule_update(submodule_path),
         ]
     )
     with (
@@ -125,7 +173,40 @@ def test_update(project):
     ):
         result = project.invoke(
             submodule.update,
-            [],
+            ["odoo/external-src/account-closing"],
+            catch_exceptions=False,
+        )
+    assert result.exit_code == 0
+    mock_fn.assert_completed_calls()
+
+
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
+    extra_files={
+        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
+    },
+)
+def test_update_force(project):
+    # Mock 4 commands:
+    # - git submodule sync -- <submodule> (once per submodule)
+    # - git submodule update --init <submodule> (once per submodule)
+    # NB: when using ``--force``, submodule statuses are not checked beforehand
+    mock_specs = []
+    for repo in ("account-closing", "account-financial-reporting"):
+        submodule_path = f"odoo/external-src/{repo}"
+        mock_specs.append(mocked_git_submodule_sync(submodule_path))
+        mock_specs.append(mocked_git_submodule_update(submodule_path))
+    mock_fn = MockSubprocessRun(mock_specs)
+    with (
+        mock.patch("subprocess.run", mock_fn),
+        mock.patch(
+            "odoo_tools.utils.git.find_autoshare_repository", return_value=(None, None)
+        ),
+    ):
+        result = project.invoke(
+            submodule.update,
+            ["--force"],
             catch_exceptions=False,
         )
     assert result.exit_code == 0
