@@ -3,6 +3,7 @@
 import shutil
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 import git
@@ -241,21 +242,71 @@ def mock_pending_merge_repo_paths(
     return path
 
 
+def _mock_repr(self) -> str:
+    info = ", ".join([f"{s}={getattr(self, s)}" for s in self.__slots__])
+    return f"{self.__class__.__name__}({info})"
+
+
 class MockCompletedProcess:
+    __slots__ = ("args", "returncode", "stdout")
+
     def __init__(self, args=None, stdout=None, returncode=0):
         self.args = args
         self.returncode = returncode
         self.stdout = stdout
+
+    __str__ = __repr__ = _mock_repr
+
+
+class MockSpec:
+    __slots__ = ("index", "kwargs", "done", "result")
+
+    def __init__(self, index: int, **kwargs):
+        assert "args" in kwargs
+        self.index: int = index
+        self.kwargs: dict[str, Any] = kwargs
+        self.done: bool = False
+        self.result: MockCompletedProcess | None = None
+
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, MockSpec)
+            and self.index == other.index
+            and self.kwargs == other.kwargs
+        )
+
+    def __contains__(self, item):
+        return isinstance(item, str) and item in self.kwargs
+
+    def __getitem__(self, item):
+        return self.kwargs[item]
+
+    def get(self, item, default=None):
+        return self[item] if item in self else default
+
+    __str__ = __repr__ = _mock_repr
+
+
+def convert_mock_specs(mock_specs: list[dict]) -> list[MockSpec]:
+    return [MockSpec(index, **kwargs) for index, kwargs in enumerate(mock_specs)]
 
 
 class MockSubprocessRun:
     """A mock for subprocess.run that can be used with unittest.mock.patch.
 
     Usage:
+
         mock_runner = MockSubprocessRun(spec)
         with patch("subprocess.run", mock_runner):
-            do your test
+            do your operations
+        # Test all calls have been executed
         mock_runner.assert_completed_calls()
+        # Test which calls have been executed, in order of execution
+        mock_runner.assert_completed_calls(calls=[{'arg': ...}, ...])
+        # Test no call has been executed
+        mock_runner.assert_incomplete_calls()
+        # Test which calls have not been executed, in order of execution
+        mock_runner.assert_incomplete_calls(calls=[{'arg': ...}, ...])
 
     mock_spec is a list of dictionaries. The entries are used to match
     subsequent calls to subprocess.run(), in order.
@@ -263,7 +314,8 @@ class MockSubprocessRun:
     Each directory has the following keys:
 
     args: (required) the arguments that subprocess.run() is expected to be called with.
-    If this is a callable, then it is run with the args received and is expected to test them and return True
+    If this is a callable, then it is run with the args received and is expected to test
+    them and return True
 
     stdout: (optional) a string that will be used as the output of the command
 
@@ -273,17 +325,31 @@ class MockSubprocessRun:
 
     sim_call_kwargs: (optional) a list of named parameters to `sim_call`
 
-    The mock returns a MockCompletedProcess object. If stdout is not None, the string or bytes object
-    passed is is the `stdout` attribute of that object.
+    The mock returns a MockCompletedProcess object. If stdout is not None, the string
+    or bytes object passed is the `stdout` attribute of that object.
     """
 
-    def __init__(self, mock_spec=None):
-        if mock_spec is None:
-            mock_spec = []
-        self.mock_spec = mock_spec
+    __slots__ = ("mock_spec",)
+
+    def __init__(self, mock_spec: list[dict] | None = None):
+        self.mock_spec = self._convert_mock_specs(mock_spec or [])
+
+    @property
+    def mock_spec_todo(self) -> list[MockSpec]:
+        return [spec for spec in self.mock_spec if not spec.done]
+
+    @property
+    def mock_spec_done(self) -> list[MockSpec]:
+        return [spec for spec in self.mock_spec if spec.done]
+
+    @staticmethod
+    def _convert_mock_specs(mock_specs: list[dict]) -> list[MockSpec]:
+        return convert_mock_specs(mock_specs)
+
+    __str__ = __repr__ = _mock_repr
 
     def __call__(self, args, stdout=None, **kwargs):
-        call_spec = self.mock_spec.pop(0)
+        call_spec = self.mock_spec_todo[0]
         if call_spec["args"] is not None:
             if callable(call_spec["args"]):
                 assert call_spec["args"](args), (
@@ -295,13 +361,26 @@ class MockSubprocessRun:
                 )
         if "sim_call" in call_spec:
             call_spec["sim_call"](
-                *call_spec.get(
-                    "sim_call_args", [], **call_spec.get("sim_call_kwargs", {})
-                )
+                *call_spec.get("sim_call_args", []),
+                **call_spec.get("sim_call_kwargs", {}),
             )
-        return MockCompletedProcess(args, stdout=call_spec.get("stdout"))
+        result = MockCompletedProcess(args, stdout=call_spec.get("stdout"))
+        call_spec.done = True
+        call_spec.result = result
+        return result
 
-    def assert_completed_calls(self):
-        assert not self.mock_spec, (
-            f"{len(self.mock_spec)} calls missing: {self.mock_spec}"
-        )
+    def _assert_calls(
+        self,
+        mock_specs: list[MockSpec],
+        calls: list[MockSpec] | None = None,
+    ):
+        if calls is None:
+            calls = self.mock_spec
+        for call, spec in zip(calls, mock_specs, strict=True):
+            assert call == spec, f"Expected {call}, got {spec} instead"
+
+    def assert_completed_calls(self, calls: list[MockSpec] | None = None):
+        self._assert_calls(self.mock_spec_done, calls)
+
+    def assert_incomplete_calls(self, calls: list[MockSpec] | None = None):
+        self._assert_calls(self.mock_spec_todo, calls)
