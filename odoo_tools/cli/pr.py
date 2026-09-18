@@ -163,10 +163,13 @@ def handle_git_repository(pr_number, branch):
         docker_diff = run(f"git diff pr-{pr_number} {master} -- {dockerfile}")
         req_diff = run(f"git diff pr-{pr_number} {master} -- {requirements}")
 
-        for submodule in git.iter_gitmodules():
+        submodules = list(git.iter_gitmodules())
+        paths = [submodule.path for submodule in submodules]
+        git.sync_submodules(paths)
+        git.register_submodules(paths)
+        for submodule in submodules:
+            # init brings an existing submodule up to date by itself
             git.submodule_init(submodule)
-            git.submodule_sync(submodule.path)
-            git.submodule_update(submodule.path)
         if docker_diff or req_diff:
             ui.echo("👷 Rebuilding docker image")
             run(docker_compose.build())

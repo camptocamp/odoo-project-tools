@@ -131,3 +131,11 @@ def test_debug_option_reraises_errors(cli, runner):
     """The flag reaches `handle_exceptions` even though it is not exposed."""
     result = runner.invoke(cli, ["--debug", "boom"])
     assert isinstance(result.exception, ValueError)
+
+
+def test_is_debug_without_a_context_can_be_told_what_to_answer():
+    """Being verbose is the right default for a report nobody asked for, and
+    the wrong one for something that outlives it -- a temporary file kept for
+    someone to read, when there is no one and no command."""
+    assert is_debug() is True
+    assert is_debug(default=False) is False
