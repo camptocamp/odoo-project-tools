@@ -1,10 +1,11 @@
+from concurrent.futures import ThreadPoolExecutor
 from itertools import chain
 
 import click
 
 from ..utils import git, path, proj, ui
 from ..utils import pending_merge as pm_utils
-from ..utils.click import global_command_decorators
+from ..utils.click import DEFAULT_MAX_WORKERS, global_command_decorators
 from ..utils.config import config
 
 
@@ -25,9 +26,16 @@ def init(ctx):
     It means less 'git submodule add -b ... {url} {path}' commands to run
 
     """
-    with path.cd(path.root_path()):
-        for submodule in git.iter_gitmodules():
-            git.submodule_init(submodule)
+    with (
+        path.cd(path.root_path()),
+        ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS) as pool,
+    ):
+
+        def _init(sm: git.SubmoduleInfo):
+            git.submodule_init(sm)
+
+        for f in [pool.submit(_init, sm) for sm in git.iter_gitmodules()]:
+            f.result()
 
     ui.echo("Submodules initialized.")
     ui.echo("")
@@ -117,12 +125,22 @@ def update(submodule_path=None, force: bool = False):
     :param submodule_path: submodule path for a precise sync & update
     :param force: force-update submodules
     """
-    with path.cd(path.root_path()):
+    with (
+        path.cd(path.root_path()),
+        ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS) as pool,
+    ):
+
+        def _update(sm: git.SubmoduleInfo):
+            git.submodule_update(sm.path)
+
         out_of_sync_paths = None if force else git.get_out_of_sync_submodules()
+        futures = []
         for submodule in git.iter_gitmodules(filter_path=submodule_path):
             if out_of_sync_paths is None or submodule.path in out_of_sync_paths:
                 git.submodule_sync(submodule.path)
-                git.submodule_update(submodule.path)
+                futures.append(pool.submit(_update, submodule))
+        for f in futures:
+            f.result()
 
 
 @cli.command()
@@ -219,39 +237,50 @@ def upgrade(submodule_path, force_branch, clean_pending, aggregate):
     ui.warn_missing_github_token()
     # Resolved lazily on the first push, then reused for the other submodules.
     target_branch = None
-    with path.cd(path.root_path()):
-        for submodule in git.iter_gitmodules(filter_path=submodule_path):
-            repo = pm_utils.Repo(submodule.path, path_check=False)
+    with (
+        path.cd(path.root_path()),
+        ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS) as pool,
+    ):
+        futures = []
+
+        def _upgrade(sm: git.SubmoduleInfo):
+            repo = pm_utils.Repo(sm.path, path_check=False)
             if repo.has_pending_merges() and clean_pending:
-                ui.echo(f"Purging merged PRs for {submodule.path}")
+                ui.echo(f"Purging merged PRs for {sm.path}")
                 for pr in repo.purge_merged_prs():
                     ui.echo(f"  removed {pr.shortcut}")
             if repo.has_pending_merges():
                 if not aggregate:
-                    ui.echo(f"Skipping {submodule.path}: it has pending merges")
-                    continue
-                ui.echo(f"Rebuilding consolidation branch for {submodule.path}")
+                    ui.echo(f"Skipping {sm.path}: it has pending merges")
+                    return
+                ui.echo(f"Rebuilding consolidation branch for {sm.path}")
+                nonlocal target_branch
                 target_branch = target_branch or pm_utils.gh.get_target_branch()
                 repo.rebuild_consolidation_branch(
                     push=True, target_branch=target_branch
                 )
-                continue
+                return
             # No pending merges: upgrade to latest remote
             branch = force_branch
-            if not branch and submodule.branch and submodule.branch != odoo_version:
+            if not branch and sm.branch and sm.branch != odoo_version:
                 ui.echo(
-                    f"WARNING: {submodule.path} branch is {submodule.branch}"
+                    f"WARNING: {sm.path} branch is {sm.branch}"
                     f" (expected {odoo_version})"
                 )
-                if not ui.ask_confirmation(f"Upgrade {submodule.path} anyway?"):
-                    continue
+                if not ui.ask_confirmation(f"Upgrade {sm.path} anyway?"):
+                    return
             try:
-                git.submodule_update(submodule.path)
-                git.submodule_upgrade(submodule.path, submodule.url, branch=branch)
+                git.submodule_update(sm.path)
+                git.submodule_upgrade(sm.path, sm.url, branch=branch)
             except Exception as e:
-                ui.echo(f"ERROR upgrading {submodule.path}: {e}", fg="red")
-                ui.echo(f"Rolling back {submodule.path}")
-                git.submodule_update(submodule.path)
+                ui.echo(f"ERROR upgrading {sm.path}: {e}", fg="red")
+                ui.echo(f"Rolling back {sm.path}")
+                git.submodule_update(sm.path)
+
+        for submodule in git.iter_gitmodules(filter_path=submodule_path):
+            futures.append(pool.submit(_upgrade, submodule))
+        for f in futures:
+            f.result()
 
 
 if __name__ == "__main__":

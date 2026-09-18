@@ -1,4 +1,5 @@
 import logging
+import os
 from collections.abc import Callable
 from functools import wraps
 
@@ -87,7 +88,7 @@ version_option = click.version_option(
 )
 
 #: How much concurrency this project considers reasonable, by default.
-DEFAULT_MAX_WORKERS = 8
+DEFAULT_MAX_WORKERS = int(os.environ.get("OTOOLS_MAX_WORKERS", 8))
 
 #: Shared ``--jobs`` option for the commands that fan their work out over a
 #: thread pool. Pass it as ``max_workers``; ``--jobs 1`` runs everything

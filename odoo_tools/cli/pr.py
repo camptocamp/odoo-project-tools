@@ -1,12 +1,13 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import click
 
 from ..utils import db, docker_compose, gh, git, ui
-from ..utils.click import global_command_decorators
+from ..utils.click import DEFAULT_MAX_WORKERS, global_command_decorators
 from ..utils.os_exec import run
 from ..utils.path import cd, root_path
 
@@ -163,10 +164,15 @@ def handle_git_repository(pr_number, branch):
         docker_diff = run(f"git diff pr-{pr_number} {master} -- {dockerfile}")
         req_diff = run(f"git diff pr-{pr_number} {master} -- {requirements}")
 
-        for submodule in git.iter_gitmodules():
-            git.submodule_init(submodule)
-            git.submodule_sync(submodule.path)
-            git.submodule_update(submodule.path)
+        with ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS) as pool:
+            futures = []
+            for submodule in git.iter_gitmodules():
+                git.submodule_init(submodule)
+                git.submodule_sync(submodule.path)
+                futures.append(pool.submit(git.submodule_update, submodule.path))
+            for f in futures:
+                f.result()
+
         if docker_diff or req_diff:
             ui.echo("👷 Rebuilding docker image")
             run(docker_compose.build())
