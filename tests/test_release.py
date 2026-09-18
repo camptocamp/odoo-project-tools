@@ -2,6 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import datetime
+import subprocess
 from pathlib import Path
 from unittest import mock
 
@@ -262,14 +263,14 @@ def test_bump_push_no_repo(project):
     proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
 )
 def test_bump_push_repo_with_pending_merge(project):
-    ran_cmd = []
+    ran = []
     real_run = release.run
 
     def mocked_run(cmd, **kwargs):
         # Only the per-repo branch push runs with an explicit cwd; record those
         # and let the real bump/towncrier commands execute.
         if "cwd" in kwargs:
-            ran_cmd.append(cmd)
+            ran.append((cmd, kwargs))
             return ""
         return real_run(cmd, **kwargs)
 
@@ -286,15 +287,21 @@ def test_bump_push_repo_with_pending_merge(project):
             env={"COLUMNS": "60"},
         )
     assert result.exit_code == 0
-    assert ran_cmd == [
+    assert [cmd for cmd, __ in ran] == [
         "git config remote.camptocamp.url",
         "git push -f -v camptocamp HEAD:refs/heads/merge-branch-1234-14.0.0.2.0",
     ]
-    # the pushed repo shows up in the live progress grid, keeping its state
-    # indicator: an overflowing row must ellipsize instead of squeezing it out
-    assert "● odoo/external-src/edi-framework pushed merge-branch-1234-…" in (
-        result.output
-    )
+    probe, push = (kwargs for __, kwargs in ran)
+    # the probe is a question -- it has to be able to answer no, quietly, so
+    # that a remote which isn't configured yet gets added
+    assert probe["check"] is True
+    assert probe["quiet"] is True
+    # and the push has to be able to fail, or every repo comes back green
+    assert push["check"] is True
+    # the step says what it is, and the repo says what came of it -- on one
+    # line, unmangled, at a width narrow enough to have squeezed the old grid
+    assert "Pushing the aggregated branches" in result.output
+    assert "✔ odoo/external-src/edi-framework pushed" in result.output
 
 
 def test_get_new_release_notes(tmp_path):
@@ -569,3 +576,32 @@ def test_bump_ignores_untracked_files(project):
     # The untracked files were left alone, not swept into the release commit
     assert "AGENTS.md" not in repo.head.commit.stats.files
     assert set(repo.untracked_files) == {"AGENTS.md", "tmp/scratch.txt"}
+
+
+@pytest.mark.project_setup(
+    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
+)
+def test_bump_reports_a_branch_it_could_not_push(project):
+    """A push that failed used to be reported as pushed: nothing asked git
+    whether it had worked, so every repo came back green."""
+    real_run = release.run
+
+    def mocked_run(cmd, **kwargs):
+        if "cwd" not in kwargs:
+            return real_run(cmd, **kwargs)
+        if cmd.startswith("git push"):
+            raise subprocess.CalledProcessError(1, cmd)
+        return ""
+
+    mock_pending_merge_repo_paths("edi-framework")
+    project.invoke(init, catch_exceptions=False)
+    with mock.patch("odoo_tools.cli.release.run", mocked_run):
+        result = project.invoke(
+            release.bump,
+            ["minor", "--no-commit", "--no-tag"],
+            catch_exceptions=False,
+            input="y",
+        )
+    assert "✖ odoo/external-src/edi-framework" in result.output
+    assert "1 task(s) failed" in result.output
+    assert "pushed" not in result.output

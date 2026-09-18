@@ -1,25 +1,27 @@
+import threading
+import time
 from pathlib import Path
 from unittest import mock
 
 import pytest
+from rich.console import Console
 
 from odoo_tools.cli import submodule
+from odoo_tools.utils import os_exec, ui
 
 from .common import (
     MockSubprocessRun,
-    convert_mock_specs,
+    assert_no_chdir,
     get_fixture_path,
     mock_pending_merge_repo_paths,
+    mock_subprocess,
+    patch_attr,
+    peak_counter,
+    with_submodules,
 )
 
 
-@pytest.mark.project_setup(
-    manifest=dict(odoo_version="16.0"),
-    proj_version="16.0.1.2.3",
-    extra_files={
-        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
-    },
-)
+@with_submodules
 def test_init(project):
     odoo_version = "16.0"
     mock_fn = MockSubprocessRun(
@@ -48,14 +50,18 @@ def test_init(project):
             },
         ]
     )
-    with mock.patch("subprocess.run", mock_fn):
+    # --jobs 1 so that the submodules are handled in .gitmodules order and the
+    # spec above stays an assertion about what runs rather than a race.
+    with mock_subprocess(mock_fn), assert_no_chdir():
         result = project.invoke(
             submodule.init,
-            [],
+            ["--jobs", "1"],
             catch_exceptions=False,
         )
     mock_fn.assert_completed_calls()
     assert result.exit_code == 0
+    assert "Submodules initialized." in result.output
+    assert "ENV ADDONS_PATH" in result.output
 
 
 @pytest.mark.project_setup(
@@ -64,7 +70,7 @@ def test_init(project):
 )
 def test_init_missing_gitmodules(project):
     mock_fn = MockSubprocessRun([])
-    with mock.patch("subprocess.run", mock_fn):
+    with mock_subprocess(mock_fn):
         result = project.invoke(
             submodule.init,
             [],
@@ -72,154 +78,109 @@ def test_init_missing_gitmodules(project):
         )
     mock_fn.assert_completed_calls()
     assert result.exit_code == 0
+    # nothing to do is not a failure, and the addons-path is still worth having
+    assert "Submodules initialized." in result.output
+    assert "ENV ADDONS_PATH" in result.output
 
 
+#: `git submodule status` marks each submodule with its relationship to the
+#: commit the superproject records: "+" a different commit, "-" not
+#: initialized, " " aligned, "U" conflicted. Only the first two are updated.
 MOCKED_GIT_SUBMODULE_STATUS = {
-    "args": [
-        "git",
-        "submodule",
-        "status",
-    ],
+    "args": ["git", "submodule", "status"],
     "stdout": (
-        # Prefix "+" => submodule needs syncing and updating
         b"+111 odoo/external-src/account-closing\n"
-        # Prefix "-" => submodule not initialized
-        b"-222 odoo/external-src/account-financial-reporting\n"
-        # Prefix " " => submodule is aligned w/ parent repo HEAD
-        b" 333 odoo/external-src/repo-aligned\n"
-        # Prefix "U" => submodule has merge conflicts
-        b"U444 odoo/external-src/repo-merge-conflicts\n"
+        b" 222 odoo/external-src/account-financial-reporting\n"
     ),
 }
+CLOSING = "odoo/external-src/account-closing"
+REPORTING = "odoo/external-src/account-financial-reporting"
 
 
-def mocked_git_submodule_sync(repo_path: str | Path) -> dict:
-    return {"args": ["git", "submodule", "sync", "--", str(repo_path)]}
+def mocked_submodule_batch(*paths):
+    """The superproject's own bookkeeping, done once for the whole set."""
+    return [
+        {"args": ["git", "submodule", "sync", "--", *paths]},
+        {"args": ["git", "submodule", "init", "--", *paths]},
+    ]
 
 
-def mocked_git_submodule_update(repo_path: str | Path) -> dict:
-    return {"args": ["git", "submodule", "update", "--init", str(repo_path)]}
+def mocked_submodule_update(path):
+    """One submodule's own update -- the part that runs in parallel."""
+    return {"args": ["git", "submodule", "update", "--", path]}
 
 
-@pytest.mark.project_setup(
-    manifest=dict(odoo_version="16.0"),
-    proj_version="16.0.1.2.3",
-    extra_files={
-        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
-    },
-)
-def test_update(project):
-    # Mock 9 commands:
-    # - 1 command before everything else: ``git submodule status``
-    # - 2 commands per each submodule with "+" or "-" status prefix:
-    #   - git submodule sync -- <submodule_path>
-    #   - git submodule update --init <submodule_path>
-    # - 2 commands per each submodule with " " or "U" status prefix:
-    #   - git submodule sync -- <submodule_path>
-    #   - git submodule update --init <submodule_path>
-    mock_specs = [MOCKED_GIT_SUBMODULE_STATUS]
-    for repo in (
-        "account-closing",
-        "account-financial-reporting",
-        "repo-aligned",
-        "repo-merge-conflicts",
-    ):
-        submodule_path = f"odoo/external-src/{repo}"
-        mock_specs.append(mocked_git_submodule_sync(submodule_path))
-        mock_specs.append(mocked_git_submodule_update(submodule_path))
-    mock_fn = MockSubprocessRun(mock_specs)
+def _invoke_update(project, mock_fn, args):
+    # --jobs 1 so that the submodules are handled in .gitmodules order and the
+    # spec stays an assertion about what runs rather than a race.
     with (
-        mock.patch("subprocess.run", mock_fn),
+        mock_subprocess(mock_fn),
         mock.patch(
             "odoo_tools.utils.git.find_autoshare_repository", return_value=(None, None)
         ),
+        assert_no_chdir(),
     ):
         result = project.invoke(
-            submodule.update,
-            [],
-            catch_exceptions=False,
+            submodule.update, [*args, "--jobs", "1"], catch_exceptions=False
         )
     assert result.exit_code == 0
-
-    # No call to sync/update ``repo-aligned`` and ``repo-merge-conflicts``
-    mock_fn.assert_incomplete_calls(convert_mock_specs(mock_specs)[-4:])
+    return result
 
 
-@pytest.mark.project_setup(
-    manifest=dict(odoo_version="16.0"),
-    proj_version="16.0.1.2.3",
-    extra_files={
-        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
-    },
-)
-def test_update_submodule_path(project):
-    # Mock 3 commands:
-    # - git submodule status
-    # - git submodule sync -- odoo/external-src/account-closing
-    # - git submodule update --init odoo/external-src/account-closing
-    submodule_path = "odoo/external-src/account-closing"
+@with_submodules
+def test_update_only_touches_the_out_of_sync_ones(project):
+    """`git submodule update --init` is run as its two documented halves, so
+    that only the one writing the superproject's config has to be serialised --
+    and only the submodules that are actually behind get either."""
     mock_fn = MockSubprocessRun(
         [
             MOCKED_GIT_SUBMODULE_STATUS,
-            mocked_git_submodule_sync(submodule_path),
-            mocked_git_submodule_update(submodule_path),
+            *mocked_submodule_batch(CLOSING),
+            mocked_submodule_update(CLOSING),
         ]
     )
-    with (
-        mock.patch("subprocess.run", mock_fn),
-        mock.patch(
-            "odoo_tools.utils.git.find_autoshare_repository", return_value=(None, None)
-        ),
-    ):
-        result = project.invoke(
-            submodule.update,
-            ["odoo/external-src/account-closing"],
-            catch_exceptions=False,
-        )
-    assert result.exit_code == 0
+    _invoke_update(project, mock_fn, [])
     mock_fn.assert_completed_calls()
 
 
-@pytest.mark.project_setup(
-    manifest=dict(odoo_version="16.0"),
-    proj_version="16.0.1.2.3",
-    extra_files={
-        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
-    },
-)
-def test_update_force(project):
-    # Mock 4 commands:
-    # - git submodule sync -- <submodule> (once per submodule)
-    # - git submodule update --init <submodule> (once per submodule)
-    # NB: when using ``--force``, submodule statuses are not checked beforehand
-    mock_specs = []
-    for repo in ("account-closing", "account-financial-reporting"):
-        submodule_path = f"odoo/external-src/{repo}"
-        mock_specs.append(mocked_git_submodule_sync(submodule_path))
-        mock_specs.append(mocked_git_submodule_update(submodule_path))
-    mock_fn = MockSubprocessRun(mock_specs)
-    with (
-        mock.patch("subprocess.run", mock_fn),
-        mock.patch(
-            "odoo_tools.utils.git.find_autoshare_repository", return_value=(None, None)
-        ),
-    ):
-        result = project.invoke(
-            submodule.update,
-            ["--force"],
-            catch_exceptions=False,
-        )
-    assert result.exit_code == 0
+@with_submodules
+def test_update_submodule_path(project):
+    mock_fn = MockSubprocessRun(
+        [
+            MOCKED_GIT_SUBMODULE_STATUS,
+            *mocked_submodule_batch(CLOSING),
+            mocked_submodule_update(CLOSING),
+        ]
+    )
+    _invoke_update(project, mock_fn, [CLOSING])
     mock_fn.assert_completed_calls()
 
 
-@pytest.mark.project_setup(
-    manifest=dict(odoo_version="16.0"),
-    proj_version="16.0.1.2.3",
-    extra_files={
-        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
-    },
-)
+@with_submodules
+def test_update_aligned_submodule_path_does_nothing(project):
+    """Naming a submodule that is already at the recorded commit is not a way
+    round the check -- and with nothing to do, no display is drawn either."""
+    mock_fn = MockSubprocessRun([MOCKED_GIT_SUBMODULE_STATUS])
+    _invoke_update(project, mock_fn, [REPORTING])
+    mock_fn.assert_completed_calls()
+
+
+@with_submodules
+def test_update_force_skips_the_status_check(project):
+    """With --force the statuses are not consulted at all, and both submodules
+    go through the batched bookkeeping together."""
+    paths = [CLOSING, REPORTING]
+    mock_fn = MockSubprocessRun(
+        [
+            *mocked_submodule_batch(*paths),
+            *(mocked_submodule_update(path) for path in paths),
+        ]
+    )
+    _invoke_update(project, mock_fn, ["--force"])
+    mock_fn.assert_completed_calls()
+
+
+@with_submodules
 def test_ls(project):
     result = project.invoke(
         submodule.ls,
@@ -284,7 +245,7 @@ def test_sync_remote_no_pending_merges(project):
         ]
     )
     with (
-        mock.patch("subprocess.run", mock_fn),
+        mock_subprocess(mock_fn),
         mock.patch.object(
             submodule.pm_utils, "get_new_remote_url", return_value=new_remote_url
         ),
@@ -322,7 +283,7 @@ def test_sync_remote_with_pending_merges(project):
         ]
     )
     with (
-        mock.patch("subprocess.run", mock_fn),
+        mock_subprocess(mock_fn),
         mock.patch.object(
             submodule.pm_utils, "get_new_remote_url", return_value=new_remote_url
         ),
@@ -341,13 +302,7 @@ def test_sync_remote_with_pending_merges(project):
     mock_rebuild.assert_called_once_with(push=True)
 
 
-@pytest.mark.project_setup(
-    manifest=dict(odoo_version="16.0"),
-    proj_version="16.0.1.2.3",
-    extra_files={
-        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
-    },
-)
+@with_submodules
 def test_ls_dockerfile(project):
     result = project.invoke(
         submodule.ls,
@@ -417,25 +372,23 @@ def test_ls_dockerfile_with_paid_modules(project):
     ]
 
 
-@pytest.mark.project_setup(
-    manifest=dict(odoo_version="16.0"),
-    proj_version="16.0.1.2.3",
-    extra_files={
-        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
-    },
-)
+@with_submodules
 def test_upgrade_no_pending_merges(project):
     commit_before = "aaa111"
     commit_after = "bbb222"
     mock_fn = MockSubprocessRun(
         [
+            # the superproject bookkeeping, once for every submodule being
+            # upgraded: `.gitmodules` is the source of truth for the url
+            {"args": lambda args: args[:3] == ["git", "submodule", "sync"]},
+            {"args": lambda args: args[:3] == ["git", "submodule", "init"]},
             # submodule_update for account-closing
             {
                 "args": [
                     "git",
                     "submodule",
                     "update",
-                    "--init",
+                    "--",
                     "odoo/external-src/account-closing",
                 ],
             },
@@ -446,20 +399,11 @@ def test_upgrade_no_pending_merges(project):
                 ),
                 "stdout": commit_before.encode(),
             },
-            # submodule_upgrade (no branch)
-            {
-                "args": lambda args: (
-                    args[:5]
-                    == [
-                        "git",
-                        "submodule",
-                        "update",
-                        "-f",
-                        "--remote",
-                    ]
-                    and "odoo/external-src/account-closing" in args
-                ),
-            },
+            # submodule_upgrade: fetch the branch by url, check out what came
+            # back -- no guessing which local remote holds the tip
+            {"args": lambda args: args[3:5] == ["reset", "--hard"]},
+            {"args": lambda args: args[3] == "fetch" and args[-1] == "16.0"},
+            {"args": lambda args: args[3:] == ["checkout", "--detach", "FETCH_HEAD"]},
             # get_submodule_commit after
             {
                 "args": lambda args: (
@@ -473,7 +417,7 @@ def test_upgrade_no_pending_merges(project):
                     "git",
                     "submodule",
                     "update",
-                    "--init",
+                    "--",
                     "odoo/external-src/account-financial-reporting",
                 ],
             },
@@ -484,20 +428,11 @@ def test_upgrade_no_pending_merges(project):
                 ),
                 "stdout": commit_after.encode(),
             },
-            # submodule_upgrade (no branch)
-            {
-                "args": lambda args: (
-                    args[:5]
-                    == [
-                        "git",
-                        "submodule",
-                        "update",
-                        "-f",
-                        "--remote",
-                    ]
-                    and "odoo/external-src/account-financial-reporting" in args
-                ),
-            },
+            # submodule_upgrade: fetch the branch by url, check out what came
+            # back -- no guessing which local remote holds the tip
+            {"args": lambda args: args[3:5] == ["reset", "--hard"]},
+            {"args": lambda args: args[3] == "fetch" and args[-1] == "16.0"},
+            {"args": lambda args: args[3:] == ["checkout", "--detach", "FETCH_HEAD"]},
             # get_submodule_commit after (same = not upgraded)
             {
                 "args": lambda args: (
@@ -508,7 +443,7 @@ def test_upgrade_no_pending_merges(project):
         ]
     )
     with (
-        mock.patch("subprocess.run", mock_fn),
+        mock_subprocess(mock_fn),
         mock.patch(
             "odoo_tools.utils.git.find_autoshare_repository",
             return_value=(None, None),
@@ -521,7 +456,7 @@ def test_upgrade_no_pending_merges(project):
     ):
         result = project.invoke(
             submodule.upgrade,
-            [],
+            ["--jobs", "1"],
             catch_exceptions=False,
         )
     assert result.exit_code == 0
@@ -530,13 +465,7 @@ def test_upgrade_no_pending_merges(project):
     assert "NOT UPGRADED" in result.output
 
 
-@pytest.mark.project_setup(
-    manifest=dict(odoo_version="16.0"),
-    proj_version="16.0.1.2.3",
-    extra_files={
-        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
-    },
-)
+@with_submodules
 def test_upgrade_with_pending_merges(project):
     with (
         mock.patch.object(
@@ -549,77 +478,26 @@ def test_upgrade_with_pending_merges(project):
             "has_any_pr_left",
             return_value=True,
         ),
-        mock.patch.object(
-            submodule.pm_utils.Repo, "purge_merged_prs", return_value=[]
-        ) as mock_purge,
+        mock.patch.object(submodule.pending, "purge_repos") as mock_purge,
         mock.patch.object(
             submodule.pm_utils.Repo, "rebuild_consolidation_branch"
         ) as mock_rebuild,
         mock.patch.object(
-            submodule.pm_utils.gh, "get_target_branch", return_value="merge-branch"
+            submodule.gh, "get_target_branch", return_value="merge-branch"
         ),
     ):
         result = project.invoke(
             submodule.upgrade,
-            ["odoo/external-src/account-closing"],
+            ["odoo/external-src/account-closing", "--jobs", "1"],
             catch_exceptions=False,
         )
     assert result.exit_code == 0
-    mock_purge.assert_called_once_with()
+    mock_purge.assert_called_once()
+    assert [repo.name for repo in mock_purge.call_args.args[0]] == ["account-closing"]
     mock_rebuild.assert_called_once_with(push=True, target_branch="merge-branch")
 
 
-@pytest.mark.project_setup(
-    manifest=dict(odoo_version="16.0"),
-    proj_version="16.0.1.2.3",
-    extra_files={
-        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
-    },
-)
-def test_upgrade_pending_merges_target_branch_resolved_once(project):
-    # The target branch depends on the project and its HEAD only, so it must be
-    # resolved once and reused, otherwise get_target_branch() asks to confirm
-    # the override once per submodule with pending merges.
-    with (
-        mock.patch.object(
-            submodule.pm_utils.Repo,
-            "has_pending_merges",
-            return_value=True,
-        ),
-        mock.patch.object(
-            submodule.pm_utils.Repo,
-            "has_any_pr_left",
-            return_value=True,
-        ),
-        mock.patch.object(submodule.pm_utils.Repo, "purge_merged_prs", return_value=[]),
-        mock.patch.object(
-            submodule.pm_utils.Repo, "rebuild_consolidation_branch"
-        ) as mock_rebuild,
-        mock.patch.object(
-            submodule.pm_utils.gh, "get_target_branch", return_value="merge-branch"
-        ) as mock_get_target_branch,
-    ):
-        result = project.invoke(
-            submodule.upgrade,
-            [],
-            catch_exceptions=False,
-        )
-    assert result.exit_code == 0
-    mock_get_target_branch.assert_called_once_with()
-    # The fixture has 2 submodules: both are re-aggregated with the same branch.
-    assert mock_rebuild.call_args_list == [
-        mock.call(push=True, target_branch="merge-branch"),
-        mock.call(push=True, target_branch="merge-branch"),
-    ]
-
-
-@pytest.mark.project_setup(
-    manifest=dict(odoo_version="16.0"),
-    proj_version="16.0.1.2.3",
-    extra_files={
-        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
-    },
-)
+@with_submodules
 def test_upgrade_no_aggregate_never_resolves_target_branch(project):
     # Nothing gets re-aggregated: the target branch must never be resolved, so
     # that such a run never asks to confirm a branch override.
@@ -634,27 +512,19 @@ def test_upgrade_no_aggregate_never_resolves_target_branch(project):
             "has_any_pr_left",
             return_value=True,
         ),
-        mock.patch.object(submodule.pm_utils.Repo, "purge_merged_prs", return_value=[]),
-        mock.patch.object(
-            submodule.pm_utils.gh, "get_target_branch"
-        ) as mock_get_target_branch,
+        mock.patch.object(submodule.pending, "purge_repos"),
+        mock.patch.object(submodule.gh, "get_target_branch") as mock_get_target_branch,
     ):
         result = project.invoke(
             submodule.upgrade,
-            ["--no-aggregate"],
+            ["--no-aggregate", "--jobs", "1"],
             catch_exceptions=False,
         )
     assert result.exit_code == 0
     mock_get_target_branch.assert_not_called()
 
 
-@pytest.mark.project_setup(
-    manifest=dict(odoo_version="16.0"),
-    proj_version="16.0.1.2.3",
-    extra_files={
-        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
-    },
-)
+@with_submodules
 @pytest.mark.parametrize(
     "options,expect_purge,expect_rebuild",
     [
@@ -678,21 +548,19 @@ def test_upgrade_pending_merges_options(project, options, expect_purge, expect_r
             "has_any_pr_left",
             return_value=True,
         ),
-        mock.patch.object(
-            submodule.pm_utils.Repo, "purge_merged_prs", return_value=[]
-        ) as mock_purge,
+        mock.patch.object(submodule.pending, "purge_repos") as mock_purge,
         mock.patch.object(
             submodule.pm_utils.Repo, "rebuild_consolidation_branch"
         ) as mock_rebuild,
         mock.patch.object(
-            submodule.pm_utils.gh, "get_target_branch", return_value="merge-branch"
+            submodule.gh, "get_target_branch", return_value="merge-branch"
         ),
         mock.patch.object(submodule.git, "submodule_update") as mock_update,
         mock.patch.object(submodule.git, "submodule_upgrade") as mock_upgrade,
     ):
         result = project.invoke(
             submodule.upgrade,
-            ["odoo/external-src/account-closing", *options],
+            ["odoo/external-src/account-closing", "--jobs", "1", *options],
             catch_exceptions=False,
         )
     assert result.exit_code == 0
@@ -705,20 +573,14 @@ def test_upgrade_pending_merges_options(project, options, expect_purge, expect_r
         assert "Skipping odoo/external-src/account-closing" in result.output
 
 
-@pytest.mark.project_setup(
-    manifest=dict(odoo_version="16.0"),
-    proj_version="16.0.1.2.3",
-    extra_files={
-        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
-    },
-)
+@with_submodules
 def test_upgrade_pending_merges_all_purged(project):
-    # Regression test for #252: when purging removes the last pending PR,
-    # purge_merged_prs() already deletes the pending-merges file. The upgrade
-    # command must NOT call _handle_empty_merges_file() again, otherwise it
-    # reads the now-deleted file and crashes with FileNotFoundError.
-    # True the first time (enter purge branch), False afterwards because
-    # purge_merged_prs() deleted the now-empty pending-merges file.
+    # Regression test for #252: purging can remove the last pending PR, and
+    # `pending.purge_repos` disposes of the emptied merges file itself. The
+    # upgrade command must NOT handle it again, or it reads a file that is no
+    # longer there and crashes with FileNotFoundError.
+    # True the first time (so the repo is purged), False afterwards because the
+    # purge deleted the now-empty pending-merges file.
     pending_merges = iter([True])
 
     def fake_has_pending_merges(self):
@@ -731,45 +593,43 @@ def test_upgrade_pending_merges_all_purged(project):
             autospec=True,
             side_effect=fake_has_pending_merges,
         ),
-        mock.patch.object(
-            submodule.pm_utils.Repo, "purge_merged_prs", return_value=[]
-        ) as mock_purge,
+        mock.patch.object(submodule.pending, "purge_repos") as mock_purge,
         mock.patch.object(
             submodule.pm_utils.Repo, "_handle_empty_merges_file"
         ) as mock_handle,
+        mock.patch.object(submodule.git, "sync_submodules"),
+        mock.patch.object(submodule.git, "register_submodules"),
         mock.patch.object(submodule.git, "submodule_update"),
         mock.patch.object(submodule.git, "submodule_upgrade"),
     ):
         result = project.invoke(
             submodule.upgrade,
-            ["odoo/external-src/account-closing"],
+            ["odoo/external-src/account-closing", "--jobs", "1"],
             catch_exceptions=False,
         )
     assert result.exit_code == 0
-    mock_purge.assert_called_once_with()
-    # The caller must not re-handle the empty file; purge_merged_prs() owns it.
+    mock_purge.assert_called_once()
+    # The caller must not re-handle the empty file; purge_repos() owns it.
     mock_handle.assert_not_called()
 
 
-@pytest.mark.project_setup(
-    manifest=dict(odoo_version="16.0"),
-    proj_version="16.0.1.2.3",
-    extra_files={
-        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
-    },
-)
+@with_submodules
 def test_upgrade_force_branch(project):
     commit_before = "aaa111"
     commit_after = "bbb222"
     mock_fn = MockSubprocessRun(
         [
+            # the superproject bookkeeping, once for every submodule being
+            # upgraded: `.gitmodules` is the source of truth for the url
+            {"args": lambda args: args[:3] == ["git", "submodule", "sync"]},
+            {"args": lambda args: args[:3] == ["git", "submodule", "init"]},
             # submodule_update
             {
                 "args": [
                     "git",
                     "submodule",
                     "update",
-                    "--init",
+                    "--",
                     "odoo/external-src/account-closing",
                 ],
             },
@@ -780,20 +640,11 @@ def test_upgrade_force_branch(project):
                 ),
                 "stdout": commit_before.encode(),
             },
-            # git reset
-            {
-                "args": lambda args: args[:2] == ["git", "-C"] and args[-1] == "--hard",
-            },
-            # git fetch
-            {
-                "args": lambda args: args[:2] == ["git", "-C"] and "fetch" in args,
-            },
-            # git checkout
-            {
-                "args": lambda args: (
-                    args[:2] == ["git", "-C"] and "checkout" in args and "17.0" in args
-                ),
-            },
+            # submodule_upgrade: fetch the forced branch by url, then check
+            # out exactly what came back
+            {"args": lambda args: args[3:5] == ["reset", "--hard"]},
+            {"args": lambda args: args[3] == "fetch" and args[-1] == "17.0"},
+            {"args": lambda args: args[3:] == ["checkout", "--detach", "FETCH_HEAD"]},
             # get_submodule_commit after
             {
                 "args": lambda args: (
@@ -804,7 +655,7 @@ def test_upgrade_force_branch(project):
         ]
     )
     with (
-        mock.patch("subprocess.run", mock_fn),
+        mock_subprocess(mock_fn),
         mock.patch(
             "odoo_tools.utils.git.find_autoshare_repository",
             return_value=(None, None),
@@ -821,9 +672,413 @@ def test_upgrade_force_branch(project):
                 "odoo/external-src/account-closing",
                 "--force-branch",
                 "17.0",
+                "--jobs",
+                "1",
             ],
             catch_exceptions=False,
         )
     assert result.exit_code == 0
     mock_fn.assert_completed_calls()
     assert "UPGRADED" in result.output
+
+
+# ── init / update, several submodules at a time ──────────────────────────────
+
+SUBMODULES = [
+    "odoo/external-src/account-closing",
+    "odoo/external-src/account-financial-reporting",
+]
+
+
+def _patch_git(name, replacement=None):
+    """Replace a git helper with a recording mock, optionally acting as one."""
+    return mock.patch.object(submodule.git, name, side_effect=replacement)
+
+
+@with_submodules
+def test_update_runs_the_submodules_in_parallel(project):
+    """Both submodules really are updated at the same time.
+
+    The barrier only clears if both are in flight together, so a serial
+    implementation times out on it rather than passing.
+    """
+    both_in_flight = threading.Barrier(2, timeout=10)
+
+    with (
+        _patch_git("sync_submodules"),
+        _patch_git("sync_submodules"),
+        _patch_git("register_submodules"),
+        _patch_git("submodule_update", lambda *a, **kw: both_in_flight.wait()),
+    ):
+        result = project.invoke(
+            submodule.update, ["--force", "--jobs", "2"], catch_exceptions=True
+        )
+    assert result.exit_code == 0, result.output
+
+
+@with_submodules
+def test_init_runs_the_submodules_in_parallel(project):
+    both_in_flight = threading.Barrier(2, timeout=10)
+
+    with _patch_git("submodule_init", lambda *a, **kw: both_in_flight.wait()):
+        result = project.invoke(submodule.init, ["--jobs", "2"], catch_exceptions=True)
+    assert result.exit_code == 0, result.output
+
+
+@with_submodules
+def test_update_jobs_caps_the_concurrency(project):
+    """--jobs 1 serialises them: no two updates ever overlap."""
+    update, state = peak_counter()
+    with (
+        _patch_git("sync_submodules"),
+        _patch_git("sync_submodules"),
+        _patch_git("register_submodules"),
+        _patch_git("submodule_update", update),
+    ):
+        result = project.invoke(
+            submodule.update, ["--force", "--jobs", "1"], catch_exceptions=True
+        )
+    assert result.exit_code == 0
+    assert state["peak"] == 1
+
+
+def _fails_on_account_closing(path, *args, **kwargs):
+    if str(path) == SUBMODULES[0]:
+        raise RuntimeError("fatal: could not read from remote")
+
+
+@with_submodules
+def test_update_reports_failures_without_stopping(project):
+    """One submodule failing doesn't prevent the others, and its log is linked."""
+    with (
+        _patch_git("sync_submodules"),
+        _patch_git("sync_submodules"),
+        _patch_git("register_submodules"),
+        _patch_git("submodule_update", _fails_on_account_closing) as mock_update,
+    ):
+        result = project.invoke(submodule.update, ["--force"], catch_exceptions=True)
+    assert result.exit_code == 1
+    # the healthy one was attempted too, whichever order they ran in
+    assert {str(call.args[0]) for call in mock_update.call_args_list} == set(SUBMODULES)
+    failed_lines = [line for line in result.output.splitlines() if line.startswith("✖")]
+    # the one submodule, and the step it was part of
+    assert len(failed_lines) == 2
+    assert failed_lines[0].startswith(f"✖ {SUBMODULES[0]}")
+    assert failed_lines[1] == "✖ Updating submodules"
+    assert "1 task(s) failed" in result.output
+    assert "Please inspect the logs for details." in result.output
+
+
+@with_submodules
+def test_init_does_not_print_the_addons_path_when_a_submodule_failed(project):
+    """An incomplete ENV ADDONS_PATH pasted into a Dockerfile is worse than none."""
+    with _patch_git(
+        "submodule_init", lambda info: _fails_on_account_closing(info.path)
+    ):
+        result = project.invoke(submodule.init, [], catch_exceptions=True)
+    assert result.exit_code == 1
+    assert "1 task(s) failed" in result.output
+    assert "ENV ADDONS_PATH" not in result.output
+
+
+@with_submodules
+def test_update_writes_nothing_to_the_terminal_showing_the_display(project, capfd):
+    """Whether a helper reports through ui.echo or runs a command, what it says
+    lands in the submodule's log -- written raw it would corrupt the display.
+
+    The two escape through different channels, so they are looked for in
+    different places: ui.echo would reach the click runner's own buffer, while
+    a command inheriting our file descriptors would reach the real ones.
+    """
+
+    def submodule_update(path, *args, **kwargs):
+        ui.echo("chatty progress report")
+        os_exec.run(["sh", "-c", "echo to stdout; echo to stderr >&2"])
+
+    with (
+        mock.patch.object(
+            submodule, "console", Console(force_terminal=True, width=100)
+        ),
+        _patch_git("sync_submodules"),
+        _patch_git("sync_submodules"),
+        _patch_git("register_submodules"),
+        _patch_git("submodule_update", submodule_update),
+    ):
+        result = project.invoke(submodule.update, ["--force"], catch_exceptions=True)
+    assert result.exit_code == 0
+    # a task that went fine leaves nothing of what it said on its row, either
+    assert "chatty progress report" not in result.output
+    captured = capfd.readouterr()
+    assert "to stdout" not in captured.out + captured.err
+    assert "to stderr" not in captured.out + captured.err
+
+
+@with_submodules
+def test_update_filters_on_the_given_path(project):
+    with (
+        _patch_git("sync_submodules"),
+        _patch_git("sync_submodules"),
+        _patch_git("register_submodules"),
+        _patch_git("submodule_update") as mock_update,
+    ):
+        result = project.invoke(
+            submodule.update, [SUBMODULES[1], "--force"], catch_exceptions=True
+        )
+    assert result.exit_code == 0
+    assert [str(call.args[0]) for call in mock_update.call_args_list] == [SUBMODULES[1]]
+
+
+@with_submodules
+def test_the_shared_state_is_resolved_before_the_submodules_start(project):
+    """git-autoshare prints in-process when it cannot find its config, and the
+    project manifest is parsed with a shared parser -- so the first use of
+    either has to happen while one thread still owns the terminal, not from a
+    worker with a display drawn over it.
+    """
+    events = []
+    with (
+        mock.patch.object(
+            submodule.git,
+            "preload_submodule_state",
+            side_effect=lambda: events.append("preload"),
+        ),
+        _patch_git("sync_submodules"),
+        _patch_git("sync_submodules"),
+        _patch_git("register_submodules"),
+        _patch_git("submodule_update", lambda *a, **kw: events.append("task")),
+    ):
+        result = project.invoke(submodule.update, ["--force"], catch_exceptions=True)
+    assert result.exit_code == 0
+    assert events[0] == "preload"
+    assert events.count("preload") == 1
+    assert events.count("task") == 2
+
+
+@pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
+)
+def test_nothing_is_resolved_when_there_are_no_submodules(project):
+    """No .gitmodules, so no display to draw and no shared state to fill."""
+    with mock.patch.object(submodule.git, "preload_submodule_state") as mock_preload:
+        result = project.invoke(submodule.update, [], catch_exceptions=False)
+    assert result.exit_code == 0
+    mock_preload.assert_not_called()
+
+
+# ── upgrade, several submodules at a time ────────────────────────────────────
+
+
+@with_submodules
+def test_upgrade_runs_the_submodules_in_parallel(project):
+    """The barrier only clears if both are in flight together."""
+    both_in_flight = threading.Barrier(2, timeout=10)
+
+    with (
+        patch_attr(submodule.pm_utils.Repo, "has_pending_merges", lambda self: False),
+        _patch_git("sync_submodules"),
+        _patch_git("register_submodules"),
+        _patch_git("submodule_update"),
+        _patch_git("submodule_upgrade", lambda *a, **kw: both_in_flight.wait()),
+    ):
+        result = project.invoke(
+            submodule.upgrade, ["--jobs", "2"], catch_exceptions=True
+        )
+    assert result.exit_code == 0, result.output
+
+
+@with_submodules
+def test_upgrade_resolves_the_target_branch_before_the_submodules_start(project):
+    """Resolving it may prompt, and it is the same branch for all of them."""
+    events = []
+
+    with (
+        patch_attr(submodule.pm_utils.Repo, "has_pending_merges", lambda self: True),
+        mock.patch.object(submodule.pending, "purge_repos"),
+        patch_attr(
+            submodule.pm_utils.Repo,
+            "rebuild_consolidation_branch",
+            lambda self, **kw: events.append("rebuild"),
+        ) as mock_rebuild,
+        mock.patch.object(
+            submodule.gh,
+            "get_target_branch",
+            side_effect=lambda: events.append("resolve") or "branch-1234",
+        ) as mock_target_branch,
+    ):
+        result = project.invoke(submodule.upgrade, [], catch_exceptions=True)
+    assert result.exit_code == 0, result.output
+    mock_target_branch.assert_called_once()
+    # resolved once, before either of them, and both get that same branch
+    assert events == ["resolve", "rebuild", "rebuild"]
+    assert all(
+        call.kwargs == {"push": True, "target_branch": "branch-1234"}
+        for call in mock_rebuild.call_args_list
+    )
+
+
+@with_submodules
+def test_upgrade_rolls_a_failure_back_and_still_reports_it(project):
+    """A half-upgraded submodule is worse than one left alone -- but rolling it
+    back is not succeeding, so it is still reported and the run fails."""
+    rolled_back = []
+
+    def submodule_update(path, *args, **kwargs):
+        # the second call for a path is the roll-back
+        rolled_back.append(str(path))
+
+    with (
+        patch_attr(submodule.pm_utils.Repo, "has_pending_merges", lambda self: False),
+        _patch_git("sync_submodules"),
+        _patch_git("register_submodules"),
+        _patch_git("submodule_update", submodule_update),
+        _patch_git("submodule_upgrade", _fails_on_account_closing),
+    ):
+        result = project.invoke(submodule.upgrade, [], catch_exceptions=True)
+    assert result.exit_code == 1
+    assert "1 task(s) failed" in result.output
+    # updated once each, and then a second time for the one that failed
+    assert rolled_back.count(SUBMODULES[0]) == 2
+    assert rolled_back.count(SUBMODULES[1]) == 1
+
+
+@with_submodules
+def test_upgrade_rereads_gitmodules_after_purging(project):
+    """Disposing of an emptied merges file points a submodule's url back at
+    the upstream, so what was read before the purge is out of date.
+
+    Upgrading off the stale url fetches the company fork, which only ever held
+    the consolidation branch and has no version branch to move to -- `git
+    fetch <fork> 19.0` then fails with "couldn't find remote ref".
+    """
+    fork = "git@github.com:camptocamp/account-closing.git"
+    upstream = "git@github.com:OCA/account-closing.git"
+    Path(".gitmodules").write_text(
+        f'[submodule "{SUBMODULES[0]}"]\n'
+        f"\tpath = {SUBMODULES[0]}\n\turl = {fork}\n\tbranch = 16.0\n"
+    )
+
+    def purge(repos, jobs=None):
+        # what `_handle_empty_merges_file` does on the way out
+        Path(".gitmodules").write_text(
+            f'[submodule "{SUBMODULES[0]}"]\n'
+            f"\tpath = {SUBMODULES[0]}\n\turl = {upstream}\n\tbranch = 16.0\n"
+        )
+        return []
+
+    with (
+        patch_attr(submodule.pm_utils.Repo, "has_pending_merges", lambda self: False),
+        mock.patch.object(submodule.pending, "purge_repos", side_effect=purge),
+        _patch_git("sync_submodules"),
+        _patch_git("register_submodules"),
+        _patch_git("submodule_update"),
+        _patch_git("submodule_upgrade") as mock_upgrade,
+    ):
+        result = project.invoke(submodule.upgrade, [], catch_exceptions=True)
+    assert result.exit_code == 0, result.output
+    # the url it upgrades from is the one the purge left behind
+    assert mock_upgrade.call_args.args[1] == upstream
+
+
+@with_submodules
+def test_upgrade_rebuilds_before_it_upgrades(project):
+    """Rebuilding a consolidation branch pushes to the company remote; reading
+    the report of that is far easier when a dozen submodules being pulled are
+    not interleaved with it. So the two are steps, not one fan-out.
+
+    Asserted as "no upgrade had begun while a rebuild was still running", not
+    as the order things finished in -- one fan-out would satisfy that by luck.
+    """
+    rebuilt = threading.Event()
+    seen_by_the_upgrade = []
+    # The first submodule has pending merges and is rebuilt; the second has
+    # none and is upgraded.
+    with_pending = {SUBMODULES[0]}
+
+    def rebuild(self, **kwargs):
+        # Long enough that an upgrade sharing the fan-out would start meanwhile
+        time.sleep(0.05)
+        rebuilt.set()
+
+    with (
+        patch_attr(
+            submodule.pm_utils.Repo,
+            "has_pending_merges",
+            lambda self: str(self.path) in with_pending,
+        ),
+        mock.patch.object(submodule.pending, "purge_repos", return_value=[]),
+        mock.patch.object(submodule.gh, "get_target_branch", return_value="master"),
+        patch_attr(submodule.pm_utils.Repo, "rebuild_consolidation_branch", rebuild),
+        _patch_git("sync_submodules"),
+        _patch_git("register_submodules"),
+        _patch_git("submodule_update"),
+        _patch_git(
+            "submodule_upgrade",
+            lambda *a, **kw: seen_by_the_upgrade.append(rebuilt.is_set()),
+        ),
+    ):
+        result = project.invoke(submodule.upgrade, [], catch_exceptions=True)
+    assert result.exit_code == 0, result.output
+    assert seen_by_the_upgrade == [True]
+
+
+@with_submodules
+def test_upgrade_stops_when_a_rebuild_fails(project):
+    """A consolidation branch that could not be rebuilt leaves the project in a
+    state nobody asked for; upgrading the rest on top of it only adds
+    movement to undo."""
+    upgraded = []
+
+    def explode(self, **kwargs):
+        raise RuntimeError("aggregation failed")
+
+    with (
+        patch_attr(
+            submodule.pm_utils.Repo,
+            "has_pending_merges",
+            lambda self: str(self.path) == SUBMODULES[0],
+        ),
+        mock.patch.object(submodule.pending, "purge_repos", return_value=[]),
+        mock.patch.object(submodule.gh, "get_target_branch", return_value="master"),
+        patch_attr(submodule.pm_utils.Repo, "rebuild_consolidation_branch", explode),
+        _patch_git("sync_submodules"),
+        _patch_git("register_submodules"),
+        _patch_git("submodule_update"),
+        _patch_git("submodule_upgrade", lambda path, *a, **kw: upgraded.append(path)),
+    ):
+        result = project.invoke(submodule.upgrade, [], catch_exceptions=True)
+    assert result.exit_code == 1, result.output
+    assert upgraded == []
+
+
+@with_submodules
+@pytest.mark.parametrize(
+    ("options", "asks"),
+    [([], True), (["--force-branch", "17.0"], False)],
+)
+def test_upgrade_asks_about_an_unexpected_branch_unless_forced(project, options, asks):
+    """A submodule tracking something other than the project's Odoo version is
+    usually a mistake, so it is queried -- but naming the branch outright is
+    already the answer to that question."""
+    Path(".gitmodules").write_text(
+        f'[submodule "{SUBMODULES[0]}"]\n'
+        f"\tpath = {SUBMODULES[0]}\n"
+        "\turl = git@github.com:OCA/account-closing.git\n"
+        "\tbranch = 15.0\n"
+    )
+    with (
+        patch_attr(submodule.pm_utils.Repo, "has_pending_merges", lambda self: False),
+        mock.patch.object(submodule.pending, "purge_repos", return_value=[]),
+        mock.patch.object(
+            submodule.ui, "ask_confirmation", return_value=True
+        ) as mock_ask,
+        _patch_git("sync_submodules"),
+        _patch_git("register_submodules"),
+        _patch_git("submodule_update"),
+        _patch_git("submodule_upgrade") as mock_upgrade,
+    ):
+        result = project.invoke(submodule.upgrade, options, catch_exceptions=True)
+    assert result.exit_code == 0, result.output
+    assert mock_ask.called is asks
+    # either way it is upgraded; the question is only whether one was asked
+    assert mock_upgrade.called

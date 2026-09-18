@@ -2,6 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import subprocess
+import threading
 from pathlib import Path
 from unittest import mock
 
@@ -11,9 +12,18 @@ import pytest
 from odoo_tools.exceptions import ProjectConfigException
 from odoo_tools.utils import git as git_utils
 from odoo_tools.utils import proj as proj_utils
+from odoo_tools.utils import ui
 from odoo_tools.utils.path import build_path, root_path
 
-from .common import MockSubprocessRun, assert_no_chdir, get_fixture_path
+from .common import (
+    GITMODULES,
+    MockSubprocessRun,
+    assert_no_chdir,
+    mock_subprocess,
+    peak_counter,
+    plain_console,
+    with_submodules,
+)
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -71,18 +81,21 @@ def test_repo_name_from_url_trailing_slash():
 
 
 def test_remote_exists_true():
-    with mock.patch("subprocess.run") as mock_run:
-        mock_run.return_value = mock.Mock(returncode=0)
+    with mock.patch("odoo_tools.utils.git.run") as mock_run:
         assert git_utils.remote_exists("/some/path", "OCA") is True
-        mock_run.assert_called_once_with(
-            ["git", "-C", "/some/path", "remote", "get-url", "OCA"],
-            capture_output=True,
-        )
+    # quiet: a missing remote is an answer, not something to report
+    mock_run.assert_called_once_with(
+        ["git", "-C", "/some/path", "remote", "get-url", "OCA"],
+        check=True,
+        quiet=True,
+    )
 
 
 def test_remote_exists_false():
-    with mock.patch("subprocess.run") as mock_run:
-        mock_run.return_value = mock.Mock(returncode=128)
+    with mock.patch(
+        "odoo_tools.utils.git.run",
+        side_effect=subprocess.CalledProcessError(128, "git"),
+    ):
         assert git_utils.remote_exists("/some/path", "OCA") is False
 
 
@@ -335,17 +348,21 @@ def test_setup_submodule_remotes_skips_probe_when_remote_present():
 
 def test_remote_repo_exists_true():
     git_utils.remote_repo_exists.cache_clear()
-    with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)) as mock_run:
+    with mock.patch("odoo_tools.utils.git.run") as mock_run:
         assert git_utils.remote_repo_exists("git@github.com:OCA/account-payment.git")
-        mock_run.assert_called_once_with(
-            ["git", "ls-remote", "git@github.com:OCA/account-payment.git"],
-            capture_output=True,
-        )
+    mock_run.assert_called_once_with(
+        ["git", "ls-remote", "git@github.com:OCA/account-payment.git"],
+        check=True,
+        quiet=True,
+    )
 
 
 def test_remote_repo_exists_false():
     git_utils.remote_repo_exists.cache_clear()
-    with mock.patch("subprocess.run", return_value=mock.Mock(returncode=128)):
+    with mock.patch(
+        "odoo_tools.utils.git.run",
+        side_effect=subprocess.CalledProcessError(128, "git"),
+    ):
         assert not git_utils.remote_repo_exists("git@github.com:OCA/odoo-tools.git")
 
 
@@ -378,39 +395,43 @@ def test_get_pinned_sha_returns_none_on_error():
 
 
 def test_pin_submodule_commit_when_in_store():
-    with (
-        mock.patch("subprocess.run") as mock_sp_run,
-        mock.patch("odoo_tools.utils.git.run") as mock_run,
-    ):
-        mock_sp_run.return_value = mock.Mock(returncode=0)  # cat-file succeeds
-        result = git_utils.pin_submodule_commit("/repo", "abc123")
-        assert result is True
-        mock_run.assert_called_once_with(
+    with mock.patch("odoo_tools.utils.git.run") as mock_run:  # cat-file succeeds
+        assert git_utils.pin_submodule_commit("/repo", "abc123") is True
+    assert mock_run.call_args_list == [
+        mock.call(
+            ["git", "-C", "/repo", "cat-file", "-e", "abc123^{commit}"],
+            check=True,
+            quiet=True,
+        ),
+        mock.call(
             ["git", "-C", "/repo", "update-ref", "refs/c2c-sync/pinned", "abc123"],
             check=True,
-        )
+        ),
+    ]
 
 
 def test_pin_submodule_commit_not_in_store():
-    with (
-        mock.patch("subprocess.run") as mock_sp_run,
-        mock.patch("odoo_tools.utils.git.run") as mock_run,
-    ):
-        mock_sp_run.return_value = mock.Mock(returncode=128)  # cat-file fails
-        result = git_utils.pin_submodule_commit("/repo", "abc123")
-        assert result is False
-        mock_run.assert_not_called()
+    """The commit isn't there, so there is nothing to point a ref at."""
+
+    def run(cmd, **kwargs):
+        if "cat-file" in cmd:
+            raise subprocess.CalledProcessError(1, cmd)
+        raise AssertionError(f"nothing else should have run: {cmd}")
+
+    with mock.patch("odoo_tools.utils.git.run", side_effect=run):
+        assert git_utils.pin_submodule_commit("/repo", "abc123") is False
 
 
 # ── submodule_update integration ──────────────────────────────────────────────
+
+#: The first submodule declared in the `fake-gitmodules` fixture.
+SUBMODULE = "odoo/external-src/account-closing"
 
 
 @pytest.mark.project_setup(
     manifest=dict(odoo_version="18.0", project_id="1289"),
     proj_version="18.0.1.0.0",
-    extra_files={
-        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
-    },
+    extra_files=GITMODULES,
 )
 def test_submodule_update_populates_autoshare_remotes(project, tmp_path):
     """When autoshare cache exists, setup_submodule_remotes is called on it."""
@@ -425,16 +446,16 @@ def test_submodule_update_populates_autoshare_remotes(project, tmp_path):
                     "git",
                     "submodule",
                     "update",
-                    "--init",
                     "--reference",
                     str(cache_dir),
-                    "odoo/external-src/account-closing",
+                    "--",
+                    SUBMODULE,
                 ],
             },
         ]
     )
     with (
-        mock.patch("subprocess.run", mock_fn),
+        mock_subprocess(mock_fn),
         mock.patch(
             "odoo_tools.utils.git.find_autoshare_repository",
             return_value=(None, autoshare_repo),
@@ -460,9 +481,7 @@ def test_submodule_update_populates_autoshare_remotes(project, tmp_path):
 @pytest.mark.project_setup(
     manifest=dict(odoo_version="18.0", project_id="1289"),
     proj_version="18.0.1.0.0",
-    extra_files={
-        ".gitmodules": Path(get_fixture_path("fake-gitmodules")).read_text(),
-    },
+    extra_files=GITMODULES,
 )
 def test_submodule_update_pins_commit_after_clone(project, tmp_path):
     """After git submodule update, pin the recorded commit in the submodule."""
@@ -471,20 +490,12 @@ def test_submodule_update_pins_commit_after_clone(project, tmp_path):
 
     mock_fn = MockSubprocessRun(
         [
-            {
-                "args": [
-                    "git",
-                    "submodule",
-                    "update",
-                    "--init",
-                    "odoo/external-src/account-closing",
-                ],
-            },
+            {"args": ["git", "submodule", "update", "--", SUBMODULE]},
         ]
     )
     pinned_sha = "deadbeef1234"
     with (
-        mock.patch("subprocess.run", mock_fn),
+        mock_subprocess(mock_fn),
         mock.patch(
             "odoo_tools.utils.git.find_autoshare_repository",
             return_value=(None, None),
@@ -555,3 +566,243 @@ def test_set_remote_url_runs_in_submodule(project):
         cwd=build_path("odoo/external-src/edi"),
         check=True,
     )
+
+
+@pytest.mark.parametrize(
+    ("helper", "verb"),
+    [
+        pytest.param(git_utils.sync_submodules, "sync", id="sync"),
+        pytest.param(git_utils.register_submodules, "init", id="register"),
+    ],
+)
+def test_the_superproject_commands_take_every_path_at_once(project, helper, verb):
+    """One command for the whole set, from the project root.
+
+    They cost the same for thirty paths as for one, so per-submodule they would
+    serialise most of the run behind their lock for no reason.
+    """
+    paths = ["odoo/external-src/edi", "odoo/external-src/web"]
+    with mock.patch("odoo_tools.utils.git.run") as mock_run, assert_no_chdir():
+        helper(paths)
+    mock_run.assert_called_once_with(
+        ["git", "submodule", verb, "--", *paths],
+        cwd=root_path(),
+        check=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "helper", [git_utils.sync_submodules, git_utils.register_submodules]
+)
+def test_the_superproject_commands_do_nothing_for_no_paths(project, helper):
+    with mock.patch("odoo_tools.utils.git.run") as mock_run:
+        helper([])
+    mock_run.assert_not_called()
+
+
+def test_submodule_add_runs_in_project_root(project):
+    submodule = git_utils.SubmoduleInfo(
+        SUBMODULE, "git@github.com:OCA/account-closing.git", "16.0", False, False
+    )
+    with mock.patch("odoo_tools.utils.git.run") as mock_run, assert_no_chdir():
+        git_utils.submodule_add(submodule)
+    mock_run.assert_called_once_with(
+        [
+            "git",
+            "autoshare-submodule-add",
+            "-b",
+            "16.0",
+            "--force",
+            "git@github.com:OCA/account-closing.git",
+            SUBMODULE,
+        ],
+        cwd=root_path(),
+        check=True,
+    )
+
+
+@with_submodules
+def test_submodule_update_runs_in_project_root(project):
+    with (
+        mock.patch("odoo_tools.utils.git.run") as mock_run,
+        mock.patch(
+            "odoo_tools.utils.git.find_autoshare_repository", return_value=(None, None)
+        ),
+        assert_no_chdir(),
+    ):
+        git_utils.submodule_update(SUBMODULE)
+    # only the submodule's own update: registering it is the caller's job, done
+    # once for the whole set before any of this runs
+    mock_run.assert_called_once_with(
+        ["git", "submodule", "update", "--", SUBMODULE], cwd=root_path(), check=True
+    )
+
+
+# ── serialising what the superproject shares ─────────────────────────────────
+#
+# `.gitmodules`, `.git/config` and `.git/index` belong to the project repository
+# rather than to any one submodule, and git fails outright on a lock it cannot
+# take. So the commands writing them run one at a time -- and, just as
+# importantly, the fetching and cloning around them does not.
+
+
+def _submodules(count):
+    return [
+        git_utils.SubmoduleInfo(
+            f"odoo/external-src/repo{i}",
+            f"git@github.com:OCA/repo{i}.git",
+            "16.0",
+            False,
+            False,
+        )
+        for i in range(count)
+    ]
+
+
+def test_adding_submodules_never_overlaps(project):
+    """`git submodule add` writes .gitmodules, the index and .git/config; two
+    at once would make one of them fail on a lock git never waits for."""
+    run, state = peak_counter()
+    with mock.patch("odoo_tools.utils.git.run", side_effect=run):
+        results = ui.run_tasks(
+            {
+                submodule.path: (
+                    lambda progress, submodule=submodule: git_utils.submodule_add(
+                        submodule
+                    )
+                )
+                for submodule in _submodules(3)
+            },
+            max_workers=3,
+            console=plain_console(),
+        )
+    assert all(result.ok for result in results)
+    assert state["peak"] == 1
+
+
+@with_submodules
+def test_fetching_the_submodules_themselves_still_overlaps(project):
+    """The counterpart, and the one that pins the design: were the clone held
+    under the same lock, running several submodules at once would buy nothing
+    -- and this barrier would time out instead of clearing."""
+    both_in_flight = threading.Barrier(2, timeout=10)
+
+    def run(cmd, **kwargs):
+        if cmd[:3] == ["git", "submodule", "update"]:
+            both_in_flight.wait()
+        return ""
+
+    submodules = list(git_utils.iter_gitmodules())
+    assert len(submodules) == 2
+    with (
+        mock.patch("odoo_tools.utils.git.run", side_effect=run),
+        mock.patch(
+            "odoo_tools.utils.git.find_autoshare_repository", return_value=(None, None)
+        ),
+    ):
+        results = ui.run_tasks(
+            {
+                submodule.path: (
+                    lambda progress, submodule=submodule: git_utils.submodule_update(
+                        submodule.path, submodule=submodule
+                    )
+                )
+                for submodule in submodules
+            },
+            max_workers=2,
+            console=plain_console(),
+        )
+    # a BrokenBarrierError would have been captured as a task failure
+    assert all(result.ok for result in results), [r.error for r in results]
+
+
+# ── the git-autoshare cache ──────────────────────────────────────────────────
+
+
+@with_submodules
+def test_the_autoshare_cache_is_prefetched_as_a_command(project, tmp_path):
+    """AutoshareRepository.prefetch() would print and run git on our own file
+    descriptors, which no capture can reach."""
+    autoshare_repo = _make_autoshare_repo(tmp_path / "never-created")
+    with (
+        mock.patch("odoo_tools.utils.git.run") as mock_run,
+        mock.patch(
+            "odoo_tools.utils.git.find_autoshare_repository",
+            return_value=(None, autoshare_repo),
+        ),
+        mock.patch("odoo_tools.utils.git.setup_submodule_remotes"),
+        mock.patch("odoo_tools.utils.git.get_pinned_sha", return_value=None),
+    ):
+        git_utils.submodule_update(SUBMODULE)
+    autoshare_repo.prefetch.assert_not_called()
+    assert (
+        mock.call(
+            [
+                "git",
+                "autoshare-prefetch",
+                "-q",
+                "git@github.com:OCA/account-closing.git",
+            ],
+            check=True,
+        )
+        in mock_run.call_args_list
+    )
+
+
+@with_submodules
+def test_a_cache_that_is_already_there_is_not_prefetched(project, tmp_path):
+    cache_dir = tmp_path / "autoshare-cache"
+    cache_dir.mkdir()
+    with (
+        mock.patch("odoo_tools.utils.git.run") as mock_run,
+        mock.patch(
+            "odoo_tools.utils.git.find_autoshare_repository",
+            return_value=(None, _make_autoshare_repo(cache_dir)),
+        ),
+        mock.patch("odoo_tools.utils.git.setup_submodule_remotes"),
+        mock.patch("odoo_tools.utils.git.get_pinned_sha", return_value=None),
+    ):
+        git_utils.submodule_update(SUBMODULE)
+    assert not any(
+        "autoshare-prefetch" in call.args[0] for call in mock_run.call_args_list
+    )
+
+
+# ── upgrading to a branch tip ────────────────────────────────────────────────
+
+
+@with_submodules
+def test_submodule_upgrade_fetches_the_branch_by_url(project):
+    """Not `git submodule update --remote`, which picks the remote itself.
+
+    It resolves the branch against whichever local remote matches the recorded
+    url and does not fetch it, so a remote-tracking ref nobody refreshed
+    upgrades the submodule to a commit that old without saying so.
+    """
+    url = "git@github.com:OCA/account-closing.git"
+    with (
+        mock.patch("odoo_tools.utils.git.run", return_value="") as mock_run,
+        mock.patch("odoo_tools.utils.git.get_submodule_commit", return_value="abc"),
+    ):
+        git_utils.submodule_upgrade(SUBMODULE, url)
+    commands = [call.args[0][3:] for call in mock_run.call_args_list]
+    assert commands == [
+        ["reset", "--hard", "HEAD"],
+        # the branch `.gitmodules` records for it, from the url it records
+        ["fetch", url, "16.0"],
+        ["checkout", "--detach", "FETCH_HEAD"],
+    ]
+    assert not any("--remote" in call.args[0] for call in mock_run.call_args_list)
+
+
+@with_submodules
+def test_submodule_upgrade_honours_a_forced_branch(project):
+    url = "git@github.com:OCA/account-closing.git"
+    with (
+        mock.patch("odoo_tools.utils.git.run", return_value="") as mock_run,
+        mock.patch("odoo_tools.utils.git.get_submodule_commit", return_value="abc"),
+    ):
+        git_utils.submodule_upgrade(SUBMODULE, url, branch="17.0")
+    assert ["fetch", url, "17.0"] in [
+        call.args[0][3:] for call in mock_run.call_args_list
+    ]

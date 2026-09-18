@@ -1,20 +1,21 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import subprocess
+from functools import partial
 
 import click
 from git import Repo as GitRepo
 from rich.console import Console
-from rich.live import Live
 from rich.prompt import Confirm
-from rich.spinner import Spinner
-from rich.table import Table
-from rich.text import Text
 
 from ..exceptions import ProjectConfigException
 from ..utils import gh, ui
-from ..utils.click import DEFAULT_MAX_WORKERS, global_command_decorators, jobs_option
+from ..utils.click import (
+    DEFAULT_MAX_WORKERS,
+    global_command_decorators,
+    jobs_option,
+)
 from ..utils.config import config
 from ..utils.git import get_current_branch, tag_signing_enabled
 from ..utils.marabunta import MarabuntaFileHandler
@@ -157,14 +158,32 @@ def _push_repo_branch(repo, branch_name, company_git_remote):
     """Push a single repo's pending-merge branch to the company remote."""
     merges_config = repo.merges_config()
     try:
-        run(f"git config remote.{company_git_remote}.url", cwd=repo.abs_path)
-    except Exception:  # TODO
+        # quiet: a remote that isn't configured yet is an answer, not something
+        # to report.
+        run(
+            f"git config remote.{company_git_remote}.url",
+            cwd=repo.abs_path,
+            check=True,
+            quiet=True,
+        )
+    except subprocess.CalledProcessError:
         remote_url = merges_config["remotes"][company_git_remote]
-        run(f"git remote add {company_git_remote} {remote_url}", cwd=repo.abs_path)
+        run(
+            f"git remote add {company_git_remote} {remote_url}",
+            cwd=repo.abs_path,
+            check=True,
+        )
     run(
         f"git push -f -v {company_git_remote} HEAD:refs/heads/{branch_name}",
         cwd=repo.abs_path,
+        check=True,
     )
+
+
+def _push_task(repo, branch_name, company_git_remote, progress):
+    progress.set_status("pushing")
+    _push_repo_branch(repo, branch_name, company_git_remote)
+    progress.set_outcome("pushed")
 
 
 def _push_aggregated_branches(
@@ -187,44 +206,17 @@ def _push_aggregated_branches(
     if not repos:
         ui.echo("No repo to push")
         return
-    states = {}  # repo -> "done" | error message
-    # Shared by every row: a new one per rebuild would restart the animation
-    spinner = Spinner("dots")
-
-    def build_grid():
-        grid = Table.grid(padding=(0, 1))
-        grid.add_column(no_wrap=True)  # state dot / spinner
-        grid.add_column()  # repo + outcome
-        for repo in repos:
-            state = states.get(repo)
-            outcome = Text(repo.path.as_posix(), no_wrap=True, overflow="ellipsis")
-            if state is None:
-                state_cell = spinner
-            elif state == "done":
-                state_cell = "[green]●[/]"
-                outcome.append(f" pushed {branch_name}", style="green")
-            else:
-                state_cell = "[red]?[/]"
-                outcome.append(f" {state}", style="red")
-            grid.add_row(state_cell, outcome)
-        return grid
-
-    with (
-        Live(build_grid(), console=console, refresh_per_second=10) as live,
-        ThreadPoolExecutor(max_workers=max_workers) as pool,
-    ):
-        futures = {
-            pool.submit(_push_repo_branch, repo, branch_name, company_git_remote): repo
+    ui.run_tasks(
+        {
+            repo.path.as_posix(): partial(
+                _push_task, repo, branch_name, company_git_remote
+            )
             for repo in repos
-        }
-        for future in as_completed(futures):
-            repo = futures[future]
-            try:
-                future.result()
-                states[repo] = "done"
-            except Exception as exc:
-                states[repo] = str(exc)
-            live.update(build_grid())
+        },
+        max_workers=max_workers,
+        console=console,
+        title="Pushing the aggregated branches",
+    )
 
 
 @click.group()

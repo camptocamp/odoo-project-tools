@@ -1,6 +1,9 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
+import io
 import shutil
+import threading
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -8,6 +11,8 @@ from unittest import mock
 
 import git
 import jinja2
+import pytest
+from rich.console import Console
 
 from odoo_tools.utils import pending_merge as pm_utils
 from odoo_tools.utils.config import config
@@ -28,6 +33,18 @@ def get_fixture(fname):
     return get_fixture_path(fname).read_text()
 
 
+#: The two-submodule `.gitmodules`, as `project_setup(extra_files=...)` wants it.
+GITMODULES = {".gitmodules": get_fixture("fake-gitmodules")}
+
+#: A 16.0 project with those two submodules declared. Markers compose, so a
+#: test needing a different manifest can still carry its own on top.
+with_submodules = pytest.mark.project_setup(
+    manifest=dict(odoo_version="16.0"),
+    proj_version="16.0.1.2.3",
+    extra_files=GITMODULES,
+)
+
+
 @contextmanager
 def assert_no_chdir():
     """Fail if the wrapped code changes the process working directory.
@@ -39,6 +56,53 @@ def assert_no_chdir():
     """
     with mock.patch("os.chdir", side_effect=AssertionError("os.chdir() called")):
         yield
+
+
+def patch_attr(target, name, replacement=None):
+    """Replace an attribute with a recording mock, optionally acting as one.
+
+    autospec so that the object the method was called on shows up as the first
+    argument of each recorded call -- which is how a test says *which* repos or
+    submodules were touched when the order they ran in is not defined -- and so
+    that a replacement still gets its ``self``.
+    """
+    return mock.patch.object(target, name, autospec=True, side_effect=replacement)
+
+
+def peak_counter(delay=0.02):
+    """A stand-in recording how many calls were ever in flight at once.
+
+    Returns the callable and the state it fills, so a test can assert
+    ``state["peak"] == 1`` to show that something never overlapped. The delay
+    is long enough that uncapped workers would visibly overlap without it.
+    """
+    guard, state = threading.Lock(), {"in_flight": 0, "peak": 0}
+
+    def call(*args, **kwargs):
+        with guard:
+            state["in_flight"] += 1
+            state["peak"] = max(state["peak"], state["in_flight"])
+        time.sleep(delay)
+        with guard:
+            state["in_flight"] -= 1
+        return ""
+
+    return call, state
+
+
+def plain_console():
+    """A console rendering to a string buffer, as in a non-interactive run."""
+    return Console(force_terminal=False, width=120)
+
+
+def terminal_console(width=100, interactive=False):
+    """A console that renders as if attached to a terminal, captured.
+
+    Non-interactive by default, which stops rich from running its refresh
+    thread: a capture then holds exactly the final frame. Pass
+    ``interactive=True`` to get the frames drawn while the tasks run.
+    """
+    return Console(force_terminal=True, force_interactive=interactive, width=width)
 
 
 def mock_pypi_version_cache(pkg_name, version):
@@ -266,7 +330,7 @@ class MockSpec:
         self.index: int = index
         self.kwargs: dict[str, Any] = kwargs
         self.done: bool = False
-        self.result: MockCompletedProcess | None = None
+        self.result: MockCompletedProcess | MockPopenProcess | None = None
 
     def __eq__(self, other: object) -> bool:
         return (
@@ -293,6 +357,9 @@ def convert_mock_specs(mock_specs: list[dict]) -> list[MockSpec]:
 
 class MockSubprocessRun:
     """A mock for subprocess.run that can be used with unittest.mock.patch.
+
+    Only mocks ``subprocess.run``; commands going through ``os_exec.run`` use
+    ``Popen``, so use :func:`mock_subprocess` to cover both.
 
     Usage:
 
@@ -348,7 +415,8 @@ class MockSubprocessRun:
 
     __str__ = __repr__ = _mock_repr
 
-    def __call__(self, args, stdout=None, **kwargs):
+    def _next_spec(self, args):
+        """Claim the spec for this call, checking the args and simulating it."""
         call_spec = self.mock_spec_todo[0]
         if call_spec["args"] is not None:
             if callable(call_spec["args"]):
@@ -364,10 +432,18 @@ class MockSubprocessRun:
                 *call_spec.get("sim_call_args", []),
                 **call_spec.get("sim_call_kwargs", {}),
             )
-        result = MockCompletedProcess(args, stdout=call_spec.get("stdout"))
+        return call_spec
+
+    def _record(self, call_spec, result):
         call_spec.done = True
         call_spec.result = result
         return result
+
+    def __call__(self, args, stdout=None, **kwargs):
+        call_spec = self._next_spec(args)
+        return self._record(
+            call_spec, MockCompletedProcess(args, stdout=call_spec.get("stdout"))
+        )
 
     def _assert_calls(
         self,
@@ -384,3 +460,70 @@ class MockSubprocessRun:
 
     def assert_incomplete_calls(self, calls: list[MockSpec] | None = None):
         self._assert_calls(self.mock_spec_todo, calls)
+
+
+def _as_text(value):
+    if value is None:
+        return ""
+    return value.decode() if isinstance(value, bytes) else value
+
+
+class MockPopenProcess:
+    """Minimal stand-in for a ``subprocess.Popen`` object."""
+
+    def __init__(self, args, stdout=None, stderr=None, returncode=0):
+        self.args = args
+        self.returncode = returncode
+        self.stdout = io.StringIO(_as_text(stdout))
+        self.stderr = io.StringIO(_as_text(stderr))
+
+    def wait(self):
+        return self.returncode
+
+
+class MockSubprocessPopen(MockSubprocessRun):
+    """:class:`MockSubprocessRun` for the ``subprocess.Popen`` interface.
+
+    ``os_exec.run`` goes through ``Popen``, so this is what mocks it out. The
+    spec format is the same, with an optional ``stderr`` and ``returncode``.
+    """
+
+    __slots__ = ()
+
+    def __call__(self, args, stdout=None, **kwargs):
+        call_spec = self._next_spec(args)
+        return self._record(
+            call_spec,
+            MockPopenProcess(
+                args,
+                stdout=call_spec.get("stdout"),
+                stderr=call_spec.get("stderr"),
+                returncode=call_spec.get("returncode", 0),
+            ),
+        )
+
+
+@contextmanager
+def mock_subprocess(engine):
+    """Route both ``subprocess.run`` and ``subprocess.Popen`` to ``engine``.
+
+    Commands reach the system either directly through ``subprocess.run`` or via
+    ``os_exec.run``, which uses ``Popen``; a test usually doesn't care which.
+    Both are mocked out, sharing ``engine``'s spec list so that the calls are
+    still matched in order whichever interface they come through.
+
+    Usage:
+        mock_fn = MockSubprocessRun(spec)
+        with mock_subprocess(mock_fn):
+            do your test
+        mock_fn.assert_completed_calls()
+    """
+    popen = MockSubprocessPopen()
+    # The same list object, not a copy: the calls are matched in order whichever
+    # interface they come through, and `done` has to be seen by both.
+    popen.mock_spec = engine.mock_spec
+    with (
+        mock.patch("subprocess.run", engine),
+        mock.patch("subprocess.Popen", popen),
+    ):
+        yield

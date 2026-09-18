@@ -1,12 +1,11 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
-from unittest.mock import patch
 
 import pytest
 
 from odoo_tools.utils import misc as misc_utils
 
-from .common import MockSubprocessRun
+from .common import MockSubprocessRun, mock_subprocess
 
 
 def test_parse_ini_key():
@@ -48,6 +47,6 @@ def test_get_docker_image_commit_hashes():
             },
         ]
     )
-    with patch("subprocess.run", mock_fn):
+    with mock_subprocess(mock_fn):
         res = misc_utils.get_docker_image_commit_hashes()
         assert res == ("12345", "56789")
