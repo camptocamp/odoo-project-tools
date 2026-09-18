@@ -45,8 +45,10 @@ def remote_repo_exists(url: str) -> bool:
     submodule (autoshare cache and working tree), so the network probe would
     otherwise be repeated.
     """
-    result = subprocess.run(["git", "ls-remote", url], capture_output=True)
-    return result.returncode == 0
+    # Adding HEAD as the ``ref`` argument reduces the data transfer from "all refs"
+    # to a single ref (HEAD itself), improving time elapsed by the existence probe
+    cmds = ["git", "ls-remote", url, "HEAD"]
+    return subprocess.run(cmds, capture_output=True).returncode == 0
 
 
 def get_remotes(git_dir: str | Path) -> dict[str, str]:
