@@ -368,8 +368,8 @@ def test_bump_commit_and_tag(project):
         input="n",
     )
     assert result.exit_code == 0
-    assert '✅ Committed "Release 14.0.0.2.0"' in result.output
-    assert '✅ Created tag "14.0.0.2.0"' in result.output
+    assert '✔ Committed "Release 14.0.0.2.0"' in result.output
+    assert '✔ Created tag "14.0.0.2.0"' in result.output
     repo = git.Repo(".")
     # A "Release X" commit was created, and it includes the release files
     assert repo.head.commit.message.strip() == "Release 14.0.0.2.0"
@@ -462,7 +462,7 @@ def test_bump_tag_recreate_declined(project):
     tag_object = repo.tags["14.0.0.2.0"].tag
     assert tag_object is not None
     assert tag_object.message == "old message"
-    assert "✅ Created tag" not in result.output
+    assert "✔ Created tag" not in result.output
 
 
 @pytest.mark.project_setup(
@@ -571,7 +571,7 @@ def test_bump_ignores_untracked_files(project):
         input="n",
     )
     assert result.exit_code == 0
-    assert '✅ Committed "Release 14.0.0.2.0"' in result.output
+    assert '✔ Committed "Release 14.0.0.2.0"' in result.output
     repo = git.Repo(".")
     # The untracked files were left alone, not swept into the release commit
     assert "AGENTS.md" not in repo.head.commit.stats.files

@@ -263,9 +263,30 @@ class _TaskColumn(ProgressColumn):
 SPINNER = Spinner("dots")
 
 
+#: How a finished thing is marked, wherever one is reported: the task rows of
+#: :func:`run_tasks` and the one-line "that worked" messages alike.
+OK_MARK = "✔"
+FAILED_MARK = "✖"
+
+
+def ok_mark() -> str:
+    """The success mark, styled for a ``click.echo``.
+
+    Somewhere rich is doing the rendering, mark it up as ``[green]`` instead;
+    somewhere the text is written with a bare ``print``, use :data:`OK_MARK`
+    unstyled, since nothing would strip the colour back out of a pipe.
+    """
+    return click.style(OK_MARK, fg="green")
+
+
+def failed_mark() -> str:
+    """The failure mark, styled for a ``click.echo`` -- see :func:`ok_mark`."""
+    return click.style(FAILED_MARK, fg="red")
+
+
 def _mark(ok: bool) -> Text:
     """How something went, in one character."""
-    return Text("✔", style="green") if ok else Text("✖", style="red")
+    return Text(OK_MARK, style="green") if ok else Text(FAILED_MARK, style="red")
 
 
 def _result_mark(result: TaskResult) -> Text:

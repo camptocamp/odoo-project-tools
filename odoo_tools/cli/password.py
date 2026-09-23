@@ -9,6 +9,7 @@ from rich.console import Console
 from .. import utils
 from ..utils import lpass as lpass_utils
 from ..utils import password as password_utils
+from ..utils import ui
 from ..utils.path import build_path
 
 console = Console()
@@ -83,8 +84,13 @@ def _store_in_lastpass(password, username="admin"):
             with console.status("Storing password in LastPass..."):
                 lpass_utils.store_password_in_lastpass(entry, password)
         except Exception:
-            console.print(f"❌ Unable to store Password in LastPass: {entry.location}")
+            console.print(
+                f"[red]{ui.FAILED_MARK}[/] Unable to store Password in "
+                f"LastPass: {entry.location}"
+            )
             raise
         else:
-            console.print(f"✅ Password stored in LastPass: {entry.location}")
+            console.print(
+                f"[green]{ui.OK_MARK}[/] Password stored in LastPass: {entry.location}"
+            )
             console.print(lpass_utils.format_lastpass_entry(entry, password))
