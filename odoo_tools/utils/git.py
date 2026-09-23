@@ -1,7 +1,9 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+import os
 import subprocess
+import time
 from collections.abc import Iterator
 from functools import cache
 from os import PathLike
@@ -45,8 +47,10 @@ def remote_repo_exists(url: str) -> bool:
     submodule (autoshare cache and working tree), so the network probe would
     otherwise be repeated.
     """
-    result = subprocess.run(["git", "ls-remote", url], capture_output=True)
-    return result.returncode == 0
+    # Adding HEAD as the ``ref`` argument reduces the data transfer from "all refs"
+    # to a single ref (HEAD itself), improving time elapsed by the existence probe
+    cmds = ["git", "ls-remote", url, "HEAD"]
+    return subprocess.run(cmds, capture_output=True).returncode == 0
 
 
 def get_remotes(git_dir: str | Path) -> dict[str, str]:
@@ -75,8 +79,23 @@ def ensure_remote(git_dir: str | Path, remote_name: str, url: str) -> bool:
     return True
 
 
+FETCH_REPO_UNFETCHED_FOR = int(os.environ.get("OTOOLS_FETCH_REPO_UNFETCHED_FOR", 3600))
+
+
 def fetch_targeted(git_dir: str | Path, remote_name: str, refspec: str) -> None:
     """Fetch a single refspec from a named remote, emitting a warning on failure."""
+    # Check first if the repo has been fetched recently (1hr by default)
+    fetch_head = Path(git_dir) / "FETCH_HEAD"
+    if not fetch_head.exists():
+        fetch_head = Path(git_dir) / ".git" / "FETCH_HEAD"
+    if (
+        # We do have a ``FETCH_HEAD`` file
+        fetch_head.exists()
+        # Its last modification occurred less than ``FETCH_REPO_UNFETCHED_FOR``
+        # seconds ago
+        and (time.time() - fetch_head.stat().st_mtime) < FETCH_REPO_UNFETCHED_FOR
+    ):
+        return
     try:
         run(
             ["git", "-C", str(git_dir), "fetch", remote_name, refspec],
