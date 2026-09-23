@@ -297,7 +297,7 @@ def bump(
                 "release files; aborting."
             )
         repo.index.commit(f"Release {new_version}")
-        click.echo(f'✅ Committed "Release {new_version}"')
+        click.echo(f'{ui.ok_mark()} Committed "Release {new_version}"')
         # Resolve the tag decision
         if do_tag is None:
             do_tag = Confirm.ask("Create the release tag?", default=True)
@@ -316,7 +316,7 @@ def bump(
                     sign=tag_signing_enabled(repo),
                     force=True,
                 )
-                click.echo(f'✅ Created tag "{new_version}"')
+                click.echo(f'{ui.ok_mark()} Created tag "{new_version}"')
     # Print manual instructions for pending steps
     steps = []
     if not do_commit:

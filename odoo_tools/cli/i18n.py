@@ -9,6 +9,7 @@ import click
 from rich.console import Console
 
 from .. import utils
+from ..utils import ui
 from ..utils.proj import get_odoo_serie
 
 console = Console()
@@ -264,7 +265,8 @@ def export(module_paths, languages, clean_db, init_db, export_pot):
                     source_file.replace(target_file)
                     # Print a message
                     console.print(
-                        f"✅ {target_file.relative_to(Path.cwd()).as_posix()}"
+                        f"[green]{ui.OK_MARK}[/] "
+                        f"{target_file.relative_to(Path.cwd()).as_posix()}"
                     )
 
 
