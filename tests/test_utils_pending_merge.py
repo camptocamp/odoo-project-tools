@@ -1,8 +1,12 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+import re
+import subprocess
+import threading
 from pathlib import Path
 from textwrap import dedent
+from types import SimpleNamespace
 from unittest import mock
 
 import pytest
@@ -12,6 +16,7 @@ from git.config import GitConfigParser
 
 from odoo_tools.cli import pending
 from odoo_tools.exceptions import Exit, PathNotFound
+from odoo_tools.utils import os_exec
 from odoo_tools.utils import pending_merge as pm_utils
 from odoo_tools.utils.config import config
 
@@ -19,6 +24,10 @@ from .common import (
     MockSubprocessRun,
     assert_no_chdir,
     mock_pending_merge_repo_paths,
+    mock_subprocess,
+    patch_attr,
+    peak_counter,
+    terminal_console,
 )
 
 Repo = pm_utils.Repo
@@ -223,10 +232,10 @@ def test_add_pending_pr_with_comments(project):
     {org_name}: git@github.com:{org_name}/{repo_name}.git
   target: camptocamp merge-branch-{pid}-master
   merges:
-    - {org_name} 19.0
-    # [19.0] [ADD] sale_stock_picking_backorder_policy
-    # https://github.com/OCA/{repo_name}/pull/2372
-    - {org_name} refs/pull/2372/head
+  - {org_name} 19.0
+  # [19.0] [ADD] sale_stock_picking_backorder_policy
+  # https://github.com/OCA/{repo_name}/pull/2372
+  - {org_name} refs/pull/2372/head
 """
     mock_pending_merge_repo_paths(name, tmpl=tmpl)
     repo = Repo(name, path_check=False)
@@ -251,13 +260,13 @@ def test_add_pending_pr_with_comments(project):
             OCA: git@github.com:OCA/edi.git
           target: camptocamp merge-branch-1234-master
           merges:
-            - OCA 19.0
-            # [19.0] [ADD] sale_stock_picking_backorder_policy
-            # https://github.com/OCA/edi/pull/2372
-            - OCA refs/pull/2372/head
-            # [19.0] [ADD] sale_stock_picking_backorder_split_policy
-            # https://github.com/OCA/edi/pull/2373
-            - OCA refs/pull/2373/head
+          - OCA 19.0
+          # [19.0] [ADD] sale_stock_picking_backorder_policy
+          # https://github.com/OCA/edi/pull/2372
+          - OCA refs/pull/2372/head
+          # [19.0] [ADD] sale_stock_picking_backorder_split_policy
+          # https://github.com/OCA/edi/pull/2373
+          - OCA refs/pull/2373/head
         """
     )
     assert repo.abs_merges_path.read_text() == expected
@@ -295,9 +304,9 @@ def test_add_pending_pr_without_title_no_comment(project):
             OCA: git@github.com:OCA/edi.git
           target: camptocamp merge-branch-1234-master
           merges:
-            - OCA 19.0
-            - OCA refs/pull/2372/head
-            - OCA refs/pull/2373/head
+          - OCA 19.0
+          - OCA refs/pull/2372/head
+          - OCA refs/pull/2373/head
         """
     )
     assert repo.abs_merges_path.read_text() == expected
@@ -724,11 +733,11 @@ def test_add_pending_pull_request_patch():
     {org_name}: git@github.com:{org_name}/{repo_name}.git
   target: camptocamp merge-branch-{pid}-master
   merges:
-    - {org_name} 14.0
+  - {org_name} 14.0
   shell_command_after:
-    # [14.0] [FIX] edi: fix 1469
-    # https://github.com/OCA/edi/pull/1469
-    - curl -sSL https://github.com/OCA/edi/pull/1469.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
+  # [14.0] [FIX] edi: fix 1469
+  # https://github.com/OCA/edi/pull/1469
+  - curl -sSL https://github.com/OCA/edi/pull/1469.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
 """
     mock_pending_merge_repo_paths(name, tmpl=tmpl)
     repo = Repo(name, path_check=False)
@@ -762,17 +771,17 @@ def test_add_pending_pull_request_patch():
             OCA: git@github.com:OCA/edi.git
           target: camptocamp merge-branch-1234-master
           merges:
-            - OCA 14.0
+          - OCA 14.0
           shell_command_after:
-            # [14.0] [FIX] edi: fix 1469
-            # https://github.com/OCA/edi/pull/1469
-            - curl -sSL https://github.com/OCA/edi/pull/1469.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
-            # [14.0] [FIX] edi: fix 1470
-            # https://github.com/OCA/edi/pull/1470
-            - curl -sSL https://github.com/OCA/edi/pull/1470.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
-            # [14.0] [FIX] edi: fix 1471
-            # https://github.com/OCA/edi/pull/1471
-            - curl -sSL https://github.com/OCA/edi/pull/1471.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
+          # [14.0] [FIX] edi: fix 1469
+          # https://github.com/OCA/edi/pull/1469
+          - curl -sSL https://github.com/OCA/edi/pull/1469.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
+          # [14.0] [FIX] edi: fix 1470
+          # https://github.com/OCA/edi/pull/1470
+          - curl -sSL https://github.com/OCA/edi/pull/1470.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
+          # [14.0] [FIX] edi: fix 1471
+          # https://github.com/OCA/edi/pull/1471
+          - curl -sSL https://github.com/OCA/edi/pull/1471.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
         """
     )
     assert repo.abs_merges_path.read_text() == expected
@@ -791,7 +800,7 @@ def test_add_pending_pull_request_patch_without_title_no_comment():
     {org_name}: git@github.com:{org_name}/{repo_name}.git
   target: camptocamp merge-branch-{pid}-master
   merges:
-    - {org_name} 14.0
+  - {org_name} 14.0
 """
     mock_pending_merge_repo_paths(name, tmpl=tmpl)
     repo = Repo(name, path_check=False)
@@ -811,9 +820,9 @@ def test_add_pending_pull_request_patch_without_title_no_comment():
             OCA: git@github.com:OCA/edi.git
           target: camptocamp merge-branch-1234-master
           merges:
-            - OCA 14.0
+          - OCA 14.0
           shell_command_after:
-            - curl -sSL https://github.com/OCA/edi/pull/1470.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
+          - curl -sSL https://github.com/OCA/edi/pull/1470.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
         """
     )
     assert repo.abs_merges_path.read_text() == expected
@@ -980,6 +989,49 @@ def test_repo_push_to_remote(project):
     )
 
 
+def test_repo_run_aggregate_prints_nothing_when_captured(project, capfd):
+    """Under capture_output, not a single byte may reach the terminal, even
+    when the aggregation fails: it would corrupt the live progress display.
+
+    Runs the real gitaggregate, which fails on this fake submodule -- exactly
+    the case where output would otherwise be dumped on the terminal. Note that
+    run_aggregate is not told about any of this.
+    """
+    mock_pending_merge_repo_paths("edi")
+    repo = Repo("edi", path_check=False)
+    lines = []
+    with (
+        os_exec.capture_output(lines.append),
+        pytest.raises(subprocess.CalledProcessError),
+    ):
+        repo.run_aggregate()
+    # gitaggregate did report the failure, to the sink and nowhere else
+    assert any("error" in line.lower() for line in lines), lines
+    captured = capfd.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
+
+
+def test_repo_push_to_remote_captures_the_remote_setup_too(project, capfd):
+    """Everything the push does is captured, down to the remote bookkeeping.
+
+    `git remote add` reports its failures through run() too, and it would
+    print them behind the live display if the capture didn't reach it.
+    """
+    mock_pending_merge_repo_paths("edi")
+    repo = Repo("edi", path_check=False)
+    lines = []
+    # `edi/.git` is a bare directory here, so the `git remote add` that
+    # ensure_remote runs fails and complains -- on the sink, we hope.
+    with os_exec.capture_output(lines.append):
+        with pytest.raises(subprocess.CalledProcessError):
+            repo.push_to_remote(target_branch="merge-branch-1234")
+    assert any("fatal" in line.lower() for line in lines), lines
+    captured = capfd.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
+
+
 def test_repo_aggregate_and_push_do_not_chdir(project):
     """Aggregating and pushing must not change the process working directory:
     they run concurrently, and chdir would corrupt the other threads' paths."""
@@ -992,7 +1044,7 @@ def test_repo_aggregate_and_push_do_not_chdir(project):
             {"args": None},  # git push
         ]
     )
-    with mock.patch("subprocess.run", subprocess_run), assert_no_chdir():
+    with mock_subprocess(subprocess_run), assert_no_chdir():
         repo.run_aggregate()
         repo.push_to_remote(target_branch="merge-branch-1234-master-abc12345")
     subprocess_run.assert_completed_calls()
@@ -1088,6 +1140,241 @@ def test_cli_clean_explicit_aggregate_flag_skips_prompt(project, flag, aggregate
     assert "Re-aggregate" not in result.output
     assert run_aggregate.called is aggregated
     assert push_to_remote.called is aggregated
+
+
+def _failing_aggregate(self, **kwargs):
+    """Stand in for `Repo.run_aggregate`, failing on the `edi` submodule.
+
+    A real failing command, so that its output has to reach the log without
+    run_aggregate knowing anything about the capture.
+    """
+    if self.name == "edi":
+        pm_utils.run(
+            ["sh", "-c", "echo 'fatal: could not read from remote' >&2; exit 128"],
+            check=True,
+        )
+
+
+def _reported_log(result, label):
+    """Read back the log file the failure of ``label`` pointed at."""
+    reported = re.search(rf"✖ {label} \(\d+s\): (\S*{label}\.log)", result.output)
+    assert reported, f"No log file reported in:\n{result.output}"
+    return Path(reported.group(1)).read_text()
+
+
+def _run_clean_aggregating(project, run_aggregate=None):
+    """Run `otools-pending clean --aggregate` over two touched submodules."""
+    mock_pending_merge_repo_paths("edi")
+    mock_pending_merge_repo_paths("web")
+
+    with responses.RequestsMock() as rsps:
+        _mock_clean_github_responses(rsps, repo_name="edi")
+        _mock_clean_github_responses(rsps, repo_name="web")
+        with (
+            patch_attr(pm_utils.Repo, "run_aggregate", run_aggregate) as aggregate_mock,
+            patch_attr(pm_utils.Repo, "push_to_remote") as push_mock,
+            mock.patch.object(
+                pending.gh, "get_target_branch", return_value="merge-branch-1234-master"
+            ) as target_branch_mock,
+        ):
+            result = project.invoke(
+                pending.clean_pending, ["--aggregate"], catch_exceptions=True
+            )
+    return SimpleNamespace(
+        result=result,
+        run_aggregate=aggregate_mock,
+        push_to_remote=push_mock,
+        get_target_branch=target_branch_mock,
+    )
+
+
+def test_cli_clean_aggregates_and_pushes_every_touched_submodule(project):
+    run = _run_clean_aggregating(project)
+    assert run.result.exit_code == 0
+    assert run.run_aggregate.call_count == 2
+    assert run.push_to_remote.call_count == 2
+    for call in run.push_to_remote.call_args_list:
+        assert call.kwargs["target_branch"] == "merge-branch-1234-master"
+
+
+def test_cli_clean_resolves_the_target_branch_only_once(project):
+    """Resolving it may prompt, which can't happen once the parallel
+    aggregation started, and it's the same branch for every submodule."""
+    run = _run_clean_aggregating(project)
+    run.get_target_branch.assert_called_once()
+
+
+def test_cli_clean_reports_failures_without_stopping(project):
+    """One submodule failing to aggregate doesn't prevent the others, and its
+    log file is pointed at for details."""
+    run = _run_clean_aggregating(project, run_aggregate=_failing_aggregate)
+    assert run.result.exit_code == 1
+    # the healthy submodule was still aggregated and pushed
+    assert [call.args[0].name for call in run.push_to_remote.call_args_list] == ["web"]
+    # reported once, not once by the display and once again by a summary
+    failed_lines = [
+        line for line in run.result.output.splitlines() if line.startswith("✖")
+    ]
+    # the one submodule, and the step it was part of
+    assert len(failed_lines) == 2
+    assert failed_lines[1] == "✖ Aggregating submodules"
+    assert "Please inspect the logs for details." in run.result.output
+    # the failure points at its own log, and says nothing the log doesn't
+    log = _reported_log(run.result, "edi")
+    # the failing command's stderr reached the log, though run_aggregate was
+    # never handed a sink: the capture is ambient
+    assert "fatal: could not read from remote" in log
+    # and so did the reason, which is no longer shown anywhere else
+    assert "exit status 128" in log
+
+
+def _capture_log_dirs(tmp_path):
+    """Stand in for mkdtemp(), handing out a fresh directory per call.
+
+    `clean` runs two steps, each with logs of its own, so one fixed directory
+    would have the first step's cleanup pull it out from under the second.
+    """
+    made = []
+
+    def mkdtemp(*args, **kwargs):
+        path = tmp_path / f"logs{len(made)}"
+        path.mkdir()
+        made.append(path)
+        return str(path)
+
+    return made, mock.patch.object(pending.ui.tempfile, "mkdtemp", mkdtemp)
+
+
+def test_cli_clean_discards_logs_when_all_went_fine(project, tmp_path):
+    """Only --debug asks for them to be kept."""
+    made, patched = _capture_log_dirs(tmp_path)
+    with patched:
+        run = _run_clean_aggregating(project)
+    assert run.result.exit_code == 0
+    # a directory per step, and not one of them left behind
+    assert len(made) == 2
+    assert not any(path.exists() for path in made)
+
+
+def test_cli_clean_keeps_the_logs_in_debug_mode(project, tmp_path):
+    """--debug keeps every log, successes included, and links them."""
+    made, patched = _capture_log_dirs(tmp_path)
+    # run_tasks decides for itself now, so that is where debug mode is read
+    with patched, mock.patch.object(pending.ui, "is_debug", return_value=True):
+        run = _run_clean_aggregating(project)
+    assert run.result.exit_code == 0
+    purging, aggregating = made
+    # one log per pull request that was checked, and one per submodule aggregated
+    assert sorted(path.name for path in purging.iterdir()) == [
+        "OCA_edi_663.log",
+        "OCA_edi_759.log",
+        "OCA_edi_773.log",
+        "OCA_edi_774.log",
+        "OCA_web_663.log",
+        "OCA_web_759.log",
+        "OCA_web_773.log",
+        "OCA_web_774.log",
+    ]
+    assert sorted(path.name for path in aggregating.iterdir()) == [
+        "edi.log",
+        "web.log",
+    ]
+
+
+# ── otools-pending aggregate ─────────────────────────────────────────────────
+
+
+def _run_aggregate(project, args, run_aggregate=None):
+    """Run `otools-pending aggregate` with the git operations mocked out."""
+    with (
+        patch_attr(pm_utils.Repo, "run_aggregate", run_aggregate) as aggregate_mock,
+        patch_attr(pm_utils.Repo, "push_to_remote", None) as push_mock,
+        mock.patch.object(
+            pending.gh, "get_target_branch", return_value="branch-1234"
+        ) as target_branch_mock,
+    ):
+        result = project.invoke(pending.aggregate, args, catch_exceptions=True)
+    return SimpleNamespace(
+        result=result,
+        run_aggregate=aggregate_mock,
+        push_to_remote=push_mock,
+        get_target_branch=target_branch_mock,
+    )
+
+
+def test_cli_aggregate_runs_in_parallel(project):
+    """Two submodules really are aggregated at the same time.
+
+    The barrier only clears if both aggregations are in flight together, so a
+    serial implementation would hang here rather than pass.
+    """
+    for name in ("edi", "web"):
+        mock_pending_merge_repo_paths(name)
+    both_in_flight = threading.Barrier(2, timeout=10)
+
+    def run_aggregate(self, **kwargs):
+        both_in_flight.wait()
+
+    run = _run_aggregate(
+        project, ["edi", "web", "--jobs", "2"], run_aggregate=run_aggregate
+    )
+    assert run.result.exit_code == 0
+
+
+def test_cli_aggregate_jobs_caps_the_concurrency(project):
+    """--jobs 1 serializes them: no two aggregations ever overlap."""
+    for name in ("edi", "web", "stock"):
+        mock_pending_merge_repo_paths(name)
+    aggregate, state = peak_counter()
+    run = _run_aggregate(
+        project, ["edi", "web", "stock", "--jobs", "1"], run_aggregate=aggregate
+    )
+    assert run.result.exit_code == 0
+    assert state["peak"] == 1
+
+
+def test_cli_aggregate_resolves_the_target_branch_only_once(project):
+    """It is the same branch for every submodule, and asking may prompt."""
+    for name in ("edi", "web"):
+        mock_pending_merge_repo_paths(name)
+    run = _run_aggregate(project, ["edi", "web"])
+    run.get_target_branch.assert_called_once()
+
+
+def test_cli_aggregate_explicit_target_branch_is_not_resolved(project):
+    mock_pending_merge_repo_paths("edi")
+    run = _run_aggregate(project, ["edi", "--target-branch", "my-branch"])
+    run.get_target_branch.assert_not_called()
+    assert run.push_to_remote.call_args.kwargs["target_branch"] == "my-branch"
+
+
+def test_cli_aggregate_no_push(project):
+    mock_pending_merge_repo_paths("edi")
+    run = _run_aggregate(project, ["edi", "--no-push"])
+    assert run.result.exit_code == 0
+    assert run.run_aggregate.called
+    assert not run.push_to_remote.called
+    # nothing is pushed, so there is no target branch to resolve (nor to confirm)
+    run.get_target_branch.assert_not_called()
+
+
+def test_cli_aggregate_reports_failures_without_stopping(project):
+    """One submodule failing doesn't prevent the others, and its log is linked."""
+    for name in ("edi", "web"):
+        mock_pending_merge_repo_paths(name)
+    run = _run_aggregate(project, ["edi", "web"], run_aggregate=_failing_aggregate)
+    assert run.result.exit_code == 1
+    assert [call.args[0].name for call in run.push_to_remote.call_args_list] == ["web"]
+    assert "1 task(s) failed" in run.result.output
+    assert "Please inspect the logs for details." in run.result.output
+    # the failing command's stderr reached the log, though run_aggregate was
+    # never handed a sink: the capture is ambient
+    assert "fatal: could not read from remote" in _reported_log(run.result, "edi")
+
+
+def test_cli_aggregate_requires_a_repo(project):
+    result = project.invoke(pending.aggregate, [], catch_exceptions=True)
+    assert result.exit_code != 0
 
 
 def test_iter_pending_pull_requests(project):
@@ -1299,10 +1586,10 @@ def test_purge_merged_prs_with_comments(project):
             OCA: git@github.com:OCA/edi.git
           target: camptocamp merge-branch-1234-master
           merges:
-            - OCA 19.0
+          - OCA 19.0
           # [19.0][ADD] website_sale_product_multiple_qty
           # https://github.com/OCA/edi/pull/1172
-            - OCA refs/pull/1172/head
+          - OCA refs/pull/1172/head
         """
     )
     assert repo.abs_merges_path.read_text() == expected
@@ -1400,3 +1687,159 @@ def test_enrich_with_github_uses_token(project, monkeypatch):
         pending.enrich_with_github()
         sent = list(rsps.calls)
         assert sent[0].request.headers.get("Authorization") == "token secret-token"
+
+
+# ── purge_repos, shared by `pending clean` and `submodule upgrade` ───────────
+
+
+def test_purge_repos_enriches_every_pull_request_in_parallel(project):
+    """One GitHub request per PR, and there are dozens, so they overlap.
+
+    The barrier only clears if two are in flight together, so a serial
+    implementation would time out on it rather than pass.
+    """
+    for name in ("edi", "web"):
+        mock_pending_merge_repo_paths(name)
+    repos = pending._resolve_repos(())
+    expected = sum(len(list(repo._iter_pending_pull_requests())) for repo in repos)
+    both_in_flight = threading.Barrier(2, timeout=10)
+    cleared = []
+
+    def enrich(self):
+        # a serial run leaves the first one waiting until the barrier breaks,
+        # and every later one raises immediately, so nothing is appended
+        both_in_flight.wait()
+        cleared.append(self.shortcut)
+
+    with mock.patch.object(
+        pm_utils.PendingPR, "enrich_with_github", autospec=True, side_effect=enrich
+    ):
+        pending.purge_repos(repos, jobs=2)
+    # purge_repos records an enrichment failure rather than raising it, so the
+    # count is what says the barrier really cleared
+    assert len(cleared) == expected
+
+
+def test_purge_repos_removes_the_merged_ones_and_keeps_the_rest(project):
+    mock_pending_merge_repo_paths("edi")
+    repos = pending._resolve_repos(())
+    prs = list(repos[0]._iter_pending_pull_requests())
+    merged = prs[0]
+
+    def enrich(self):
+        self.merged = self.shortcut == merged.shortcut
+        self.state = "closed" if self.merged else "open"
+
+    with mock.patch.object(
+        pm_utils.PendingPR, "enrich_with_github", autospec=True, side_effect=enrich
+    ):
+        to_aggregate = pending.purge_repos(repos, jobs=2)
+    # merges left, so the repo is worth re-aggregating rather than disposed of
+    assert [repo.name for repo in to_aggregate] == ["edi"]
+    left = [pr.shortcut for pr in repos[0]._iter_pending_pull_requests()]
+    assert merged.shortcut not in left
+    assert len(left) == len(prs) - 1
+
+
+def test_purge_repos_does_nothing_without_pull_requests(project):
+    assert pending.purge_repos([]) == []
+
+
+def test_cli_clean_says_what_it_cleaned(project):
+    """The purge announces itself above the pull requests it is working
+    through, and settles on what came of it."""
+    mock_pending_merge_repo_paths("edi")
+    with responses.RequestsMock() as rsps:
+        _mock_clean_github_responses(rsps)
+        with (
+            mock.patch.object(pm_utils.Repo, "run_aggregate"),
+            mock.patch.object(pm_utils.Repo, "push_to_remote"),
+        ):
+            result = project.invoke(
+                pending.clean_pending, ["--aggregate"], catch_exceptions=False
+            )
+    assert result.exit_code == 0
+    assert "Cleaned 1 pending merge" in result.output
+    # and the step that follows says what it is
+    assert "Aggregating submodules" in result.output
+
+
+def test_cli_clean_says_so_when_there_was_nothing_merged(project):
+    """Nothing to clean is an outcome worth stating, not silence."""
+    mock_pending_merge_repo_paths("edi")
+    with responses.RequestsMock() as rsps:
+        _mock_clean_github_responses(rsps, merged_prs=(), open_prs=(773, 774, 663, 759))
+        result = project.invoke(pending.clean_pending, catch_exceptions=False)
+    assert result.exit_code == 0
+    assert "No merged pull request" in result.output
+
+
+def test_purge_repos_writes_the_merges_file_from_several_threads(project):
+    """Dropping a pull request is a read-modify-write of the whole document, so
+    two at once on one submodule would lose one of the two edits."""
+    mock_pending_merge_repo_paths("edi")
+    repos = pending._resolve_repos(())
+    prs = list(repos[0]._iter_pending_pull_requests())
+    assert len(prs) > 2, "the fixture needs several PRs for this to mean anything"
+
+    # all but the last are merged, so they are dropped at the same time -- and
+    # one is left behind so the file is not disposed of before it can be read
+    kept = prs[-1].shortcut
+
+    def enrich(self):
+        self.merged = self.shortcut != kept
+        self.state = "open" if self.shortcut == kept else "closed"
+
+    with mock.patch.object(
+        pm_utils.PendingPR, "enrich_with_github", autospec=True, side_effect=enrich
+    ):
+        pending.purge_repos(repos, jobs=len(prs))
+    # not one edit lost: every merged pull request is gone from the file
+    assert [pr.shortcut for pr in repos[0]._iter_pending_pull_requests()] == [kept]
+
+
+def test_cli_clean_says_what_became_of_each_pull_request(project):
+    """The row a pull request is on is where its verdict is read."""
+    mock_pending_merge_repo_paths("edi")
+    with responses.RequestsMock() as rsps:
+        _mock_clean_github_responses(rsps)
+        with (
+            mock.patch.object(pm_utils.Repo, "run_aggregate"),
+            mock.patch.object(pm_utils.Repo, "push_to_remote"),
+        ):
+            result = project.invoke(
+                pending.clean_pending, ["--aggregate"], catch_exceptions=False
+            )
+    assert "removed" in result.output
+    assert "kept" in result.output
+
+
+def test_purge_repos_shows_only_what_it_dropped(project):
+    """A project has dozens of pending pull requests and most of them are still
+    open; a screen full of "kept" buries the few that were dropped. So on a
+    display only those are left, marked apart from an ordinary success.
+    """
+    mock_pending_merge_repo_paths("edi")
+    repos = pending._resolve_repos(())
+    prs = list(repos[0]._iter_pending_pull_requests())
+    merged = prs[0]
+
+    def enrich(self):
+        self.merged = self.shortcut == merged.shortcut
+        self.state = "closed" if self.merged else "open"
+
+    console = terminal_console(width=90)
+    with (
+        mock.patch.object(
+            pm_utils.PendingPR, "enrich_with_github", autospec=True, side_effect=enrich
+        ),
+        mock.patch.object(pending, "console", console),
+        console.capture() as capture,
+    ):
+        pending.purge_repos(repos, jobs=2)
+    frame = re.sub(r"\x1b\[[0-9;?]*[a-zA-Z]", "", capture.get())
+    assert f"● {merged.shortcut}" in frame
+    assert "removed" in frame
+    for pr in prs[1:]:
+        assert pr.shortcut not in frame
+    assert "kept" not in frame

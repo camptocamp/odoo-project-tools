@@ -1,8 +1,6 @@
-from unittest.mock import patch
-
 from odoo_tools.utils import docker_compose
 
-from .common import MockSubprocessRun
+from .common import MockSubprocessRun, mock_subprocess
 
 
 def test_version():
@@ -14,7 +12,7 @@ def test_version():
             }
         ]
     )
-    with patch("subprocess.run", mock_fn):
+    with mock_subprocess(mock_fn):
         version = docker_compose.get_version()
     assert version == [2, 36, 2]
 
@@ -56,7 +54,7 @@ def test_run_version_2_36():
             }
         ]
     )
-    with patch("subprocess.run", mock_fn):
+    with mock_subprocess(mock_fn):
         cmd = docker_compose.run(
             "odoo",
             ["odoo"],
@@ -93,7 +91,7 @@ def test_run_version_2_36_other_args():
             }
         ]
     )
-    with patch("subprocess.run", mock_fn):
+    with mock_subprocess(mock_fn):
         cmd = docker_compose.run(
             "odoo",
             ["odoo"],
@@ -132,7 +130,7 @@ def test_run_version_2_33():
             }
         ]
     )
-    with patch("subprocess.run", mock_fn):
+    with mock_subprocess(mock_fn):
         cmd = docker_compose.run(
             "odoo",
             ["odoo"],

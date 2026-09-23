@@ -1,6 +1,7 @@
 # Copyright 2017 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+import threading
 from pathlib import Path
 
 # TODO: do we really need this to edit such files?
@@ -8,7 +9,53 @@ from ruamel.yaml import YAML
 from ruamel.yaml.error import CommentMark
 from ruamel.yaml.tokens import CommentToken
 
-yaml = YAML()
+
+class ThreadSafeYAML(YAML):
+    """A ``YAML`` that several threads can read and write through.
+
+    ruamel keeps the parser's and the emitter's state on the ``YAML`` object
+    itself, so two threads going through one walk over each other's -- and the
+    failures don't look like a race at all: "'NoneType' object has no attribute
+    'anchor'", stray IndexErrors, parse errors on perfectly good documents.
+    Commands handle several submodules at once now, and each of them reads the
+    project manifest.
+
+    Guarding the object rather than the functions around it means the guarantee
+    holds for everything that reaches for it, ``yaml.load(...)`` included.
+
+    The lock is reentrant because these delegate to each other: ``dump`` goes
+    through ``dump_all``, and ``load`` calls itself once for a ``Path``.
+
+    ``load_all`` is deliberately left alone: it is a generator, so the lock
+    would be held for however long the caller took to iterate it, which is
+    worse than not holding it. Nothing here uses it.
+
+    The documents involved are small -- a project manifest, a pending-merges
+    file -- so serialising them costs nothing worth measuring.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._lock = threading.RLock()
+
+    def load(self, stream):
+        with self._lock:
+            return super().load(stream)
+
+    def dump(self, data, stream=None, *, transform=None):
+        with self._lock:
+            return super().dump(data, stream, transform=transform)
+
+    def dump_all(self, documents, stream, *, transform=None):
+        with self._lock:
+            return super().dump_all(documents, stream, transform=transform)
+
+
+#: The one round-trip configuration this project reads and writes YAML with.
+#: Shared rather than built per call because :func:`sequence_item_indent`
+#: derives its column from it, so the comments we align have to be aligned
+#: against the indentation the items are actually dumped with.
+yaml = ThreadSafeYAML()
 
 # Never fold long scalars: the `curl ... | git am` patch commands of the
 # pending-merges files are way past the default width, and wrapping them
@@ -166,9 +213,6 @@ def append_seq_item_with_comments(seq, value, comment=None, comment_indent=""):
 
 
 def update_yml_file(path, new_data, main_key=None):
-    # preservation of indentation
-    yaml.indent(mapping=2, sequence=4, offset=2)
-
     yml_path = Path(path)
     data = yaml_load(yml_path.read_text()) or {}
     if main_key:
@@ -176,5 +220,10 @@ def update_yml_file(path, new_data, main_key=None):
     else:
         data.update(new_data)
 
+    # Block sequences indented under their key, as this file has always been
+    # written. Its own dumper: configuring the shared one would re-indent every
+    # other file the process writes, the pending-merges files included.
+    dumper = ThreadSafeYAML()
+    dumper.indent(mapping=2, sequence=4, offset=2)
     with yml_path.open("w") as fobj:
-        yaml.dump(data, fobj)
+        dumper.dump(data, fobj)

@@ -2,21 +2,20 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 import subprocess
 from pathlib import Path
-from unittest.mock import patch
 
-from .common import MockSubprocessRun
+from .common import MockSubprocessRun, mock_subprocess
 
 
 def test_MockSubprocessRun():
     mock_fn = MockSubprocessRun([{"args": ["ls", "-l"], "stdout": "file1\nfile2\n"}])
-    with patch("subprocess.run", mock_fn):
+    with mock_subprocess(mock_fn):
         res = subprocess.run(["ls", "-l"], check=False)
         assert res.stdout.splitlines() == ["file1", "file2"]
 
 
 def test_MockSubprocessRun_fail():
     mock_fn = MockSubprocessRun([{"args": ["ls", "-l"], "stdout": "file1\nfile2\n"}])
-    with patch("subprocess.run", mock_fn):
+    with mock_subprocess(mock_fn):
         try:
             subprocess.run(["ls", "-a"], check=False)
         except AssertionError as exc:
@@ -38,7 +37,7 @@ def test_MockSubprocessRun_side_effect(project):
             }
         ]
     )
-    with patch("subprocess.run", mock_fn):
+    with mock_subprocess(mock_fn):
         res = subprocess.run(["touch", str(temp_file)], check=False)
         assert res.returncode == 0
         assert temp_file.is_file()

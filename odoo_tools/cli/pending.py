@@ -3,6 +3,7 @@
 
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import partial
 
 import arrow
 import click
@@ -13,8 +14,8 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
+from ..utils import gh, ui
 from ..utils import pending_merge as pm_utils
-from ..utils import ui
 from ..utils.click import (
     DEFAULT_MAX_WORKERS,
     deprecated_option,
@@ -154,6 +155,47 @@ def show_pending(repo_paths=(), check=True, as_json=False, jobs=DEFAULT_MAX_WORK
         console.print(build_grid())
 
 
+def _aggregate_repos(repos, push=True, target_branch=None, jobs=DEFAULT_MAX_WORKERS):
+    """Aggregate (and push) the given repos in parallel.
+
+    Aggregating is mostly waiting on the network, so several submodules are
+    handled at once. Their output can't be printed as it comes -- it would be
+    interleaved, and would fight with the progress display -- so each repo
+    logs to its own file, and the last line of it is shown as its progress.
+    Those logs are thrown away unless the repo failed, or we are in debug mode.
+
+    :raises Exit: if any of the repos failed, after reporting them all.
+    """
+    if not repos:
+        return
+    # Resolve the target branch once for all of them: it is the same for every
+    # repo, and asking for it may prompt, which can't happen once the parallel
+    # aggregation (and the live display it draws) has started.
+    if push and not target_branch:
+        target_branch = gh.get_target_branch()
+
+    def make_task(repo):
+        def task(progress):
+            progress.set_status("aggregating")
+            repo.run_aggregate()
+            if push:
+                progress.set_status("pushing")
+                repo.push_to_remote(target_branch=target_branch)
+
+        return task
+
+    # Keyed by name, which is also what's worth reading on the display: a name
+    # determines a submodule path, and _resolve_repos() returns each path once.
+    tasks = {repo.name: make_task(repo) for repo in repos}
+    ui.run_tasks(
+        tasks,
+        max_workers=jobs,
+        console=console,
+        title="Aggregating submodules",
+        exit_on_failure=True,
+    )
+
+
 @cli.command(name="clean")
 @click.argument(
     "repo_paths",
@@ -171,76 +213,7 @@ def show_pending(repo_paths=(), check=True, as_json=False, jobs=DEFAULT_MAX_WORK
 @jobs_option
 def clean_pending(repo_paths=(), aggregate=None, jobs=DEFAULT_MAX_WORKERS):
     """Remove merged pull requests from pending-merge files."""
-    repos = _resolve_repos(repo_paths)
-    all_prs = [pr for repo in repos for pr in repo._iter_pending_pull_requests()]
-    if not all_prs:
-        return
-    ui.warn_missing_github_token()
-    touched_repos: set[pm_utils.Repo] = set()
-    removed: set[int] = set()  # ids of PRs removed from their merges file
-    # ids of PRs whose enrichment failed -> error message
-    errors: dict[int, str] = {}
-    # Shared by every row: a new one per rebuild would restart the animation
-    spinner = Spinner("dots")
-
-    def build_grid():
-        grid = Table.grid(padding=(0, 1))
-        grid.add_column(no_wrap=True)  # state dot / spinner
-        grid.add_column(no_wrap=True)  # shortcut (linked)
-        grid.add_column(no_wrap=True, style="dim")  # patch marker
-        grid.add_column()  # outcome
-        for pr in all_prs:
-            if id(pr) in errors:
-                state_cell = "[red]?[/]"
-                outcome = Text(
-                    errors[id(pr)], style="red", no_wrap=True, overflow="ellipsis"
-                )
-            elif not pr.is_enriched:
-                state_cell, outcome = spinner, ""
-            elif id(pr) in removed:
-                state = "merged" if pr.merged else pr.state
-                state_cell = f"[{PR_STATE_STYLES.get(state, 'white')}]●[/]"
-                outcome = Text("removed", style="green")
-            else:
-                continue  # enriched but not removed — nothing to do here
-            grid.add_row(
-                state_cell,
-                f"[link={pr.url}]{pr.shortcut}[/link]",
-                "(patch)" if pr.is_patch else "",
-                outcome,
-            )
-        return grid
-
-    # Enrich every PR via the GitHub API in parallel; remove the merged ones
-    # from the merges file as soon as we know the verdict, on the main thread
-    # (so concurrent yaml edits stay race-free).
-    with (
-        Live(build_grid(), console=console, refresh_per_second=10) as live,
-        ThreadPoolExecutor(max_workers=jobs) as pool,
-    ):
-        futures = {pool.submit(pr.enrich_with_github): pr for pr in all_prs}
-        for future in as_completed(futures):
-            pr = futures[future]
-            try:
-                future.result()
-            except Exception as exc:
-                # Leave the PR in place; we can't tell if it was merged.
-                errors[id(pr)] = str(exc)
-                live.update(build_grid())
-                continue
-            if pr.merged:
-                pr.remove_from_merges_file()
-                touched_repos.add(pr._repo)
-                removed.add(id(pr))
-            live.update(build_grid())
-    # Dispose of the merges files left without any pending merge, and keep the
-    # rest for re-aggregation.
-    to_aggregate = []
-    for repo in sorted(touched_repos, key=lambda repo: repo.name):
-        if repo.has_any_pr_left():
-            to_aggregate.append(repo)
-        else:
-            repo._handle_empty_merges_file()
+    to_aggregate = purge_repos(_resolve_repos(repo_paths), jobs=jobs)
     if not to_aggregate:
         return
     # Re-aggregating performs an upgrade of the submodules, potentially pulling
@@ -255,9 +228,80 @@ def clean_pending(repo_paths=(), aggregate=None, jobs=DEFAULT_MAX_WORKERS):
         )
     if not aggregate:
         return
-    for repo in to_aggregate:
-        repo.run_aggregate()
-        repo.push_to_remote()
+    _aggregate_repos(to_aggregate, jobs=jobs)
+
+
+def _cleaned_summary(removed: int, total: int, unreachable: int) -> str:
+    """What the purge came to.
+
+    A pull request nobody could get a verdict on is worth saying: it stays
+    pending, and the count of what was cleaned alone would read as a clean run.
+    """
+    cleaned = f"Cleaned {removed} pending merge(s)"
+    if unreachable:
+        return f"{cleaned}; {unreachable} of {total} could not be checked"
+    if not removed:
+        return f"No merged pull request among the {total} pending"
+    return cleaned
+
+
+def _purge_task(pull_request, progress):
+    """Ask GitHub about one pending pull request, and drop it if it is merged."""
+    progress.set_status("checking")
+    pull_request.enrich_with_github()
+    if not pull_request.merged:
+        # Worth recording, not worth a row: most pull requests are still open,
+        # and a screen full of them buries the few that were dropped.
+        progress.set_outcome("kept", hide=True)
+        return
+    pull_request.remove_from_merges_file()
+    progress.set_outcome("removed", icon=Text("●", style=PR_STATE_STYLES["merged"]))
+
+
+def purge_repos(repos, jobs=DEFAULT_MAX_WORKERS):
+    """Drop the merged pull requests from the given repos' pending merges.
+
+    Every pull request of every repo is asked about at once -- one request
+    each, and there are dozens of them -- and each shows its verdict on its own
+    row as it arrives. A merged one is dropped from its merges file there and
+    then, which is safe from a worker: see the lock in
+    :mod:`~odoo_tools.utils.pending_merge`.
+
+    One that GitHub could not be reached about is reported and left alone: with
+    no verdict, the safe answer is that it is still pending.
+
+    A repo left without any pending merge at all has its merges file disposed
+    of, which is the end of it. The others are the answer.
+
+    :param repos: repos that have a pending-merges file; see `_resolve_repos`.
+    :returns: the repos that still have pending merges, so are worth
+        re-aggregating.
+    """
+    all_prs = [pr for repo in repos for pr in repo._iter_pending_pull_requests()]
+    if not all_prs:
+        return []
+    ui.warn_missing_github_token()
+    results = ui.run_tasks(
+        {pr.shortcut: partial(_purge_task, pr) for pr in all_prs},
+        max_workers=jobs,
+        console=console,
+        title="Cleaning pending merges",
+    )
+    answered = {result.label for result in results if result.ok}
+    removed = [pr for pr in all_prs if pr.merged and pr.shortcut in answered]
+    console.print(
+        _cleaned_summary(len(removed), len(all_prs), len(all_prs) - len(answered)),
+        highlight=False,
+    )
+    # Dispose of the merges files left without any pending merge, and keep the
+    # rest for re-aggregation.
+    to_aggregate = []
+    for repo in sorted({pr._repo for pr in removed}, key=lambda repo: repo.name):
+        if repo.has_any_pr_left():
+            to_aggregate.append(repo)
+        else:
+            repo._handle_empty_merges_file()
+    return to_aggregate
 
 
 @cli.command(name="aggregate")
@@ -275,12 +319,11 @@ def clean_pending(repo_paths=(), aggregate=None, jobs=DEFAULT_MAX_WORKERS):
     default=True,
     help="push the result of the aggregation to a remote branch",
 )
-def aggregate(repo_paths, target_branch=None, push=None):
+@jobs_option
+def aggregate(repo_paths, target_branch=None, push=None, jobs=DEFAULT_MAX_WORKERS):
     """Perform a git aggregation on each <repo_path>."""
-    for repo in _resolve_repos(repo_paths):
-        repo.run_aggregate()
-        if push:
-            repo.push_to_remote(target_branch=target_branch)
+    repos = _resolve_repos(repo_paths)
+    _aggregate_repos(repos, push=push, target_branch=target_branch, jobs=jobs)
 
 
 @cli.command(name="add")
@@ -307,7 +350,14 @@ def aggregate(repo_paths, target_branch=None, push=None):
     default=True,
     help="push the result of the aggregation to a remote branch",
 )
-def add_pending(entity_urls, aggregate=True, patch=False, push=True):
+@jobs_option
+def add_pending(
+    entity_urls,
+    aggregate=True,
+    patch=False,
+    push=True,
+    jobs=DEFAULT_MAX_WORKERS,
+):
     """Add one or more pending merges using the given entity link(s)"""
     # pattern, given an https://github.com/<user>/<repo>/pull/<pr-index>
     # # PR headline
@@ -322,10 +372,7 @@ def add_pending(entity_urls, aggregate=True, patch=False, push=True):
         repos[repo.abs_merges_path] = repo
     # Then aggregate each affected submodule once.
     if aggregate:
-        for repo in repos.values():
-            repo.run_aggregate()
-            if push:
-                repo.push_to_remote()
+        _aggregate_repos(list(repos.values()), push=push, jobs=jobs)
 
 
 @cli.command(name="remove")

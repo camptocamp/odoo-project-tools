@@ -2,6 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import io
+from concurrent.futures import ThreadPoolExecutor
 from textwrap import dedent
 
 import pytest
@@ -11,7 +12,9 @@ from odoo_tools.utils.yaml import (
     append_seq_item_with_comments,
     remove_seq_item_with_comments,
     sequence_item_indent,
-    yaml,
+    update_yml_file,
+    yaml_dump,
+    yaml_load,
 )
 
 
@@ -560,11 +563,12 @@ class TestAppendSeqItemWithComments:
         assert result == expected
 
 
-def test_sequence_item_indent_matches_pending_merge_config():
-    """Under the pending-merges dump config the item-aligned indent is 4
-    spaces (lines a comment up with the ``    - item`` dashes)."""
-    yaml.indent(mapping=2, sequence=4, offset=2)
-    assert sequence_item_indent() == "    "
+def test_sequence_item_indent_matches_how_the_items_are_dumped():
+    """A block sequence's dash sits at its parent key's indent, so a comment
+    lines up with it two spaces in -- and this must not be worked out by
+    configuring the shared dumper, which would re-indent every file written
+    afterwards."""
+    assert sequence_item_indent() == "  "
 
 
 class TestRuamelUpstreamCanary:
@@ -647,3 +651,81 @@ class TestRuamelUpstreamCanary:
             """
         )
         assert result == expected
+
+
+#: Big enough that two threads reliably interleave inside one parse.
+_DOC = "\n".join(
+    ["project_id: '1289'", "odoo_version: '16.0'"]
+    + [f"key_{i}: value_{i}" for i in range(40)]
+)
+
+
+def _load(__):
+    assert yaml_load(_DOC)["odoo_version"] == "16.0"
+
+
+def _dump(__):
+    buffer = io.StringIO()
+    yaml_dump({"a": [1, 2, 3], "b": {"c": "d"}}, buffer)
+    assert "c: d" in buffer.getvalue()
+
+
+@pytest.mark.parametrize("operation", [_load, _dump], ids=["load", "dump"])
+def test_the_shared_parser_survives_several_threads(operation):
+    """ruamel keeps the parser's and the emitter's state on the ``YAML``
+    object, so the one this module shares has to be used one thread at a time.
+
+    Without that, `otools-submodule init` failed on whichever submodules
+    happened to read the project manifest at the same moment, and said things
+    like "'NoneType' object has no attribute 'anchor'" -- nothing that points
+    at a shared parser.
+    """
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        # pulling the results re-raises whatever a worker hit
+        list(pool.map(operation, range(200)))
+
+
+def test_the_dump_configuration_does_not_depend_on_what_ran_before():
+    """How a file comes out must not depend on what the process wrote earlier.
+
+    The shared dumper is reached by every command; anything that configures it
+    in passing decides the formatting of files it knows nothing about.
+    """
+    assert sequence_item_indent() == "  "
+
+
+def test_a_pending_merges_file_round_trips_unchanged():
+    """Loading and dumping one back must not reindent it.
+
+    The dash of a block sequence sits at its parent key's indent in every one
+    of these files. A dumper configured otherwise moves every item two columns,
+    turning a one-line edit into a whole-file diff.
+    """
+    src = dedent(
+        """\
+        ../odoo/external-src/edi:
+          remotes:
+            camptocamp: git@github.com:camptocamp/edi.git
+            OCA: git@github.com:OCA/edi.git
+          target: camptocamp merge-branch-3644-master
+          merges:
+          - OCA 19.0
+          # [19.0][FIX] sale_order_import: propagate line currency
+          # https://github.com/OCA/edi/pull/1385
+          - OCA refs/pull/1385/head
+        """
+    )
+    buffer = io.StringIO()
+    yaml_dump(yaml_load(src), buffer)
+    assert buffer.getvalue() == src
+
+
+def test_writing_a_manifest_does_not_reindent_the_next_file(tmp_path):
+    """`update_yml_file` indents its own file; it must not leave the shared
+    dumper configured that way for whatever is written next."""
+    manifest = tmp_path / "manifest.yml"
+    manifest.write_text("langs:\n  - de\n")
+    update_yml_file(manifest, {"extra": "y"})
+    buffer = io.StringIO()
+    yaml_dump(yaml_load("merges:\n- OCA 19.0\n"), buffer)
+    assert buffer.getvalue() == "merges:\n- OCA 19.0\n"

@@ -2,6 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import subprocess
+import threading
 from collections.abc import Iterator
 from functools import cache
 from os import PathLike
@@ -9,13 +10,37 @@ from pathlib import Path
 from typing import NamedTuple
 
 from git.config import GitConfigParser
+from git_autoshare.core import config as autoshare_config
 from git_autoshare.core import find_autoshare_repository
 
 from . import ui
 from .config import config as proj_config
 from .os_exec import run
 from .path import build_path, root_path
-from .proj import get_odoo_version, get_project_id
+from .proj import get_odoo_version, get_project_id, get_project_manifest
+
+_superproject_lock = threading.Lock()
+
+
+def run_in_superproject(cmd, **kwargs):
+    """Run a git command that writes files the whole superproject shares.
+
+    ``.gitmodules``, ``.git/config`` and ``.git/index`` belong to the project
+    repository rather than to any one submodule, and git guards each of them
+    with a lock file it never waits on: a second writer fails outright with
+    ``Unable to create '....lock': File exists``. So these run one at a time.
+
+    They also run *from* the project root, passed as ``cwd`` rather than
+    chdir'd into: the working directory is process-global, so changing it would
+    move it under the feet of whatever else is running.
+
+    Use it for the commands that write that shared metadata, and plain
+    :func:`~.os_exec.run` for the ones that only touch a single submodule --
+    those are the ones that take the time, and serialising them would defeat
+    handling several submodules at once.
+    """
+    with _superproject_lock:
+        return run(cmd, cwd=root_path(), check=True, **kwargs)
 
 
 def _repo_name_from_url(url: str) -> str:
@@ -24,12 +49,20 @@ def _repo_name_from_url(url: str) -> str:
 
 
 def remote_exists(git_dir: str | Path, remote_name: str) -> bool:
-    """Return True if the named remote exists in the repo at git_dir."""
-    result = subprocess.run(
-        ["git", "-C", str(git_dir), "remote", "get-url", remote_name],
-        capture_output=True,
-    )
-    return result.returncode == 0
+    """Return True if the named remote exists in the repo at git_dir.
+
+    Quiet: not having the remote is one of the answers, so git saying so is
+    not worth putting in front of anybody.
+    """
+    try:
+        run(
+            ["git", "-C", str(git_dir), "remote", "get-url", remote_name],
+            check=True,
+            quiet=True,
+        )
+    except subprocess.CalledProcessError:
+        return False
+    return True
 
 
 @cache
@@ -45,8 +78,14 @@ def remote_repo_exists(url: str) -> bool:
     submodule (autoshare cache and working tree), so the network probe would
     otherwise be repeated.
     """
-    result = subprocess.run(["git", "ls-remote", url], capture_output=True)
-    return result.returncode == 0
+    try:
+        # Asking for one ref rather than none narrows the advertisement the
+        # server sends from every ref it has to a single line, which on a
+        # repository with thousands of branches is the whole cost of the probe.
+        run(["git", "ls-remote", url, "HEAD"], check=True, quiet=True)
+    except subprocess.CalledProcessError:
+        return False
+    return True
 
 
 def get_remotes(git_dir: str | Path) -> dict[str, str]:
@@ -136,10 +175,14 @@ def setup_submodule_remotes(
         )
 
 
-def get_pinned_sha(submodule_path: str | PathLike) -> str | None:
+def get_pinned_sha(
+    submodule_path: str | PathLike, cwd: str | Path | None = None
+) -> str | None:
     """Return the commit SHA recorded in the parent repo HEAD for this submodule."""
     try:
-        output = run(["git", "ls-tree", "HEAD", str(submodule_path)], check=True)
+        output = run(
+            ["git", "ls-tree", "HEAD", str(submodule_path)], cwd=cwd, check=True
+        )
         if output:
             # "160000 commit <sha>\t<path>"
             parts = output.split()
@@ -161,11 +204,14 @@ def pin_submodule_commit(repo_path: str | Path, pinned_sha: str) -> bool:
 
     Returns True if the ref was set, False if the commit is not in the object store.
     """
-    check = subprocess.run(
-        ["git", "-C", str(repo_path), "cat-file", "-e", f"{pinned_sha}^{{commit}}"],
-        capture_output=True,
-    )
-    if check.returncode != 0:
+    try:
+        run(
+            ["git", "-C", str(repo_path), "cat-file", "-e", f"{pinned_sha}^{{commit}}"],
+            check=True,
+            quiet=True,
+        )
+    except subprocess.CalledProcessError:
+        # Not in the object store, so there is nothing to point a ref at.
         return False
     run(
         [
@@ -265,37 +311,116 @@ def iter_gitmodules(
         )
 
 
+def preload_submodule_state() -> None:
+    """Fill the caches :func:`submodule_update` reads, on the calling thread.
+
+    Each of them is computed on first use and reused afterwards -- but that
+    first use has to happen before several submodules are handled at once:
+
+    * git-autoshare ``print()``s when it cannot find its ``repos.yml``, and it
+      does it in-process, where no capture can reach it. From a worker that
+      line lands in the middle of the live display.
+    * the project manifest is parsed with a shared YAML parser (see
+      :mod:`~odoo_tools.utils.yaml`), so every worker missing the cache at once
+      means doing the same parse N times, one after another, for one answer.
+
+    Call it before fanning out. It is cheap, and doing it twice does nothing.
+    """
+    autoshare_config()
+    get_project_manifest()
+    proj_config.company_git_remote  # noqa: B018 -- a cached_property, filled by reading
+
+
 def submodule_init(submodule: SubmoduleInfo) -> None:
-    """Add a submodule"""
+    """Add a submodule, or bring it up to date if it is already there.
+
+    The second case goes through :func:`submodule_update`, so the same applies:
+    the submodule has to have been registered already.
+    """
     if submodule.exists:
-        submodule_update(submodule.path)
+        submodule_update(submodule.path, submodule=submodule)
     else:
         submodule_add(submodule)
 
 
+def prefetch_autoshare(url: str) -> None:
+    """Populate the git-autoshare cache for ``url``, out of process.
+
+    ``AutoshareRepository.prefetch()`` would do the same in-process: it prints
+    and runs git on our own file descriptors, so its output goes straight to
+    the terminal, past :func:`~.os_exec.capture_output` and over whatever is
+    drawn there. The console script does the work in a child process, whose
+    output :func:`~.os_exec.run` does capture.
+    """
+    run(["git", "autoshare-prefetch", "-q", url], check=True)
+
+
 def submodule_add(submodule: SubmoduleInfo) -> None:
-    """Add a submodule"""
-    cmd = ["git", "autoshare-submodule-add"]
+    """Add a submodule to the superproject.
+
+    Serialised whole: ``git submodule add`` clones *and* writes ``.gitmodules``,
+    the index and ``.git/config``, and it is not documented where in that
+    sequence it takes which lock. So adding submodules stays sequential -- it
+    is the rare path anyway, an existing checkout going through
+    :func:`submodule_update`.
+    """
     args = ["--force", submodule.url, str(submodule.path)]
     if submodule.branch:
         args = ["-b", submodule.branch, *args]
-    subprocess.run(cmd + args, check=True)
+    # git-autoshare-submodule-add takes no -C: it shells out to `git submodule
+    # add` in the working directory, hence the project root.
+    run_in_superproject(["git", "autoshare-submodule-add", *args])
 
 
-def submodule_sync(path: str | PathLike):
-    """Submodule sync"""
-    sync_cmd = ["git", "submodule", "sync"]
-    if path:
-        sync_cmd += ["--", str(path)]
-    run(sync_cmd, check=True)
+def sync_submodules(paths) -> None:
+    """Point the submodules' remotes at the urls recorded in ``.gitmodules``.
+
+    Every path in one command. See :func:`register_submodules` for why.
+    """
+    paths = [str(path) for path in paths]
+    if paths:
+        run_in_superproject(["git", "submodule", "sync", "--", *paths])
 
 
-def submodule_update(path: str | PathLike):
-    """Submodule update"""
-    cmd = ["git", "submodule", "update", "--init"]
+def register_submodules(paths) -> None:
+    """Copy the submodules' urls from ``.gitmodules`` into ``.git/config``.
+
+    The "init" half of ``git submodule update --init``, which the manual
+    defines as exactly these two commands. Split out, and taking every path at
+    once, because of what it costs: it writes only the superproject's shared
+    metadata, so it has to be serialised, and it costs the same for thirty
+    paths as for one -- around 70ms either way, nearly all of it ``git
+    submodule`` start-up rather than the write itself. Left in the
+    per-submodule path it would serialise 70ms times the number of submodules,
+    however many workers were running, which on a large project is most of the
+    time the command takes.
+
+    So the callers do this once, up front, and then :func:`submodule_update`
+    has nothing shared left to write and runs entirely in parallel.
+    """
+    paths = [str(path) for path in paths]
+    if paths:
+        run_in_superproject(["git", "submodule", "init", "--", *paths])
+
+
+def submodule_update(
+    path: str | PathLike, submodule: SubmoduleInfo | None = None
+) -> None:
+    """Bring a submodule's working tree to the commit the superproject records.
+
+    Everything here writes that one submodule's own files, so any number of
+    submodules can be done at once. It expects the submodule to be registered
+    already: call :func:`register_submodules` for the whole set first, which is
+    where the shared metadata gets written.
+
+    :param submodule: the ``.gitmodules`` entry for ``path``, read back from
+        the file when not given. A caller iterating over the submodules already
+        has it, and passing it spares a re-parse per submodule.
+    """
     args = []
     # Use git-autoshare if available
-    submodule = next(iter_gitmodules(filter_path=path), None)
+    if submodule is None:
+        submodule = next(iter_gitmodules(filter_path=path), None)
     project_id: str | None = None
     base_branch: str = get_odoo_version()
     company_remote = proj_config.company_git_remote
@@ -306,7 +431,7 @@ def submodule_update(path: str | PathLike):
         __, autoshare_repo = find_autoshare_repository([submodule.url])
         if autoshare_repo:
             if not Path(autoshare_repo.repo_dir).exists():
-                autoshare_repo.prefetch(True)
+                prefetch_autoshare(submodule.url)
             # Populate the autoshare cache with targeted OCA/<company_remote> refs so
             # that the recorded commit is reachable from a named ref in the cache.
             # This prevents git's fallback fetch from reaching parent-repo remotes
@@ -323,8 +448,8 @@ def submodule_update(path: str | PathLike):
             ui.echo(
                 f"Auto-share conf not found for {submodule.url}. You may want to check your auto-share configuration."
             )
-    args.append(str(path))
-    run(cmd + args, check=True)
+    root = root_path()
+    run(["git", "submodule", "update", *args, "--", str(path)], cwd=root, check=True)
     # After the submodule is updated: ensure it has OCA/<company_remote> remotes and
     # pin the recorded commit so subsequent git operations never trigger the
     # fallback fetch path.
@@ -336,16 +461,14 @@ def submodule_update(path: str | PathLike):
             project_id,
             company_remote,
         )
-        pinned_sha = get_pinned_sha(submodule.path)
+        pinned_sha = get_pinned_sha(submodule.path, cwd=root)
         if pinned_sha:
             pin_submodule_commit(build_path(submodule.path), pinned_sha)
 
 
 def submodule_set_url(repo_path, url, remote="origin"):
-    run(
-        ["git", "config", "--file=.gitmodules", f"submodule.{repo_path}.url", url],
-        cwd=root_path(),
-        check=True,
+    run_in_superproject(
+        ["git", "config", "--file=.gitmodules", f"submodule.{repo_path}.url", url]
     )
 
 
@@ -420,7 +543,7 @@ def get_out_of_sync_submodules() -> set[str]:
     ``git submodule update`` should not silently interfere with a conflicted
     working tree.
     """
-    output = run(["git", "submodule", "status"], check=True)
+    output = run(["git", "submodule", "status"], cwd=root_path(), check=True)
     out_of_sync = set()
     for line in output.splitlines():
         if line and line[0] in {"+", "-"} and len(parts := line[1:].split()) > 1:
@@ -429,29 +552,31 @@ def get_out_of_sync_submodules() -> set[str]:
 
 
 def submodule_upgrade(path, url, branch=None):
-    """Upgrade a submodule to the latest remote commit.
+    """Upgrade a submodule to the tip of the branch it tracks.
+
+    The branch is fetched from ``url`` and exactly what came back is checked
+    out. Deliberately not ``git submodule update --remote``, which decides for
+    itself where the tip is: it resolves the branch against whichever *local*
+    remote happens to match the recorded url, and does not fetch that remote --
+    so a remote-tracking ref nobody has refreshed lately upgrades the submodule
+    to a commit that old, and says nothing about it. Fetching by url and
+    checking out ``FETCH_HEAD`` leaves nothing to guess.
 
     :param path: submodule path (relative to project root)
-    :param url: submodule remote url
-    :param branch: if set, force checkout of this specific branch
+    :param url: submodule remote url, as recorded in ``.gitmodules``
+    :param branch: the branch to move to; the submodule's own by default
     :returns: True if the submodule was upgraded, False otherwise
     """
     commit_before = get_submodule_commit(path)
     abs_path = str(build_path(path))
-    if branch:
-        run(["git", "-C", abs_path, "reset", "HEAD", "--hard"], check=True)
-        run(["git", "-C", abs_path, "fetch", url], check=True)
-        run(["git", "-C", abs_path, "checkout", branch], check=True)
-    else:
-        cmd = ["git", "submodule", "update", "-f", "--remote", "--checkout"]
-        # Use git-autoshare if available
+    if not branch:
         submodule = next(iter_gitmodules(filter_path=path), None)
-        if submodule:
-            __, autoshare_repo = find_autoshare_repository([submodule.url])
-            if autoshare_repo and Path(autoshare_repo.repo_dir).exists():
-                cmd += ["--reference", autoshare_repo.repo_dir]
-        cmd.append(str(path))
-        run(cmd, check=True)
+        branch = (submodule.branch if submodule else None) or get_odoo_version()
+    # As `git submodule update --force` did: a submodule is not somewhere to
+    # keep work, and the checkout below would refuse to move over it.
+    run(["git", "-C", abs_path, "reset", "--hard", "HEAD"], check=True)
+    run(["git", "-C", abs_path, "fetch", url, branch], check=True)
+    run(["git", "-C", abs_path, "checkout", "--detach", "FETCH_HEAD"], check=True)
     commit_after = get_submodule_commit(path)
     if commit_before != commit_after:
         ui.echo(f"UPGRADED {path}: {commit_before} -> {commit_after}")

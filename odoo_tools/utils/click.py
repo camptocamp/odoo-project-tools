@@ -27,20 +27,21 @@ __all__ = [
 DEBUG_META_KEY = "odoo_tools.debug"
 
 
-def is_debug() -> bool:
+def is_debug(default: bool = True) -> bool:
     """Tell whether debug mode is currently on.
 
     Debug mode shows full stack traces (see `handle_exceptions`) and routes the
     ``odoo_tools`` debug logs to stderr.
 
-    With no click context at all, debug mode is reported: we are then running
-    outside of a command, early enough that the flag could not have been parsed
-    yet, and being verbose about whatever goes wrong is the more useful default
-    there.
+    :param default: what to answer with no click context at all -- we are then
+        running outside of a command, early enough that the flag could not have
+        been parsed yet. Being verbose about whatever goes wrong is the more
+        useful default there, so it is ``True``; pass ``False`` for something
+        that outlives the report, such as a file kept for someone to read.
     """
     ctx = click.get_current_context(silent=True)
     if ctx is None:
-        return True
+        return default
     return bool(
         # Set by the global `--debug` flag, wherever it was passed
         ctx.meta.get(DEBUG_META_KEY)
