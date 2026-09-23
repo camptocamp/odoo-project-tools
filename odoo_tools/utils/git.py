@@ -79,7 +79,10 @@ def remote_repo_exists(url: str) -> bool:
     otherwise be repeated.
     """
     try:
-        run(["git", "ls-remote", url], check=True, quiet=True)
+        # Asking for one ref rather than none narrows the advertisement the
+        # server sends from every ref it has to a single line, which on a
+        # repository with thousands of branches is the whole cost of the probe.
+        run(["git", "ls-remote", url, "HEAD"], check=True, quiet=True)
     except subprocess.CalledProcessError:
         return False
     return True
