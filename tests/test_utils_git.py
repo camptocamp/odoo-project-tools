@@ -351,7 +351,7 @@ def test_remote_repo_exists_true():
     with mock.patch("odoo_tools.utils.git.run") as mock_run:
         assert git_utils.remote_repo_exists("git@github.com:OCA/account-payment.git")
     mock_run.assert_called_once_with(
-        ["git", "ls-remote", "git@github.com:OCA/account-payment.git"],
+        ["git", "ls-remote", "git@github.com:OCA/account-payment.git", "HEAD"],
         check=True,
         quiet=True,
     )
