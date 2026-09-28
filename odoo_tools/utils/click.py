@@ -1,4 +1,5 @@
 import logging
+import os
 from collections.abc import Callable
 from functools import wraps
 
@@ -9,6 +10,8 @@ from .minimum_version import with_minimum_version_check
 from .update_check import with_update_check
 
 __all__ = [
+    "BUILTIN_DEFAULT_JOBS",
+    "DEFAULT_JOBS_ENV_VAR",
     "DEFAULT_MAX_WORKERS",
     "debug_option",
     "deprecated_option",
@@ -87,8 +90,42 @@ version_option = click.version_option(
     __version__, "-V", "--version", package_name="odoo-tools"
 )
 
-#: How much concurrency this project considers reasonable, by default.
-DEFAULT_MAX_WORKERS = 8
+#: How much concurrency this project considers reasonable when nothing says
+#: otherwise. The work is network-bound, so this is about how many requests a
+#: remote should be asked to field at once rather than about cores.
+BUILTIN_DEFAULT_JOBS = 8
+
+#: Overrides it, for a machine with more to spare or a network with less.
+DEFAULT_JOBS_ENV_VAR = "OTOOLS_DEFAULT_JOBS"
+
+
+def _resolve_default_jobs() -> int:
+    """How many operations to run at a time unless a command is told otherwise.
+
+    A value that is not a whole number of at least one is reported and ignored:
+    a mistyped variable is worth saying something about, and not worth refusing
+    to run over.
+    """
+    raw = os.getenv(DEFAULT_JOBS_ENV_VAR)
+    if raw is None:
+        return BUILTIN_DEFAULT_JOBS
+    try:
+        jobs = int(raw)
+    except ValueError:
+        jobs = 0
+    if jobs < 1:
+        click.secho(
+            f"Warning: ignoring {DEFAULT_JOBS_ENV_VAR}={raw!r}, "
+            f"which is not a whole number of at least 1",
+            fg="yellow",
+            err=True,
+        )
+        return BUILTIN_DEFAULT_JOBS
+    return jobs
+
+
+#: What the commands fan out to when `--jobs` is not given.
+DEFAULT_MAX_WORKERS = _resolve_default_jobs()
 
 #: Shared ``--jobs`` option for the commands that fan their work out over a
 #: thread pool. Pass it as ``max_workers``; ``--jobs 1`` runs everything
@@ -99,7 +136,8 @@ jobs_option = click.option(
     type=click.IntRange(min=1),
     default=DEFAULT_MAX_WORKERS,
     show_default=True,
-    help="Number of operations to run in parallel.",
+    help=f"Number of operations to run in parallel. Defaults to"
+    f" ${DEFAULT_JOBS_ENV_VAR} when it is set.",
 )
 
 
