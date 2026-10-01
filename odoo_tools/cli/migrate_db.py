@@ -33,6 +33,7 @@ from urllib.request import urlretrieve
 import click
 import psycopg2
 
+from ..utils import ui
 from ..utils.click import global_command_decorators
 from ..utils.path import build_path, root_path
 from ..utils.proj import get_current_version
@@ -200,9 +201,9 @@ def pre_migrate_restore_prod(ctx):
                 f"run -T --rm odoo pg_restore -x -O -d {db_name} < {db_path}"
             )
         except subprocess.CalledProcessError:
-            print("💥")
+            click.echo(ui.failed_mark())
             raise
-        print("✅", end="")
+        click.echo(ui.ok_mark(), nl=False)
         is_done = True
     else:
         print("ℹ️  (skipped: prod database already restored)", end="")
@@ -241,9 +242,9 @@ def pre_migrate_fix_prod_data(ctx):
                     f"-f {container_script_path}"
                 )
             except subprocess.CalledProcessError:
-                print("💥")
+                click.echo(ui.failed_mark())
                 raise
-            print("✅", end="")
+            click.echo(ui.ok_mark(), nl=False)
             is_done = True
         else:
             print("ℹ️  (skipped: fixed production database already exists)", end="")
@@ -271,7 +272,7 @@ def pre_migrate_dump_prod(ctx):
         # A simple copy of the .pg file to .dump is enough to satisfy
         # Odoo S.A. upgrade script.
         shutil.copy(ctx.obj["input_db_path"], dump_path)
-        print("✅", end="")
+        click.echo(ui.ok_mark(), nl=False)
         is_done = True
         return is_done
     container_dump_path = _get_db_prod_fixed_dump_path(in_container=True)
@@ -282,9 +283,9 @@ def pre_migrate_dump_prod(ctx):
             f"-f {container_dump_path}"
         )
     except subprocess.CalledProcessError:
-        print("💥")
+        click.echo(ui.failed_mark())
         raise
-    print("✅", end="")
+    click.echo(ui.ok_mark(), nl=False)
     return True
 
 
@@ -312,15 +313,15 @@ def migrate_odoo(ctx):
         cmd += f"--env-file {env_file_path}"
     ret = subprocess.run(cmd, shell=True, capture_output=True)
     if ret.returncode:
-        print("💥 FAILED 💥")
+        click.echo(f"{ui.failed_mark()} FAILED")
         log_path = ctx.obj["store_path"].joinpath("upgrade.log")
         raise SystemExit(f"=> Check logs located at {log_path}")
     # Sometimes Odoo upgrade script has a returncode == 0 while an error occurred.
     if not upgraded_zip_path.exists() and ret.stderr:
-        print("💥 FAILED 💥")
+        click.echo(f"{ui.failed_mark()} FAILED")
         print("== Logs from Odoo upgrade ==")
         raise SystemExit(ret.stderr.decode())
-    print("✅", end="")
+    click.echo(ui.ok_mark(), nl=False)
     return True
 
 
@@ -354,11 +355,11 @@ def restore_odoo_migrated(ctx):
             raise_on_error=False,
         )
     except subprocess.CalledProcessError:
-        print("💥")
+        click.echo(ui.failed_mark())
         raise
     assert upgraded_dir_path.exists()
     shutil.rmtree(upgraded_dir_path)
-    print("✅", end="")
+    click.echo(ui.ok_mark(), nl=False)
     return True
 
 
@@ -379,9 +380,9 @@ def dump_odoo_migrated(ctx):
             f"-f {container_odoo_migrated_path}"
         )
     except subprocess.CalledProcessError:
-        print("💥")
+        click.echo(ui.failed_mark())
         raise
-    print("✅", end="")
+    click.echo(ui.ok_mark(), nl=False)
     return True
 
 
@@ -412,9 +413,9 @@ def migrate_c2c_core(ctx):
             f"migrate-db migrate-db-core > {log_file}"
         )
     except subprocess.CalledProcessError:
-        print("💥 C2C core migration failed.")
+        click.echo(f"{ui.failed_mark()} C2C core migration failed.")
         raise SystemExit(f"=> Check logs located at {log_file}")  # noqa: B904
-    print("✅", end="")
+    click.echo(ui.ok_mark(), nl=False)
     return True
 
 
@@ -440,9 +441,9 @@ def migrate_c2c_external(ctx):
             f"migrate-db migrate-db-external > {log_file}"
         )
     except subprocess.CalledProcessError:
-        print("💥 C2C external migration failed.")
+        click.echo(f"{ui.failed_mark()} C2C external migration failed.")
         raise SystemExit(f"=> Check logs located at {log_file}")  # noqa: B904
-    print("✅", end="")
+    click.echo(ui.ok_mark(), nl=False)
     return True
 
 
@@ -468,9 +469,9 @@ def migrate_c2c_local(ctx):
             f"migrate-db migrate-db-local > {log_file}"
         )
     except subprocess.CalledProcessError:
-        print("💥 C2C local migration failed.")
+        click.echo(f"{ui.failed_mark()} C2C local migration failed.")
         raise SystemExit(f"=> Check logs located at {log_file}")  # noqa: B904
-    print("✅", end="")
+    click.echo(ui.ok_mark(), nl=False)
     return True
 
 
@@ -496,9 +497,9 @@ def migrate_c2c_cleanup(ctx):
             f"migrate-db migrate-db-cleanup > {log_file}"
         )
     except subprocess.CalledProcessError:
-        print("💥 C2C cleanup migration failed.")
+        click.echo(f"{ui.failed_mark()} C2C cleanup migration failed.")
         raise SystemExit(f"=> Check logs located at {log_file}")  # noqa: B904
-    print("✅", end="")
+    click.echo(ui.ok_mark(), nl=False)
     return True
 
 
@@ -522,15 +523,15 @@ def dump_c2c_migrated(ctx):
             f"-f {container_c2c_migrated_path}"
         )
     except subprocess.CalledProcessError:
-        print("💥 Dump of C2C cleanup snapshot failed.")
+        click.echo(f"{ui.failed_mark()} Dump of C2C cleanup snapshot failed.")
         raise
-    print("✅", end="")
+    click.echo(ui.ok_mark(), nl=False)
     return True
 
 
 @click.pass_context
 def migration_done(ctx):
-    print("✅")
+    click.echo(ui.ok_mark())
     odoo_migrated_path = _get_db_odoo_migrated_dump_path()
     c2c_migrated_path = _get_db_c2c_migrated_dump_path()
     print("\nYou can now upload on the relevant Celebrimbor environment:")
@@ -561,7 +562,7 @@ def _dropdb(ctx, db_name):
     try:
         return _run_docker_compose_cmd(cmd)
     except subprocess.CalledProcessError:
-        print(f"💥  Unable to drop DB {db_name}")
+        click.echo(f"{ui.failed_mark()} Unable to drop DB {db_name}")
         raise SystemExit(f"=> Is there an open connection on {db_name}?") from None
 
 
@@ -573,7 +574,8 @@ def _createdb(ctx, db_name, db_template=None):
     try:
         return _run_docker_compose_cmd(cmd)
     except subprocess.CalledProcessError:
-        msg = f"💥  Unable to create DB {db_name}"
+        # Unstyled: printed with a bare `print` further down.
+        msg = f"{ui.FAILED_MARK} Unable to create DB {db_name}"
         if db_template:
             msg += f" from {db_template}"
         print(msg)

@@ -158,7 +158,9 @@ def _load_database(db_name, fname):
             # to ignore warnings on db restore
             pass
     else:
-        msg = f"❌ ** Database file {fname} for restore was not found**"
+        # Unstyled: `Exit` prints its message with a bare `print`, which would
+        # leave the escape codes in a redirected log.
+        msg = f"{ui.FAILED_MARK} ** Database file {fname} for restore was not found**"
         return ui.exit_msg(msg)
     return fname
 

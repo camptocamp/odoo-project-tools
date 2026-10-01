@@ -7,6 +7,9 @@ import click
 import pytest
 
 from odoo_tools.utils.click import (
+    BUILTIN_DEFAULT_JOBS,
+    DEFAULT_JOBS_ENV_VAR,
+    _resolve_default_jobs,
     global_command_decorators,
     handle_exceptions,
     is_debug,
@@ -131,3 +134,36 @@ def test_debug_option_reraises_errors(cli, runner):
     """The flag reaches `handle_exceptions` even though it is not exposed."""
     result = runner.invoke(cli, ["--debug", "boom"])
     assert isinstance(result.exception, ValueError)
+
+
+def test_is_debug_without_a_context_can_be_told_what_to_answer():
+    """Being verbose is the right default for a report nobody asked for, and
+    the wrong one for something that outlives it -- a temporary file kept for
+    someone to read, when there is no one and no command."""
+    assert is_debug() is True
+    assert is_debug(default=False) is False
+
+
+# ── OTOOLS_DEFAULT_JOBS ───────────────────────────────────────────────────────
+
+
+def test_default_jobs_falls_back_to_the_builtin(monkeypatch):
+    monkeypatch.delenv(DEFAULT_JOBS_ENV_VAR, raising=False)
+    assert _resolve_default_jobs() == BUILTIN_DEFAULT_JOBS
+
+
+def test_default_jobs_comes_from_the_environment(monkeypatch):
+    """For a machine with more to spare, or a network with less."""
+    monkeypatch.setenv(DEFAULT_JOBS_ENV_VAR, "3")
+    assert _resolve_default_jobs() == 3
+
+
+@pytest.mark.parametrize("value", ["nonsense", "", "0", "-2", "2.5"])
+def test_default_jobs_says_so_and_carries_on_when_it_cannot_use_the_value(
+    value, monkeypatch, capsys
+):
+    """A mistyped variable is worth saying something about, and not worth
+    refusing to run over."""
+    monkeypatch.setenv(DEFAULT_JOBS_ENV_VAR, value)
+    assert _resolve_default_jobs() == BUILTIN_DEFAULT_JOBS
+    assert DEFAULT_JOBS_ENV_VAR in capsys.readouterr().err

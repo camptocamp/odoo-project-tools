@@ -4,6 +4,7 @@
 import logging
 import os
 import re
+import threading
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -109,6 +110,13 @@ class PendingPR:
         self.number = data.get("number")
         self.title = data.get("title")
         self.updated_at = data.get("updated_at")
+
+
+#: Guards the read-modify-write of a pending-merges file. Dropping a pull
+#: request loads the whole document, edits it and writes it back, so two of
+#: them at once lose one of the two edits -- and several pull requests of one
+#: submodule are checked at the same time.
+_merges_file_lock = threading.Lock()
 
 
 class Repo:
@@ -493,6 +501,10 @@ class Repo:
         print(f"✨ cherry pick {upstream}/{commit_sha} has been removed")
 
     def remove_pending_pull(self, upstream, pull_id):
+        with _merges_file_lock:
+            self._remove_pending_pull(upstream, pull_id)
+
+    def _remove_pending_pull(self, upstream, pull_id):
         conf = self.merges_config()
         line_to_drop = f"{upstream} refs/pull/{pull_id}/head"
         if line_to_drop not in conf["merges"]:
@@ -505,6 +517,10 @@ class Repo:
         self.update_merges_config(conf)
 
     def remove_pending_pull_from_patches(self, upstream, pull_id):
+        with _merges_file_lock:
+            self._remove_pending_pull_from_patches(upstream, pull_id)
+
+    def _remove_pending_pull_from_patches(self, upstream, pull_id):
         conf = self.merges_config()
         patches = conf.get("shell_command_after") or []
         if not patches:
