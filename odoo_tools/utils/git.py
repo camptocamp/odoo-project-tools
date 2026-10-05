@@ -178,19 +178,39 @@ def setup_submodule_remotes(
 def get_pinned_sha(
     submodule_path: str | PathLike, cwd: str | Path | None = None
 ) -> str | None:
-    """Return the commit SHA recorded in the parent repo HEAD for this submodule."""
+    """Return the commit SHA the parent repo index records for this submodule.
+
+    The index rather than HEAD: it is what ``git submodule update`` checks
+    out, and the two differ when a submodule bump is staged. ``None`` when
+    there is no such entry, or when there is a merge conflict.
+    """
     try:
         output = run(
-            ["git", "ls-tree", "HEAD", str(submodule_path)], cwd=cwd, check=True
+            ["git", "rev-parse", "--verify", "--quiet", f":{submodule_path}"],
+            cwd=cwd,
+            check=True,
+            quiet=True,
         )
-        if output:
-            # "160000 commit <sha>\t<path>"
-            parts = output.split()
-            if len(parts) >= 3:
-                return parts[2]
-    except (subprocess.CalledProcessError, IndexError):
-        pass
-    return None
+    except subprocess.CalledProcessError:
+        return None
+    return output.strip() or None
+
+
+def commit_exists(repo_path: str | Path, sha: str) -> bool:
+    """Return True if ``sha`` is a commit in the repo's object store.
+
+    Alternates included, so a commit held only by the git-autoshare cache
+    counts as here.
+    """
+    try:
+        run(
+            ["git", "-C", str(repo_path), "cat-file", "-e", f"{sha}^{{commit}}"],
+            check=True,
+            quiet=True,
+        )
+    except subprocess.CalledProcessError:
+        return False
+    return True
 
 
 def pin_submodule_commit(repo_path: str | Path, pinned_sha: str) -> bool:
@@ -204,13 +224,7 @@ def pin_submodule_commit(repo_path: str | Path, pinned_sha: str) -> bool:
 
     Returns True if the ref was set, False if the commit is not in the object store.
     """
-    try:
-        run(
-            ["git", "-C", str(repo_path), "cat-file", "-e", f"{pinned_sha}^{{commit}}"],
-            check=True,
-            quiet=True,
-        )
-    except subprocess.CalledProcessError:
+    if not commit_exists(repo_path, pinned_sha):
         # Not in the object store, so there is nothing to point a ref at.
         return False
     run(
@@ -417,6 +431,49 @@ def submodule_update(
         the file when not given. A caller iterating over the submodules already
         has it, and passing it spares a re-parse per submodule.
     """
+    root = root_path()
+    if not _submodule_update_from_local(path, root):
+        _submodule_update_from_remote(path, root, submodule)
+
+
+def _submodule_update_from_local(path: str | PathLike, root: Path) -> bool:
+    """Check out the recorded commit without fetching, if it is already here.
+
+    ``git submodule update`` does not ask whether it has the commit, but
+    whether a ref reaches it, and fetches when none does. A commit taken from a
+    merge branch that has since been rebased is reached by none, so going back
+    to a project branch would otherwise fetch everything again -- along with
+    the targeted fetches :func:`_submodule_update_from_remote` does on both
+    sides of it.
+
+    Returns False, having done nothing, when the submodule is not cloned or
+    the commit is not in its object store (alternates included).
+    """
+    submodule_dir = build_path(path)
+    if not (submodule_dir / ".git").exists():
+        return False
+    pinned_sha = get_pinned_sha(path, cwd=root)
+    if not pinned_sha or not commit_exists(submodule_dir, pinned_sha):
+        return False
+    ui.echo(f"Updating submodule {path} from local objects")
+    run(
+        ["git", "submodule", "update", "--no-fetch", "--", str(path)],
+        cwd=root,
+        check=True,
+    )
+    pin_submodule_commit(submodule_dir, pinned_sha)
+    return True
+
+
+def _submodule_update_from_remote(
+    path: str | PathLike, root: Path, submodule: SubmoduleInfo | None
+) -> None:
+    """Fetch the recorded commit and check it out.
+
+    Through the git-autoshare cache when there is one, which is brought up to
+    date first. The OCA and <company_remote> branches are fetched on both sides
+    of the update, and the commit pinned once it is here.
+    """
     args = []
     # Use git-autoshare if available
     if submodule is None:
@@ -448,7 +505,6 @@ def submodule_update(
             ui.echo(
                 f"Auto-share conf not found for {submodule.url}. You may want to check your auto-share configuration."
             )
-    root = root_path()
     run(["git", "submodule", "update", *args, "--", str(path)], cwd=root, check=True)
     # After the submodule is updated: ensure it has OCA/<company_remote> remotes and
     # pin the recorded commit so subsequent git operations never trigger the

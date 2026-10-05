@@ -204,16 +204,22 @@ def make_fake_project_root(
             Path(path).write_text(content)
     # Initialize a git repository
     if git_init:
-        repo = git.Repo.init(".")
-        with repo.config_writer() as cfg:
-            cfg.set_value("user", "email", "test@test.com")
-            cfg.set_value("user", "name", "Test")
-            # Disable signing so tests never invoke GPG, regardless of the
-            # developer's global git configuration.
-            cfg.set_value("tag", "gpgsign", "false")
-            cfg.set_value("commit", "gpgsign", "false")
+        repo = init_test_repo(".")
         repo.index.add(repo.untracked_files)
         repo.index.commit("initial commit")
+
+
+def init_test_repo(path, **kwargs):
+    """``git init`` a repository that commits the same on any machine."""
+    repo = git.Repo.init(path, **kwargs)
+    with repo.config_writer() as cfg:
+        cfg.set_value("user", "email", "test@test.com")
+        cfg.set_value("user", "name", "Test")
+        # Disable signing so tests never invoke GPG, regardless of the
+        # developer's global git configuration.
+        cfg.set_value("tag", "gpgsign", "false")
+        cfg.set_value("commit", "gpgsign", "false")
+    return repo
 
 
 def fake_marabunta_file(source_file_path=None):
