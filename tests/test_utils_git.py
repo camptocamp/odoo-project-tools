@@ -19,6 +19,7 @@ from .common import (
     GITMODULES,
     MockSubprocessRun,
     assert_no_chdir,
+    init_test_repo,
     mock_subprocess,
     peak_counter,
     plain_console,
@@ -370,10 +371,18 @@ def test_remote_repo_exists_false():
 
 
 def test_get_pinned_sha_returns_commit():
-    ls_tree_output = "160000 commit abc123def456\todoo/external-src/foo"
-    with mock.patch("odoo_tools.utils.git.run", return_value=ls_tree_output):
+    with mock.patch(
+        "odoo_tools.utils.git.run", return_value="abc123def456\n"
+    ) as mock_run:
         sha = git_utils.get_pinned_sha("odoo/external-src/foo")
         assert sha == "abc123def456"
+    # from the index: what `git submodule update` checks out
+    mock_run.assert_called_once_with(
+        ["git", "rev-parse", "--verify", "--quiet", ":odoo/external-src/foo"],
+        cwd=None,
+        check=True,
+        quiet=True,
+    )
 
 
 def test_get_pinned_sha_returns_none_on_empty():
@@ -391,6 +400,16 @@ def test_get_pinned_sha_returns_none_on_error():
         assert sha is None
 
 
+@pytest.mark.project_setup(git_init=True)
+def test_get_pinned_sha_reads_a_staged_bump(project):
+    """What `git submodule update` checks out, rather than what HEAD has."""
+    repo = git.Repo(root_path())
+    repo.git.update_index("--add", "--cacheinfo", f"160000,{'1' * 40},sub")
+    repo.git.commit("-m", "add sub")
+    repo.git.update_index("--cacheinfo", f"160000,{'2' * 40},sub")
+    assert git_utils.get_pinned_sha("sub", cwd=root_path()) == "2" * 40
+
+
 # ── pin_submodule_commit ──────────────────────────────────────────────────────
 
 
@@ -404,7 +423,14 @@ def test_pin_submodule_commit_when_in_store():
             quiet=True,
         ),
         mock.call(
-            ["git", "-C", "/repo", "update-ref", "refs/c2c-sync/pinned", "abc123"],
+            [
+                "git",
+                "-C",
+                "/repo",
+                "update-ref",
+                "refs/c2c-sync/pinned",
+                "abc123",
+            ],
             check=True,
         ),
     ]
@@ -512,6 +538,109 @@ def test_submodule_update_pins_commit_after_clone(project, tmp_path):
     mock_pin.assert_called_once()
     call_args = mock_pin.call_args[0]
     assert call_args[1] == pinned_sha
+
+
+@with_submodules
+def test_submodule_update_from_local_objects(project):
+    """A commit already in the object store is checked out without fetching,
+    and without touching the remotes either."""
+    (Path(SUBMODULE) / ".git").mkdir(parents=True)  # simulate cloned submodule
+    with (
+        mock.patch("odoo_tools.utils.git.run") as mock_run,
+        mock.patch("odoo_tools.utils.git.get_pinned_sha", return_value="abc123"),
+        mock.patch("odoo_tools.utils.git.commit_exists", return_value=True),
+        mock.patch("odoo_tools.utils.git.pin_submodule_commit") as mock_pin,
+        mock.patch("odoo_tools.utils.git.find_autoshare_repository") as mock_find,
+        mock.patch("odoo_tools.utils.git.setup_submodule_remotes") as mock_setup,
+    ):
+        git_utils.submodule_update(SUBMODULE)
+    mock_pin.assert_called_once_with(Path(build_path(SUBMODULE)), "abc123")
+    mock_run.assert_called_once_with(
+        ["git", "submodule", "update", "--no-fetch", "--", SUBMODULE],
+        cwd=root_path(),
+        check=True,
+    )
+    mock_find.assert_not_called()
+    mock_setup.assert_not_called()
+
+
+@with_submodules
+def test_submodule_update_fetches_a_commit_not_here(project):
+    (Path(SUBMODULE) / ".git").mkdir(parents=True)  # simulate cloned submodule
+    with (
+        mock.patch("odoo_tools.utils.git.run") as mock_run,
+        mock.patch("odoo_tools.utils.git.get_pinned_sha", return_value="abc123"),
+        mock.patch("odoo_tools.utils.git.commit_exists", return_value=False),
+        mock.patch(
+            "odoo_tools.utils.git.find_autoshare_repository", return_value=(None, None)
+        ),
+        mock.patch("odoo_tools.utils.git.setup_submodule_remotes") as mock_setup,
+    ):
+        git_utils.submodule_update(SUBMODULE)
+    assert (
+        mock.call(
+            ["git", "submodule", "update", "--", SUBMODULE],
+            cwd=root_path(),
+            check=True,
+        )
+        in mock_run.call_args_list
+    )
+    mock_setup.assert_called_once()
+
+
+@pytest.mark.project_setup(git_init=True)
+def test_switching_back_needs_no_fetch(project, tmp_path, monkeypatch):
+    """A commit no branch reaches any more, recorded by an older project
+    commit: going back to it must not fetch."""
+    # the submodule's upstream is a local path, which git refuses to clone
+    # from as a submodule unless told otherwise
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "protocol.file.allow")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "always")
+    upstream = tmp_path / "upstream"
+    upstream_repo = init_test_repo(upstream, initial_branch="main")
+    upstream_repo.git.commit("--allow-empty", "-m", "base")
+    upstream_repo.git.checkout("-b", "merge-branch")
+    upstream_repo.git.commit("--allow-empty", "-m", "a")
+    commit_a = upstream_repo.head.commit.hexsha
+    project_repo = git.Repo(root_path())
+    # no git-autoshare, and no OCA/company remotes: nothing reaches GitHub
+    with (
+        mock.patch(
+            "odoo_tools.utils.git.find_autoshare_repository", return_value=(None, None)
+        ),
+        mock.patch("odoo_tools.utils.git.setup_submodule_remotes"),
+    ):
+        project_repo.git.commit("--allow-empty", "-m", "init")
+        project_repo.git.submodule("add", "-b", "merge-branch", str(upstream), "sub")
+        project_repo.git.commit("-m", "A")
+        project_commit_a = project_repo.head.commit.hexsha
+        git_utils.submodule_update("sub")
+
+        # the merge branch is rebased: commit A is on no branch any more
+        upstream_repo.git.checkout("main")
+        upstream_repo.git.commit("--allow-empty", "-m", "x")
+        upstream_repo.git.checkout("-B", "merge-branch")
+        upstream_repo.git.commit("--allow-empty", "-m", "a2")
+        sub_repo = git.Repo(Path(root_path()) / "sub")
+        sub_repo.git.fetch("--prune")
+        sub_repo.git.checkout("origin/merge-branch")
+        project_repo.git.add("sub")
+        project_repo.git.commit("-m", "B")
+        git_utils.submodule_update("sub")
+        for branch in sub_repo.branches:
+            sub_repo.delete_head(branch, force=True)
+        sub_repo.git.reflog("expire", "--expire=now", "--all")
+        # from here on, any fetch fails
+        sub_repo.git.remote("set-url", "origin", str(tmp_path / "gone"))
+
+        project_repo.git.checkout(project_commit_a)
+        # the pin holds the commit checked out last: only being in the object
+        # store is left to go by
+        assert sub_repo.git.rev_parse("refs/c2c-sync/pinned") != commit_a
+        git_utils.submodule_update("sub")
+    assert sub_repo.head.commit.hexsha == commit_a
+    assert sub_repo.git.rev_parse("refs/c2c-sync/pinned") == commit_a
 
 
 # ── get_current_branch ────────────────────────────────────────────────────────
