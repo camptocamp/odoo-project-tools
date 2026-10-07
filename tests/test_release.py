@@ -3,9 +3,11 @@
 
 import datetime
 import subprocess
+from functools import partial
 from pathlib import Path
 from unittest import mock
 
+import click
 import git
 import pytest
 
@@ -40,15 +42,12 @@ def test_bump(project):
     # the commit flow requires a clean tree to start from
     git_commit_all()
 
-    def bump(*args):
+    def bump(*args, **kwargs):
+        kwargs.setdefault("catch_exceptions", False)
+        kwargs.setdefault("input", "n")
         # --commit --tag exercises the full release path without prompting;
         # the bump auto-commits, so no manual git_commit_all is needed between calls.
-        project.invoke(
-            release.bump,
-            [*args, "--commit", "--tag"],
-            catch_exceptions=False,
-            input="n",
-        )
+        project.invoke(release.bump, [*args, "--commit", "--tag"], **kwargs)
 
     bump("patch")
     assert ver_file.read_text() == "14.0.0.1.1"
@@ -64,6 +63,15 @@ def test_bump(project):
     assert ver_file.read_text() == "14.0.2.0.0"
     bump("major", "--new-version", "15.0.0.0.1")
     assert ver_file.read_text() == "15.0.0.0.1"
+    bump("--new-version", "15.0.1.0.0")
+    assert ver_file.read_text() == "15.0.1.0.0"
+    with pytest.raises(
+        click.UsageError,
+        match="At least one of ``rel_type`` or ``new_version`` is required",
+    ):
+        # NB: add ``standalone_mode=False`` to prevent ``click.core.Command.main()``
+        # from swallowing the ``click.UsageError`` exception
+        bump(standalone_mode=False)
 
 
 @pytest.mark.project_setup(
@@ -641,3 +649,34 @@ def test_bump_does_not_commit_a_release_it_could_not_push(project):
     assert "Committed" not in result.output
     assert "Created tag" not in result.output
     assert git.Repo(".").head.commit.hexsha == head_before
+
+
+def test_make_bumpversion_cmd_supports_rel_type_and_explicit_version():
+    """Ensures ``make_bumpversion_cmd`` supports both ``rel_type`` and ``new_version``
+
+    Checks parameters' workflow:
+    - if only 1 is specified, the command to update the version is created accordingly
+    - if both are specified, ``new_version`` takes precedence
+    - if none is specified, an error is raised
+    """
+    make_cmd = partial(release.make_bumpversion_cmd, "14.0.1.0.0", ["VERSION"])
+    # Test ``rel_type`` only
+    cmd = make_cmd(rel_type="major")
+    assert "major" in cmd
+    assert "--new-version" not in cmd
+    # Test ``new_version`` only
+    cmd = make_cmd(new_version="14.0.1.0.1")
+    assert "--new-version" in cmd
+    assert "14.0.1.0.1" in cmd
+    assert "patch" in cmd  # default value, as ``bump-my-version bump`` requires it
+    # Test ``rel_type`` and ``new_version`` together
+    cmd = make_cmd(rel_type="major", new_version="14.0.1.0.1")
+    assert "--new-version" in cmd
+    assert "14.0.1.0.1" in cmd
+    assert "major" not in cmd  # overridden by default value
+    assert "patch" in cmd  # default value
+    # Test none of them is provided
+    with pytest.raises(
+        ValueError, match="At least one of ``rel_type`` or ``new_version`` is required"
+    ):
+        make_cmd()

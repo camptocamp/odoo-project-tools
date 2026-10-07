@@ -27,6 +27,22 @@ from ..utils.proj import get_current_version, get_project_bundle_addon_name
 console = Console()
 
 
+def _resolve_version_target(
+    rel_type: str | None = None, new_version: str | None = None
+) -> tuple[str, str]:
+    """Validates the version target and applies precedence.
+
+    At least one of ``rel_type`` / ``new_version`` is required.
+    If provided, ``new_version`` takes precedence and ``rel_type`` is ignored
+    (backward compatibility).
+    """
+    if new_version:
+        return "", new_version
+    elif rel_type:
+        return rel_type, ""
+    raise ValueError("At least one of ``rel_type`` or ``new_version`` is required")
+
+
 def get_new_release_notes(repo, history_path):
     """Return the release notes towncrier just added to HISTORY.rst.
 
@@ -67,7 +83,8 @@ def get_bumpversion_files():
     return files
 
 
-def make_bumpversion_cmd(rel_type, current_version, files, new_version=None):
+def make_bumpversion_cmd(current_version, files, rel_type=None, new_version=None):
+    rel_type, new_version = _resolve_version_target(rel_type, new_version)
     parse = (
         r"(?P<odoo_major>\d+)\.(?P<odoo_minor>\d+)"
         r"\.(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)"
@@ -87,7 +104,10 @@ def make_bumpversion_cmd(rel_type, current_version, files, new_version=None):
     ]
     if new_version:
         cmd.extend(["--new-version", new_version])
-    cmd.append(rel_type)
+    # ``bump-my-version bump`` always parses the first positional argument as a
+    # version component, even with ``--new-version``, so pass a placeholder value
+    # (ignored when ``--new-version`` is set).
+    cmd.append(rel_type or "patch")
     cmd.extend(files)
     return cmd
 
@@ -117,7 +137,7 @@ def _warn_deprecated_bumpversion_cfg():
         )
 
 
-def _do_bump(rel_type, new_version=None):
+def _do_bump(rel_type=None, new_version=None):
     """Run the file-modifying release steps.
 
     Bumps the version, regenerates the changelog (towncrier) and updates the
@@ -135,7 +155,7 @@ def _do_bump(rel_type, new_version=None):
     # Run bumpversion
     current_version = get_current_version()
     cmd = make_bumpversion_cmd(
-        rel_type, current_version, files, new_version=new_version
+        current_version, files, rel_type=rel_type, new_version=new_version
     )
     run(cmd, check=True, verbose=True)
     modified.extend(files)
@@ -231,7 +251,9 @@ def cli():
 
 @cli.command(help="Increment version")
 @click.argument(
-    "rel_type", type=click.Choice(["major", "minor", "patch"], case_sensitive=False)
+    "rel_type",
+    type=click.Choice(["major", "minor", "patch"], case_sensitive=False),
+    required=False,
 )
 @click.option("--new-version", "new_version", help="explicit new version to create")
 @click.option(
@@ -254,7 +276,7 @@ def cli():
 )
 @jobs_option
 def bump(
-    rel_type,
+    rel_type=None,
     new_version=None,
     do_commit=None,
     do_tag=None,
@@ -262,6 +284,10 @@ def bump(
     jobs=DEFAULT_MAX_WORKERS,
 ):
     """Prepare a new release"""
+    try:
+        rel_type, new_version = _resolve_version_target(rel_type, new_version)
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
     # --tag requires --commit (only the explicit conflict is an error here;
     # the undecided None cases are resolved by prompting later)
     if do_tag is True and do_commit is False:
@@ -278,7 +304,7 @@ def bump(
             "Commit or stash them before running `bump`."
         )
     # Run the file-modifying release steps (version, changelog, marabunta)
-    new_version, modified_files = _do_bump(rel_type, new_version=new_version)
+    new_version, modified_files = _do_bump(rel_type=rel_type, new_version=new_version)
     # Stage everything the release process touched
     repo.index.add(modified_files)
     # Obtain the release notes from the HISTORY.rst diff
