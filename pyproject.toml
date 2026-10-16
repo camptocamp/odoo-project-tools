@@ -25,7 +25,7 @@ dependencies = [
     "psycopg2-binary>=2.9.13",
     "gitpython",
     "packaging",
-    "pydantic>=2.13.5",
+    "pydantic>=2.14.1",
     "ruamel.yaml",
     "cookiecutter",
     "click>=8.5.0,<8.6",
