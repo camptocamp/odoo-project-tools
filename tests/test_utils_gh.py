@@ -20,6 +20,7 @@ class TestParseGithubUrl:
             "repo_name": "edi",
             "entity_type": "pull",
             "entity_id": "731",
+            "is_patch": False,
         }
 
     def test_short_ref(self):
@@ -29,6 +30,7 @@ class TestParseGithubUrl:
             "repo_name": "edi",
             "entity_type": "pull",
             "entity_id": "731",
+            "is_patch": False,
         }
 
     def test_commit_url(self):
@@ -40,6 +42,7 @@ class TestParseGithubUrl:
             "repo_name": "edi",
             "entity_type": "commit",
             "entity_id": sha,
+            "is_patch": False,
         }
 
     def test_tree_url(self):
@@ -50,6 +53,7 @@ class TestParseGithubUrl:
             "repo_name": "edi",
             "entity_type": "tree",
             "entity_id": "16.0",
+            "is_patch": False,
         }
 
     def test_url_with_trailing_garbage(self):
@@ -59,6 +63,11 @@ class TestParseGithubUrl:
         assert result["repo_name"] == "edi"
         assert result["entity_type"] == "pull"
         assert result["entity_id"] == "731"
+
+    def test_patch_pull_url(self):
+        result = gh_utils.parse_github_url("https://github.com/OCA/edi/pull/731.patch")
+        assert result["entity_id"] == "731"
+        assert result["is_patch"] is True
 
     def test_oca_lowercase_is_uppercased(self):
         result = gh_utils.parse_github_url("oca/edi#731")

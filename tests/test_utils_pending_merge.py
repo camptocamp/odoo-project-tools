@@ -436,13 +436,15 @@ def test_remove_pending_pr():
 
 
 @pytest.mark.usefixtures("all_template_versions")
-def test_remove_pending_pr_not_found():
+def test_remove_pending_pr_not_found(capsys):
     """Removing a PR that doesn't exist should raise Exit."""
     name = "edi"
     mock_pending_merge_repo_paths(name)
     repo = Repo(name, path_check=False)
     with pytest.raises(Exit):
         repo.remove_pending_pull("OCA", 999)
+    output = capsys.readouterr()
+    assert "No pending merge or patch of OCA/edi#999" in output.out + output.err
 
 
 @pytest.mark.usefixtures("all_template_versions")
@@ -717,6 +719,39 @@ def test_remove_pending_patch_v1():
     repo.remove_pending_pull_from_patches("OCA", "1469")
     shell_command_after = repo.merges_config().get("shell_command_after", [])
     assert not shell_command_after
+
+
+@pytest.mark.usefixtures("project")
+@pytest.mark.project_setup(proj_tmpl_ver=1)
+@pytest.mark.parametrize(
+    "entity_url",
+    [
+        "https://github.com/OCA/edi/pull/1469",
+        "https://github.com/OCA/edi/pull/1469.patch",
+    ],
+)
+def test_remove_pending_pr_applied_as_patch(entity_url):
+    """Removing a PR by its URL also finds it when it is applied as a patch."""
+    name = "edi"
+    tmpl = """\
+../{ext_src_rel_path}/{repo_name}:
+  remotes:
+    camptocamp: git@github.com:camptocamp/{repo_name}.git
+    {org_name}: git@github.com:{org_name}/{repo_name}.git
+  target: camptocamp merge-branch-{pid}-master
+  merges:
+  - {org_name} 14.0
+  - {org_name} refs/pull/774/head
+  shell_command_after:
+  # [14.0] [FIX] edi: fix 1469
+  # https://github.com/OCA/edi/pull/1469
+  - curl -sSL https://github.com/OCA/edi/pull/1469.patch | git am -3 --keep-non-patch --exclude '*requirements.txt'
+"""
+    mock_pending_merge_repo_paths(name, tmpl=tmpl)
+    pm_utils.remove_pending(entity_url, aggregate=False)
+    conf = Repo(name, path_check=False).merges_config()
+    assert conf["merges"] == ["OCA 14.0", "OCA refs/pull/774/head"]
+    assert not conf.get("shell_command_after")
 
 
 @pytest.mark.usefixtures("project")

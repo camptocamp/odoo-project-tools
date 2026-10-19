@@ -92,7 +92,7 @@ class PendingPR:
         if self.is_patch:
             self._repo.remove_pending_pull_from_patches(self.owner, self.pr)
         else:
-            self._repo.remove_pending_pull(self.owner, self.pr)
+            self._repo.remove_pending_pull_from_merges(self.owner, self.pr)
 
     def enrich_with_github(self) -> None:
         """Fetch the PR's GitHub state and update this instance in place.
@@ -501,6 +501,17 @@ class Repo:
         print(f"✨ cherry pick {upstream}/{commit_sha} has been removed")
 
     def remove_pending_pull(self, upstream, pull_id):
+        """Drop a pull request, whether it is merged as a ref or applied as a patch."""
+        for pull in self._iter_pending_pull_requests():
+            if pull.owner.lower() == upstream.lower() and pull.pr == int(pull_id):
+                pull.remove_from_merges_file()
+                return
+        ui.exit_msg(
+            f"No pending merge or patch of {upstream}/{self.name}#{pull_id}"
+            f" found in {self.abs_merges_path}"
+        )
+
+    def remove_pending_pull_from_merges(self, upstream, pull_id):
         with _merges_file_lock:
             self._remove_pending_pull(upstream, pull_id)
 
@@ -709,10 +720,8 @@ def add_pending(entity_url, aggregate=True, patch=False, push=True):
         repo.update_pending_merges_file_base_merge()
 
     if entity_type == "pull":
-        # A ``.patch`` URL implies --patch, and is stripped to get the bare PR id
-        if entity_id.endswith(".patch"):
-            patch = True
-            entity_id = entity_id.removesuffix(".patch")
+        # A ``.patch`` URL implies --patch
+        patch = patch or parts["is_patch"]
         repo.add_pending_pull_request(upstream, entity_id, patch=patch)
     elif entity_type in ("commit", "tree"):
         repo.add_pending_commit(upstream, entity_id)
