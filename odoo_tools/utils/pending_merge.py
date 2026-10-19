@@ -637,13 +637,13 @@ class Repo:
         the upstream branch of the project's Odoo version.
         """
         odoo_version = get_project_manifest_key("odoo_version")
-        avail_remotes = list(self.merges_config()["remotes"].keys())
-        if "OCA" in avail_remotes:
-            remote = "OCA"
-        elif self.company_git_remote in avail_remotes:
-            remote = self.company_git_remote
-        else:
-            ui.exit_msg("No OCA or company remote found in merges config.")
+        # The first ``merges`` entry is the base ref the consolidation branch is
+        # built on (e.g. ``odoo 19.0``): its remote is the upstream to go back to,
+        # be it OCA, odoo or the company itself for a repository it owns.
+        base_merge = next(iter(self.merges_config().get("merges") or []), None)
+        if not base_merge:
+            ui.exit_msg(f"No base merge found in {self.abs_merges_path}.")
+        remote = str(base_merge).split()[0]
         new_remote_url = get_new_remote_url(repo=self, force_remote=remote)
         if remote not in git.get_remotes(self.abs_path):
             logger.debug("Adding missing remote: %s -> %s", remote, new_remote_url)
