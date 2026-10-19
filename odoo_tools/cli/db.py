@@ -1,6 +1,7 @@
 # Copyright 2025 Camptocamp SA (https://www.camptocamp.com).
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
+import fnmatch
 import json
 from datetime import datetime
 from pathlib import Path
@@ -123,6 +124,33 @@ def dump(db_name, output_path, format):
     Defaults to the current directory.
     """
     utils.db.dump_db(db_name, output_path, format)
+
+
+@cli.command()
+@click.argument("pattern")
+@click.option("-y", "--yes", is_flag=True, help="Skip the confirmation prompt.")
+@utils.click.handle_exceptions()
+def drop(pattern, yes):
+    """Drop all databases matching PATTERN.
+
+    PATTERN supports shell-style wildcards (e.g. ``prod_*``). Without
+    wildcards, only the database with that exact name is dropped.
+    """
+    matching = sorted(
+        name for name in utils.db.get_db_list() if fnmatch.fnmatchcase(name, pattern)
+    )
+    if not matching:
+        click.echo(f"No databases found matching {pattern!r}")
+        return
+    table = Table("Name")
+    for db_name in matching:
+        table.add_row(db_name)
+    console.print(table)
+    if not yes:
+        utils.ui.ask_or_abort(f"Drop the {len(matching)} database(s) above?")
+    for db_name in matching:
+        utils.ui.echo(f"🗑️  Dropping {db_name}")
+        utils.os_exec.run(utils.docker_compose.drop_db(db_name), check=True)
 
 
 @cli.group()
