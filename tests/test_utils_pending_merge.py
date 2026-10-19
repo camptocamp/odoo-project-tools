@@ -482,7 +482,9 @@ def test_handle_empty_merges_file_unlink_is_idempotent(project):
     assert not repo.abs_merges_path.exists()
     with (
         mock.patch.object(
-            Repo, "merges_config", return_value={"remotes": {"OCA": "url"}}
+            Repo,
+            "merges_config",
+            return_value={"remotes": {"OCA": "url"}, "merges": ["OCA 16.0"]},
         ),
         mock.patch.object(pm_utils, "get_new_remote_url", return_value="url"),
         mock.patch.object(pm_utils.git, "get_remotes", return_value=["OCA"]),
@@ -491,6 +493,36 @@ def test_handle_empty_merges_file_unlink_is_idempotent(project):
     ):
         # The unlink must not raise FileNotFoundError for the missing file.
         repo._handle_empty_merges_file()
+
+
+@pytest.mark.usefixtures("project")
+@pytest.mark.project_setup(manifest=dict(odoo_version="19.0"), proj_tmpl_ver=1)
+def test_handle_empty_merges_file_goes_back_to_base_remote():
+    """The submodule goes back to the remote of the base merge, not to the
+    company fork, which has no version branch."""
+    name = "edi"
+    tmpl = """\
+../{ext_src_rel_path}/{repo_name}:
+  remotes:
+    camptocamp: git@github.com:camptocamp/{repo_name}.git
+    odoo: git@github.com:odoo/{repo_name}.git
+  target: camptocamp merge-branch-{pid}-master
+  merges:
+  - odoo 19.0
+"""
+    mock_pending_merge_repo_paths(name, tmpl=tmpl)
+    repo = Repo(name, path_check=False)
+    with (
+        mock.patch.object(pm_utils.git, "get_remotes", return_value=["odoo"]),
+        mock.patch.object(pm_utils.git, "submodule_set_url") as mock_set_url,
+        mock.patch.object(pm_utils.git, "checkout") as mock_checkout,
+    ):
+        repo._handle_empty_merges_file()
+    mock_set_url.assert_called_once_with(
+        repo.path, "git@github.com:odoo/edi.git", remote="odoo"
+    )
+    mock_checkout.assert_called_once_with("19.0", remote="odoo", cwd=repo.abs_path)
+    assert not repo.abs_merges_path.exists()
 
 
 @pytest.mark.project_setup(manifest=dict(odoo_version="16.0"))
