@@ -1,6 +1,7 @@
 # Copyright 2025 Camptocamp SA (https://www.camptocamp.com).
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
+import fnmatch
 import json
 from datetime import datetime
 from pathlib import Path
@@ -126,16 +127,20 @@ def dump(db_name, output_path, format):
 
 
 @cli.command()
-@click.argument("prefix")
+@click.argument("pattern")
 @click.option("-y", "--yes", is_flag=True, help="Skip the confirmation prompt.")
 @utils.click.handle_exceptions()
-def drop(prefix, yes):
-    """Drop all databases whose name starts with PREFIX."""
+def drop(pattern, yes):
+    """Drop all databases matching PATTERN.
+
+    PATTERN supports shell-style wildcards (e.g. ``prod_*``). Without
+    wildcards, only the database with that exact name is dropped.
+    """
     matching = sorted(
-        name for name in utils.db.get_db_list() if name.startswith(prefix)
+        name for name in utils.db.get_db_list() if fnmatch.fnmatchcase(name, pattern)
     )
     if not matching:
-        click.echo(f"No databases found matching prefix {prefix!r}")
+        click.echo(f"No databases found matching {pattern!r}")
         return
     table = Table("Name")
     for db_name in matching:

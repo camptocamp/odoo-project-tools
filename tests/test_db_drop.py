@@ -13,7 +13,7 @@ class TestDbDrop:
         with patch("odoo_tools.utils.db.get_db_list", return_value=FAKE_DB_LIST):
             result = project.invoke(cli, ["drop", "nope"])
         assert result.exit_code == 0
-        assert "No databases found matching prefix" in result.output
+        assert "No databases found matching" in result.output
 
     def test_confirmed(self, project):
         with (
@@ -21,7 +21,7 @@ class TestDbDrop:
             patch("odoo_tools.utils.docker_compose.drop_db") as mock_drop_db,
             patch("odoo_tools.utils.os_exec.run") as mock_run,
         ):
-            result = project.invoke(cli, ["drop", "prod"], input="y\n")
+            result = project.invoke(cli, ["drop", "prod*"], input="y\n")
         assert result.exit_code == 0
         assert mock_drop_db.call_count == 3
         mock_drop_db.assert_any_call("prod")
@@ -34,7 +34,7 @@ class TestDbDrop:
             patch("odoo_tools.utils.db.get_db_list", return_value=FAKE_DB_LIST),
             patch("odoo_tools.utils.os_exec.run") as mock_run,
         ):
-            result = project.invoke(cli, ["drop", "prod"], input="n\n")
+            result = project.invoke(cli, ["drop", "prod*"], input="n\n")
         assert result.exit_code != 0
         mock_run.assert_not_called()
 
@@ -44,6 +44,29 @@ class TestDbDrop:
             patch("odoo_tools.utils.docker_compose.drop_db"),
             patch("odoo_tools.utils.os_exec.run") as mock_run,
         ):
-            result = project.invoke(cli, ["drop", "prod", "--yes"])
+            result = project.invoke(cli, ["drop", "prod*", "--yes"])
         assert result.exit_code == 0
         assert mock_run.call_count == 3
+
+    def test_exact_match_without_wildcard(self, project):
+        with (
+            patch("odoo_tools.utils.db.get_db_list", return_value=FAKE_DB_LIST),
+            patch("odoo_tools.utils.docker_compose.drop_db") as mock_drop_db,
+            patch("odoo_tools.utils.os_exec.run") as mock_run,
+        ):
+            result = project.invoke(cli, ["drop", "prod", "--yes"])
+        assert result.exit_code == 0
+        mock_drop_db.assert_called_once_with("prod")
+        assert mock_run.call_count == 1
+
+    def test_wildcard_pattern(self, project):
+        with (
+            patch("odoo_tools.utils.db.get_db_list", return_value=FAKE_DB_LIST),
+            patch("odoo_tools.utils.docker_compose.drop_db") as mock_drop_db,
+            patch("odoo_tools.utils.os_exec.run"),
+        ):
+            result = project.invoke(cli, ["drop", "prod_c*", "--yes"])
+        assert result.exit_code == 0
+        assert mock_drop_db.call_count == 2
+        mock_drop_db.assert_any_call("prod_cleanup")
+        mock_drop_db.assert_any_call("prod_core")
