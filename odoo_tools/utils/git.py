@@ -313,16 +313,16 @@ def iter_gitmodules(
         filter_path = Path(filter_path)
     for section in config.sections():
         info = dict(config.items(section))
-        assert "path" in info, f"Missing `path` in {section}"
-        assert "url" in info, f"Missing `url` in {section}"
-        if filter_path and not Path(info["path"]).is_relative_to(filter_path):
+        submodule_path = info.get("path")
+        url = info.get("url")
+        assert submodule_path, f"Missing `path` in {section}"
+        assert url, f"Missing `url` in {section}"
+        if filter_path and not Path(submodule_path).is_relative_to(filter_path):
             continue
-        path = Path(build_path(info["path"]))
+        path = Path(build_path(submodule_path))
         exists = path.exists()
         cloned = exists and Path(path / ".git").exists()
-        yield SubmoduleInfo(
-            info["path"], info["url"], info.get("branch"), exists, cloned
-        )
+        yield SubmoduleInfo(submodule_path, url, info.get("branch"), exists, cloned)
 
 
 def preload_submodule_state() -> None:
