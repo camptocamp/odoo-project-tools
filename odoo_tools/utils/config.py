@@ -33,7 +33,7 @@ def format_pydantic_validation_error(e: ValidationError) -> str:
     for error in e.errors():
         fname = error["loc"][0]
         message = f"- '{fname}': {error['msg']}"
-        field = ProjectConfig.model_fields.get(fname)
+        field = ProjectConfig.model_fields.get(str(fname))
         if field and field.description:
             message += f"\n\n{indent(field.description, ' ' * 4)}"
         messages.append(message)
