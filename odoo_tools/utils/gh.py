@@ -67,11 +67,17 @@ def parse_github_url(entity_spec):
     if upstream.lower() == "oca":
         upstream = "OCA"
 
+    # A ``.patch`` pull request URL points to the same PR, applied as a patch
+    is_patch = entity_type == "pull" and entity_id.endswith(".patch")
+    if is_patch:
+        entity_id = entity_id.removesuffix(".patch")
+
     return {
         "upstream": upstream,
         "repo_name": repo_name,
         "entity_type": entity_type,
         "entity_id": entity_id,
+        "is_patch": is_patch,
     }
 
 
