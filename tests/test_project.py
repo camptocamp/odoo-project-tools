@@ -9,6 +9,7 @@ import pytest
 
 from odoo_tools.cli.project import checkout_local_odoo, init
 from odoo_tools.utils.config import config
+from odoo_tools.utils.misc import get_template_path
 from odoo_tools.utils.path import build_path
 
 from .common import MockSubprocessRun, compare_line_by_line, get_fixture
@@ -105,6 +106,28 @@ def test_init_history_file_already_existing(project):
     assert not build_path("changes.d/BS-12.feat").exists()
     assert build_path("HISTORY.rst").read_text() == get_fixture(
         "fake-converted-history.rst"
+    )
+    assert result.exit_code == 0
+
+
+@pytest.mark.project_setup(
+    proj_tmpl_ver=1,
+    extra_files={
+        "HISTORY.rst": get_fixture("fake-deprecated-history-unreleased-only.rst")
+    },
+)
+def test_init_history_file_unreleased_section_until_eof(project):
+    result = project.invoke(init, catch_exceptions=False)
+    assert (
+        build_path("changes.d/BS-31.feat").read_text()
+        == "Install the ``module_a`` module\n"
+    )
+    build_fragments = list(build_path("changes.d").glob("*.build"))
+    assert len(build_fragments) == 1
+    assert build_fragments[0].read_text() == "Project initialization\n"
+    assert (
+        build_path("HISTORY.rst").read_text()
+        == get_template_path("HISTORY.tmpl.rst").read_text()
     )
     assert result.exit_code == 0
 

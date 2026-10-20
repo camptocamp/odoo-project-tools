@@ -58,6 +58,7 @@ def convert_history_to_towncrier(history_path):
             elif (
                 start is not None
                 and content_lines[i].strip()
+                and i < max_idx
                 and content_lines[i + 1].strip() == "+" * len(content_lines[i].strip())
             ):
                 end = i - 1
@@ -85,7 +86,7 @@ def convert_history_to_towncrier(history_path):
         "Build": "build",
     }
     section = None
-    for line in content_lines[start + 2 : end]:
+    for line in content_lines[start + 2 : end + 1]:
         # Identify current section header
         if match := re.match(r"\*\*(.*?)\*\*", line.strip()):
             section = match.group(1)
