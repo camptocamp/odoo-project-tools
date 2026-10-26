@@ -60,8 +60,7 @@ def test_init(project, version):
 def test_init_without_proj_cfg_nor_env_override(project):
     """`init` must work on a project that has no `.proj.cfg` yet.
 
-    Reading the config in that situation raises, so the template version has to
-    be resolved without it. Defaults to v1.
+    The template version falls back to the default configuration's: v1.
     """
     Path(".proj.cfg").unlink()
     config._reload()

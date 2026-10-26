@@ -40,11 +40,11 @@ def _mock_config(**attrs):
     return patch.object(minimum_version, "config", _FakeConfig())
 
 
-def test_no_config_is_noop():
+def test_malformed_config_is_noop():
     with patch.object(
         type(minimum_version.config),
         "__getattr__",
-        side_effect=ProjectConfigException("no .proj.cfg"),
+        side_effect=ProjectConfigException("malformed .proj.cfg"),
     ):
         minimum_version.check_minimum_version()
 

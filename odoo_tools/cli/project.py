@@ -225,7 +225,7 @@ def init(version, backup, **kw):
         try:
             template_version = config.template_version
         except ProjectConfigException:
-            # `init` also runs on projects that have no `.proj.cfg` yet
+            # `init` also runs on projects with a malformed `.proj.cfg`
             pass
     bootstrap_files(str(template_version or "1"), backup=backup, **kw)
 
