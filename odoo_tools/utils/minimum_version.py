@@ -23,9 +23,9 @@ from .update_check import upgrade_command
 def check_minimum_version() -> None:
     """Raise ``click.ClickException`` if the installed version is too old.
 
-    No-op when there is no reachable ``.proj.cfg`` (running outside a
-    project, or before ``otools-project init``) or when the project
-    does not set ``otools_min_version``.
+    No-op when running outside a project, when ``.proj.cfg`` is
+    malformed, or when the project does not set ``otools_min_version``
+    (which is always the case without a ``.proj.cfg``).
     """
     try:
         minimum = config.otools_min_version

@@ -51,12 +51,16 @@ def validate_config(config: dict[str, Any]) -> ProjectConfig:
 
 
 def load_config(config_path: PathLike) -> ProjectConfig:
-    """Loads the configuration file."""
+    """Loads the configuration file.
+
+    Falls back to the default configuration when the project has no
+    configuration file.
+    """
     try:
         content = build_path(config_path, from_root=True).read_text()
-        config = dict(parse_ini_cfg(content, "conf")["conf"])
-    except FileNotFoundError as e:
-        raise ProjectConfigException(e) from e
+    except FileNotFoundError:
+        return ProjectConfig()
+    config = dict(parse_ini_cfg(content, "conf")["conf"])
     try:
         return validate_config(config)
     except ProjectConfigException as e:
@@ -84,10 +88,10 @@ class ProjectConfig(BaseModel):
     template_version: int = 1
     """The project template version."""
 
-    company_git_remote: str
+    company_git_remote: str = "camptocamp"
     """The company github organization"""
 
-    odoo_src_rel_path: Path
+    odoo_src_rel_path: Path = Path("odoo/src")
     """The path to the Odoo source code.
 
     For v1 projects, this is the path to the odoo/odoo submodule.
@@ -95,15 +99,18 @@ class ProjectConfig(BaseModel):
     odoo/enterprise are located.
     """
 
-    ext_src_rel_path: Path
+    ext_src_rel_path: Path = Path("odoo/external-src")
     """The path to the external submodules are located."""
 
-    local_src_rel_path: Path
+    local_src_rel_path: Path = Path("odoo/local-src")
     """The path to the local addons."""
 
-    pending_merge_rel_path: Path
+    pending_merge_rel_path: Path = Path("pending-merges.d")
     """The path to the pending merges files."""
 
+    # The optional paths have no default: when unset, consumers fall back to
+    # other sources (e.g. the bundle addon version) instead of reading a file
+    # that may not exist.
     version_file_rel_path: OptionalPath = None
     """The path to the version file."""
 
