@@ -234,11 +234,24 @@ Options:
 
 Commands:
   addons         Addons management commands.
+  drop           Drop all databases matching PATTERN.
   dump           Create a PostgreSQL dump of the specified database.
   list           List all databases in the container.
   list-versions  Print a table of DBs with Marabunta version and install...
   restore        Restore an odoo backup locally (sql, dump or zip archive)
 ```
+
+#### otools-db drop
+
+Drop all databases matching PATTERN.
+
+```
+otools-db drop mydb
+otools-db drop 'prod_*'
+otools-db drop 'test_*' --yes
+```
+
+PATTERN supports shell-style wildcards (`*`, `?`, `[...]`, case-sensitive). Without wildcards, only the database with that exact name is dropped. Matching databases are listed in a table and a confirmation is asked before dropping; use `-y`/`--yes` to skip it. Quote the pattern so your shell doesn't expand it.
 
 #### otools-db addons list
 
