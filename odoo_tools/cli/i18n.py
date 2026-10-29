@@ -2,6 +2,7 @@
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
 import os
+import re
 import tempfile
 from pathlib import Path
 
@@ -107,7 +108,7 @@ def export(module_paths, languages, clean_db, init_db, export_pot):
         if main_lang := config.odoo_main_lang:
             languages.append(main_lang)
         if aux_langs := config.odoo_aux_langs:
-            languages.extend(aux_langs.split(","))
+            languages.extend(re.split(r"[,;]", aux_langs))
     # Prepare the languages for export. We ignore en_US because it requires no
     # translations, and we add None for the pot files, if needed.
     export_languages = tuple(lang for lang in languages if lang != "en_US")
