@@ -36,6 +36,7 @@ dependencies = [
     "Jinja2",
     "manifestoo",
     "tomli>=1.1.0; python_version < '3.11'",
+    "tomlkit",
     ]
 requires-python = ">=3.10"
 dynamic = ["version"]

@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import configparser
 import sys
+from dataclasses import dataclass, field
 from functools import cache, cached_property
 from pathlib import Path
 from textwrap import indent
 from typing import Annotated, Any
 
+import tomlkit
 from packaging.version import InvalidVersion, Version
 from pydantic import (
     BaseModel,
@@ -101,8 +103,9 @@ def warn_deprecated_config_source() -> None:
 
     ui.err_console.print(
         "WARNING: reading configuration from .proj.cfg / "
-        ".cookiecutter.context.yml is deprecated. Define a [tool.odoo-project] "
-        "section in pyproject.toml instead.",
+        ".cookiecutter.context.yml is deprecated. Run `otools-project "
+        "migrate-config` to move it to the [tool.odoo-project] section of "
+        "pyproject.toml.",
         style="yellow",
         # Printed as is: [tool.odoo-project] would be taken for markup
         markup=False,
@@ -188,6 +191,82 @@ def load_config() -> ProjectConfig:
         raise ProjectConfigException(
             f"{e}\n\nPlease check the configuration: {', '.join(sources)}"
         ) from None
+
+
+@dataclass
+class ConfigMigration:
+    """What :func:`migrate_config` did."""
+
+    added: dict[str, Any] = field(default_factory=dict)
+    """The settings added to the ``[tool.odoo-project]`` section."""
+
+    dropped: list[str] = field(default_factory=list)
+    """The ``.proj.cfg`` keys left behind, as no setting reads them."""
+
+    removed_proj_cfg: bool = False
+    """Whether ``.proj.cfg`` was removed."""
+
+    @property
+    def changed(self) -> bool:
+        return bool(self.added) or self.removed_proj_cfg
+
+
+def _toml_value(value: Any) -> Any:
+    if isinstance(value, Path):
+        return value.as_posix()
+    return value
+
+
+def migrate_config() -> ConfigMigration:
+    """Move the legacy configuration into the ``[tool.odoo-project]`` section.
+
+    Every setting the legacy files provide and the section lacks is added to
+    it, unless it is the default anyway. The section's own settings win, as
+    they do when the configuration is read. Then ``.proj.cfg`` is removed.
+    ``.cookiecutter.context.yml`` stays: it belongs to the project template.
+
+    ``pyproject.toml`` is edited in place, keeping its other content, comments
+    and formatting. Nothing is written when the resulting configuration does
+    not validate.
+    """
+    migration = ConfigMigration()
+    section = read_pyproject_section() or {}
+    proj_cfg_path = build_path(DEPRECATED_PROJ_CFG_PATH)
+    proj_cfg = read_legacy_proj_cfg(proj_cfg_path) if proj_cfg_path.exists() else {}
+    manifest_path = build_path(DEPRECATED_MANIFEST_PATH)
+    manifest = read_legacy_manifest(manifest_path) if manifest_path.exists() else {}
+    legacy = {**proj_cfg, **manifest}
+    effective = validate_config({**legacy, **section})
+    for name, model_field in ProjectConfig.model_fields.items():
+        if name in section or name not in legacy:
+            continue
+        value = getattr(effective, name)
+        if not model_field.is_required() and value == model_field.default:
+            continue
+        migration.added[name] = _toml_value(value)
+    migration.dropped = sorted(set(proj_cfg) - set(ProjectConfig.model_fields))
+    if migration.added:
+        pyproject_path = build_path("pyproject.toml")
+        if pyproject_path.exists():
+            document = tomlkit.parse(pyproject_path.read_text())
+        else:
+            document = tomlkit.document()
+        tool = document.get("tool")
+        if tool is None:
+            # Written as a bare [tool.odoo-project] header, without a [tool] one
+            tool = tomlkit.table(is_super_table=True)
+            document["tool"] = tool
+        table = tool.get(PYPROJECT_SECTION)
+        if table is None:
+            table = tomlkit.table()
+            tool[PYPROJECT_SECTION] = table
+        for name, value in migration.added.items():
+            table[name] = value
+        pyproject_path.write_text(tomlkit.dumps(document))
+    if proj_cfg_path.exists():
+        proj_cfg_path.unlink()
+        migration.removed_proj_cfg = True
+    return migration
 
 
 def falsy_to_none(v: Any) -> Any | None:

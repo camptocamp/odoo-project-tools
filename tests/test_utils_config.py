@@ -12,6 +12,8 @@ from odoo_tools.utils.config import (
     DEPRECATED_MANIFEST_PATH,
     config,
     load_config,
+    migrate_config,
+    read_pyproject_section,
     warn_deprecated_config_source,
 )
 
@@ -410,3 +412,117 @@ def test_manifest_next_to_pyproject_is_read_silently(project, capsys):
     loaded = load_config()
     assert loaded.customer_shortname == "acme"
     assert "deprecated" not in capsys.readouterr().err
+
+
+@pytest.mark.project_setup(legacy=True)
+def test_migrate_config(project):
+    before = load_config()
+    manifest = Path(DEPRECATED_MANIFEST_PATH).read_text()
+    migration = migrate_config()
+    # Only what differs from the defaults is written, the required settings
+    # always are
+    assert migration.added == {
+        "version_file_rel_path": "odoo/VERSION",
+        "marabunta_mig_file_rel_path": "odoo/migration.yml",
+        "odoo_version": "14.0",
+        "customer_shortname": "acme",
+        "project_name": "acme_odoo",
+        "project_id": "1234",
+        "country": "ch",
+        "odoo_main_lang": "de_DE",
+        "odoo_aux_langs": "fr_CH;it_IT",
+    }
+    assert read_pyproject_section() == migration.added
+    # A new pyproject.toml gets no empty [tool] table
+    assert Path("pyproject.toml").read_text().startswith("[tool.odoo-project]\n")
+    assert migration.removed_proj_cfg
+    assert not Path(".proj.cfg").exists()
+    # The manifest is the project template's: it is left as it was
+    assert Path(DEPRECATED_MANIFEST_PATH).read_text() == manifest
+    # The project reads the same configuration as before
+    assert load_config() == before
+
+
+@pytest.mark.project_setup(
+    legacy=True,
+    extra_files={
+        "pyproject.toml": dedent(
+            """\
+            # Project tooling
+            [project]
+            name = "acme_odoo"
+
+            [tool.ruff]
+            line-length = 88  # keep in sync with black
+
+            [tool.odoo-project]
+            odoo_version = "18.0"  # upgraded
+            """
+        ),
+    },
+)
+def test_migrate_config_keeps_pyproject_and_its_section(project):
+    migration = migrate_config()
+    # The section's own settings win over the legacy ones
+    assert "odoo_version" not in migration.added
+    assert load_config().odoo_version == "18.0"
+    assert Path("pyproject.toml").read_text() == dedent(
+        """\
+        # Project tooling
+        [project]
+        name = "acme_odoo"
+
+        [tool.ruff]
+        line-length = 88  # keep in sync with black
+
+        [tool.odoo-project]
+        odoo_version = "18.0"  # upgraded
+        version_file_rel_path = "odoo/VERSION"
+        marabunta_mig_file_rel_path = "odoo/migration.yml"
+        customer_shortname = "acme"
+        project_name = "acme_odoo"
+        project_id = "1234"
+        country = "ch"
+        odoo_main_lang = "de_DE"
+        odoo_aux_langs = "fr_CH;it_IT"
+        """
+    )
+
+
+@pytest.mark.project_setup(
+    legacy=True,
+    extra_files={
+        ".proj.cfg": dedent(
+            """\
+            [conf]
+            local_src_rel_path = odoo/addons
+            some_old_key = foo
+            """
+        ),
+    },
+)
+def test_migrate_config_reports_unknown_proj_cfg_keys(project):
+    migration = migrate_config()
+    assert migration.added["local_src_rel_path"] == "odoo/addons"
+    assert migration.dropped == ["some_old_key"]
+    assert "some_old_key" not in Path("pyproject.toml").read_text()
+
+
+@pytest.mark.project_setup(
+    legacy=True,
+    extra_files={
+        ".cookiecutter.context.yml": "odoo_version: '16.0'\n",
+    },
+)
+def test_migrate_config_writes_nothing_when_invalid(project):
+    with pytest.raises(ProjectConfigException, match="customer_shortname"):
+        migrate_config()
+    assert Path(".proj.cfg").exists()
+    assert not Path("pyproject.toml").exists()
+
+
+def test_migrate_config_nothing_to_migrate(project):
+    content = Path("pyproject.toml").read_text()
+    migration = migrate_config()
+    assert not migration.changed
+    assert Path("pyproject.toml").read_text() == content
