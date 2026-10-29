@@ -11,7 +11,6 @@ from ..utils.click import global_command_decorators
 from ..utils.config import config
 from ..utils.misc import SmartDict
 from ..utils.path import build_path, is_odoo_module
-from ..utils.proj import get_odoo_serie
 from ..utils.pypi import odoo_name_to_pkg_name
 
 
@@ -51,7 +50,7 @@ def add_requirement(name, **kw):
     """
     opts = SmartDict(kw)
 
-    pkg_name = odoo_name_to_pkg_name(name, odoo_serie=get_odoo_serie())
+    pkg_name = odoo_name_to_pkg_name(name, odoo_serie=config.odoo_serie)
 
     if opts.file:
         req_utils.add_requirement(

@@ -5,9 +5,10 @@ import os
 from pathlib import Path
 from unittest import mock
 
+import git
 import pytest
 
-from odoo_tools.cli.project import checkout_local_odoo, init
+from odoo_tools.cli.project import checkout_local_odoo, init, migrate_config
 from odoo_tools.utils.config import config
 from odoo_tools.utils.misc import get_template_path
 from odoo_tools.utils.path import build_path
@@ -20,11 +21,13 @@ from .common import MockSubprocessRun, compare_line_by_line, get_fixture
     [
         pytest.param(
             1,
-            marks=pytest.mark.project_setup(proj_tmpl_ver=1),
+            marks=pytest.mark.project_setup(proj_tmpl_ver=1, legacy=True),
         ),
         pytest.param(
             2,
-            marks=pytest.mark.project_setup(proj_tmpl_ver=2, proj_version="16.0.1.1.0"),
+            marks=pytest.mark.project_setup(
+                proj_tmpl_ver=2, proj_version="16.0.1.1.0", legacy=True
+            ),
         ),
     ],
 )
@@ -56,7 +59,7 @@ def test_init(project, version):
     os.environ["GIT_AUTOSHARE_CONFIG_DIR"] = str(autoshare_config_dir)
 
 
-@pytest.mark.project_setup(proj_tmpl_ver=1)
+@pytest.mark.project_setup(proj_tmpl_ver=1, legacy=True)
 def test_init_without_proj_cfg_nor_env_override(project):
     """`init` must work on a project that has no `.proj.cfg` yet.
 
@@ -72,6 +75,16 @@ def test_init_without_proj_cfg_nor_env_override(project):
 
 
 @pytest.mark.project_setup(proj_tmpl_ver=1)
+def test_init_skips_proj_cfg_with_pyproject_section(project):
+    """A project configured through [tool.odoo-project] gets no `.proj.cfg`."""
+    result = project.invoke(init, catch_exceptions=False)
+    assert result.exit_code == 0
+    assert not Path(".proj.cfg").exists()
+    # The rest of the project is still bootstrapped
+    assert Path("towncrier.toml").exists()
+
+
+@pytest.mark.project_setup(proj_tmpl_ver=1, legacy=True)
 def test_init_proj_conf_already_existing(project):
     orig_content = get_fixture("expected.proj.v1.cfg")
     expected = orig_content + "\nfoo = baz"
@@ -147,7 +160,7 @@ def test_init_history_file_already_existing_but_already_converted(project):
     assert result.exit_code == 0
 
 
-@pytest.mark.project_setup(proj_tmpl_ver=1)
+@pytest.mark.project_setup(proj_tmpl_ver=1, legacy=True)
 def test_init_version_option_takes_precedence(project):
     """`--version` selects the template version, over the `PROJ_TMPL_VER` env var."""
     Path(".proj.cfg").unlink()
@@ -439,3 +452,58 @@ def test_checkout_local_odoo_fallback_to_branch(runner):
     # both repositories are fetched on the project's odoo version branch
     assert refs[1] == "16.0"
     assert refs[4] == "16.0"
+
+
+@pytest.mark.project_setup(legacy=True)
+def test_migrate_config_commit(project):
+    result = project.invoke(migrate_config, ["--commit"], catch_exceptions=False)
+    assert result.exit_code == 0
+    assert (
+        "Added to the [tool.odoo-project] section of pyproject.toml:" in result.output
+    )
+    assert '  odoo_version = "14.0"' in result.output
+    assert "Removed .proj.cfg" in result.output
+    repo = git.Repo(".")
+    assert not repo.is_dirty(untracked_files=True)
+    commit = repo.head.commit
+    assert commit.message.strip() == (
+        "Migrate the project configuration to pyproject.toml"
+    )
+    assert set(commit.stats.files) == {"pyproject.toml", ".proj.cfg"}
+
+
+@pytest.mark.project_setup(legacy=True)
+def test_migrate_config_no_commit(project):
+    repo = git.Repo(".")
+    head = repo.head.commit
+    result = project.invoke(migrate_config, ["--no-commit"], catch_exceptions=False)
+    assert result.exit_code == 0
+    assert repo.head.commit == head
+    assert repo.is_dirty(path=".proj.cfg")
+    assert "pyproject.toml" in repo.untracked_files
+
+
+@pytest.mark.project_setup(legacy=True)
+def test_migrate_config_asks_before_committing(project):
+    repo = git.Repo(".")
+    head = repo.head.commit
+    result = project.invoke(migrate_config, input="\n", catch_exceptions=False)
+    assert result.exit_code == 0
+    assert "Commit the migration?" in result.output
+    # Not committing is the default answer
+    assert repo.head.commit == head
+
+
+@pytest.mark.project_setup(legacy=True)
+def test_migrate_config_refuses_to_commit_unrelated_changes(project):
+    Path("pyproject.toml").write_text('[project]\nname = "acme_odoo"\n')
+    result = project.invoke(migrate_config, ["--commit"])
+    assert result.exit_code != 0
+    assert "uncommitted changes" in result.output
+    assert Path(".proj.cfg").exists()
+
+
+def test_migrate_config_nothing_to_migrate(project):
+    result = project.invoke(migrate_config, catch_exceptions=False)
+    assert result.exit_code == 0
+    assert "Nothing to migrate." in result.output

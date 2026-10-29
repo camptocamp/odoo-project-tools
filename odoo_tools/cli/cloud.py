@@ -9,6 +9,7 @@ import click
 
 from .. import utils
 from ..utils.click import global_command_decorators
+from ..utils.config import config
 
 
 def get_customer_name_from_project_name(project_name: str) -> str:
@@ -21,9 +22,9 @@ def build_celebrimbor_command(
 ):
     """Build celebrimbor_cli command."""
     if platform is None:
-        platform = utils.proj.get_project_manifest_key("country")
+        platform = config.country
     if customer is None:
-        project = utils.proj.get_project_manifest_key("project_name")
+        project = config.project_name
         customer = get_customer_name_from_project_name(project)
     command_args = ["celebrimbor_cli"]
     extra_args = [*args]

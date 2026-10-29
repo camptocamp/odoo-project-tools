@@ -9,6 +9,7 @@ from textwrap import dedent
 from types import SimpleNamespace
 from unittest import mock
 
+import git
 import pytest
 import requests
 import responses
@@ -938,6 +939,8 @@ def test_cli_add_multiple_urls(project):
 def test_cli_add_multiple_urls_aggregates_once_per_submodule(project):
     """Submodules are aggregated once each, after all entries are written, even
     when several URLs target the same submodule (no intermediate aggregation)."""
+    # Off master, where pushing the consolidation branch asks for confirmation
+    git.Repo(".").create_head("feature-x").checkout()
     mock_pending_merge_repo_paths("edi")
     mock_pending_merge_repo_paths("web")
     with responses.RequestsMock() as rsps:
@@ -988,6 +991,8 @@ def test_repo_run_aggregate_runs_gitaggregate_cli(project):
 
 
 def test_cli_aggregate(project):
+    # Off master, where pushing the consolidation branch asks for confirmation
+    git.Repo(".").create_head("feature-x").checkout()
     mock_pending_merge_repo_paths("edi")
     with (
         mock.patch.object(pm_utils.Repo, "run_aggregate") as run_aggregate,
@@ -1002,6 +1007,8 @@ def test_cli_aggregate(project):
 def test_cli_aggregate_multiple_repos(project):
     """`otools-pending aggregate` accepts several repos at once, aggregating
     each of them once, and skips the ones without pending merges."""
+    # Off master, where pushing the consolidation branch asks for confirmation
+    git.Repo(".").create_head("feature-x").checkout()
     mock_pending_merge_repo_paths("edi")
     mock_pending_merge_repo_paths("web")
     mock_pending_merge_repo_paths("stock", pending=False)
@@ -1056,7 +1063,7 @@ def test_repo_push_to_remote(project):
     )
 
 
-def test_repo_run_aggregate_prints_nothing_when_captured(project, capfd):
+def test_repo_run_aggregate_prints_nothing_when_captured(project, capfd, monkeypatch):
     """Under capture_output, not a single byte may reach the terminal, even
     when the aggregation fails: it would corrupt the live progress display.
 
@@ -1066,6 +1073,8 @@ def test_repo_run_aggregate_prints_nothing_when_captured(project, capfd):
     """
     mock_pending_merge_repo_paths("edi")
     repo = Repo("edi", path_check=False)
+    # Keep git from finding the project repository above the fake submodule
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(repo.abs_path.parent))
     lines = []
     with (
         os_exec.capture_output(lines.append),
@@ -1079,7 +1088,7 @@ def test_repo_run_aggregate_prints_nothing_when_captured(project, capfd):
     assert captured.err == ""
 
 
-def test_repo_push_to_remote_captures_the_remote_setup_too(project, capfd):
+def test_repo_push_to_remote_captures_the_remote_setup_too(project, capfd, monkeypatch):
     """Everything the push does is captured, down to the remote bookkeeping.
 
     `git remote add` reports its failures through run() too, and it would
@@ -1087,6 +1096,8 @@ def test_repo_push_to_remote_captures_the_remote_setup_too(project, capfd):
     """
     mock_pending_merge_repo_paths("edi")
     repo = Repo("edi", path_check=False)
+    # Keep git from finding the project repository above the fake submodule
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(repo.abs_path.parent))
     lines = []
     # `edi/.git` is a bare directory here, so the `git remote add` that
     # ensure_remote runs fails and complains -- on the sink, we hope.
@@ -1141,6 +1152,8 @@ def _mock_clean_github_responses(
 def test_cli_clean_prompts_for_aggregate(project, answer, aggregated):
     """Without an explicit --aggregate/--no-aggregate flag, `otools-pending
     clean` asks before re-aggregating each touched submodule."""
+    # Off master, where pushing the consolidation branch asks for confirmation
+    git.Repo(".").create_head("feature-x").checkout()
     mock_pending_merge_repo_paths("edi")
     repo = Repo("edi", path_check=False)
     with responses.RequestsMock() as rsps:
@@ -1165,6 +1178,8 @@ def test_cli_clean_prompts_for_aggregate(project, answer, aggregated):
 def test_cli_clean_prompts_for_aggregate_once_for_all_repos(project):
     """The re-aggregation question is asked once, listing every touched
     submodule, rather than once per submodule."""
+    # Off master, where pushing the consolidation branch asks for confirmation
+    git.Repo(".").create_head("feature-x").checkout()
     mock_pending_merge_repo_paths("edi")
     mock_pending_merge_repo_paths("web")
     with responses.RequestsMock() as rsps:
@@ -1191,6 +1206,8 @@ def test_cli_clean_prompts_for_aggregate_once_for_all_repos(project):
 )
 def test_cli_clean_explicit_aggregate_flag_skips_prompt(project, flag, aggregated):
     """An explicit --aggregate/--no-aggregate flag is honored without asking."""
+    # Off master, where pushing the consolidation branch asks for confirmation
+    git.Repo(".").create_head("feature-x").checkout()
     mock_pending_merge_repo_paths("edi")
     with responses.RequestsMock() as rsps:
         _mock_clean_github_responses(rsps)
@@ -1815,6 +1832,8 @@ def test_purge_repos_does_nothing_without_pull_requests(project):
 def test_cli_clean_says_what_it_cleaned(project):
     """The purge announces itself above the pull requests it is working
     through, and settles on what came of it."""
+    # Off master, where pushing the consolidation branch asks for confirmation
+    git.Repo(".").create_head("feature-x").checkout()
     mock_pending_merge_repo_paths("edi")
     with responses.RequestsMock() as rsps:
         _mock_clean_github_responses(rsps)

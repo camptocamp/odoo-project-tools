@@ -13,7 +13,8 @@ from typing import Literal
 
 import psycopg2
 
-from . import docker_compose, os_exec, proj, ui
+from . import docker_compose, os_exec, ui
+from .config import config
 
 
 def create_db_from_db_dump(
@@ -108,7 +109,7 @@ def dump_db(
     # If output_path is a directory, generate a filename
     if output_path.is_dir() or output_path.as_posix().endswith("/"):
         username = getpass.getuser()
-        project_name = proj.get_project_manifest_key("project_name")
+        project_name = config.project_name
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         filename = f"{username}_{project_name}-{timestamp}.pg"
         output_path = output_path / filename

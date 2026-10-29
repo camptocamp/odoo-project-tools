@@ -4,8 +4,8 @@
 import pytest
 from click.testing import CliRunner
 
+from odoo_tools.utils import path as path_utils
 from odoo_tools.utils.config import config
-from odoo_tools.utils.proj import get_project_manifest
 
 from .common import make_fake_project_root
 
@@ -71,7 +71,8 @@ def all_template_versions(project):
 
 @pytest.fixture(autouse=True)
 def clear_caches():
-    get_project_manifest.cache_clear()
+    config._reload()
+    path_utils.root_path.cache_clear()
 
 
 @pytest.fixture(autouse=True)

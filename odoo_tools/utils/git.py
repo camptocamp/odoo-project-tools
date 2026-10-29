@@ -13,11 +13,29 @@ from git.config import GitConfigParser
 from git_autoshare.core import config as autoshare_config
 from git_autoshare.core import find_autoshare_repository
 
+from ..exceptions import ProjectRootFolderNotFound
 from . import ui
 from .config import config as proj_config
 from .os_exec import run
 from .path import build_path, root_path
-from .proj import get_odoo_version, get_project_id, get_project_manifest
+
+
+def git_toplevel() -> Path:
+    """Return the outermost git working tree containing the current directory.
+
+    Uses ``--show-superproject-working-tree`` so that, when run from within a
+    submodule (e.g. ``odoo/src``), we get the project repository rather than the
+    submodule. Raises :class:`ProjectRootFolderNotFound` when not inside a git
+    repository.
+    """
+    top = run("git rev-parse --show-superproject-working-tree")
+    top = top or run("git rev-parse --show-toplevel")
+    if not top:
+        raise ProjectRootFolderNotFound(
+            "Not inside a git repository. It's not a project directory. Exiting"
+        )
+    return Path(top)
+
 
 _superproject_lock = threading.Lock()
 
@@ -334,14 +352,14 @@ def preload_submodule_state() -> None:
     * git-autoshare ``print()``s when it cannot find its ``repos.yml``, and it
       does it in-process, where no capture can reach it. From a worker that
       line lands in the middle of the live display.
-    * the project manifest is parsed with a shared YAML parser (see
+    * the project configuration is loaded on first read, on legacy projects
+      by parsing the manifest with a shared YAML parser (see
       :mod:`~odoo_tools.utils.yaml`), so every worker missing the cache at once
       means doing the same parse N times, one after another, for one answer.
 
     Call it before fanning out. It is cheap, and doing it twice does nothing.
     """
     autoshare_config()
-    get_project_manifest()
     proj_config.company_git_remote  # noqa: B018 -- a cached_property, filled by reading
 
 
@@ -479,11 +497,11 @@ def _submodule_update_from_remote(
     if submodule is None:
         submodule = next(iter_gitmodules(filter_path=path), None)
     project_id: str | None = None
-    base_branch: str = get_odoo_version()
+    base_branch: str = proj_config.odoo_version
     company_remote = proj_config.company_git_remote
     if submodule:
         ui.echo(f"Updating submodule {submodule.path}")
-        project_id = get_project_id(raise_if_missing=False)
+        project_id = proj_config.project_id
         base_branch = submodule.branch or base_branch
         __, autoshare_repo = find_autoshare_repository([submodule.url])
         if autoshare_repo:
@@ -627,7 +645,7 @@ def submodule_upgrade(path, url, branch=None):
     abs_path = str(build_path(path))
     if not branch:
         submodule = next(iter_gitmodules(filter_path=path), None)
-        branch = (submodule.branch if submodule else None) or get_odoo_version()
+        branch = (submodule.branch if submodule else None) or proj_config.odoo_version
     # As `git submodule update --force` did: a submodule is not somewhere to
     # keep work, and the checkout below would refuse to move over it.
     run(["git", "-C", abs_path, "reset", "--hard", "HEAD"], check=True)
