@@ -475,6 +475,48 @@ def test_remove_pending_last_pr():
     mock_handle.assert_called_once()
 
 
+@pytest.mark.parametrize(
+    ("args", "aggregated", "pushed"),
+    [
+        ([], True, True),
+        (["--no-push"], True, False),
+        (["--no-aggregate"], False, False),
+    ],
+)
+def test_cli_remove_pending_aggregates_and_pushes(project, args, aggregated, pushed):
+    """With other pending merges left, the submodule is re-aggregated and the
+    result pushed, otherwise its pin would point to a commit only found locally."""
+    name = "edi"
+    tmpl = """
+../{ext_src_rel_path}/{repo_name}:
+    remotes:
+        camptocamp: git@github.com:camptocamp/{repo_name}.git
+        {org_name}: git@github.com:{org_name}/{repo_name}.git
+    target: camptocamp merge-branch-{pid}-master
+    merges:
+    - {org_name} 14.0
+    - {org_name} refs/pull/774/head
+    - {org_name} refs/pull/775/head
+"""
+    mock_pending_merge_repo_paths(name, tmpl=tmpl)
+    with (
+        mock.patch.object(pm_utils.Repo, "run_aggregate") as run_aggregate,
+        mock.patch.object(pm_utils.Repo, "push_to_remote") as push_to_remote,
+    ):
+        result = project.invoke(
+            pending.remove_pending,
+            ["https://github.com/OCA/edi/pull/774", *args],
+            catch_exceptions=False,
+        )
+    assert result.exit_code == 0
+    assert Repo(name).merges_config()["merges"] == [
+        "OCA 14.0",
+        "OCA refs/pull/775/head",
+    ]
+    assert run_aggregate.called is aggregated
+    assert push_to_remote.called is pushed
+
+
 @pytest.mark.project_setup(manifest=dict(odoo_version="16.0"))
 def test_handle_empty_merges_file_unlink_is_idempotent(project):
     """Deleting the merges file stays safe if it is already gone (#252)."""
