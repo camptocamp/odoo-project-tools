@@ -732,7 +732,13 @@ def add_pending(entity_url, aggregate=True, patch=False, push=True):
     return repo
 
 
-def remove_pending(entity_url, aggregate=True):
+def remove_pending(entity_url, aggregate=True, push=True):
+    """Remove a pending merge using the given entity url.
+
+    :param entity_url: url of a pull request or commit
+    :param aggregate: if True, run git aggregate after editing the file
+    :param push: if True, push the aggregated result to the company remote
+    """
     parts = gh.parse_github_url(entity_url)
     upstream = parts.get("upstream")
     repo_name = parts.get("repo_name")
@@ -751,6 +757,8 @@ def remove_pending(entity_url, aggregate=True):
         repo._handle_empty_merges_file()
     elif aggregate:
         repo.run_aggregate()
+        if push:
+            repo.push_to_remote()
     return repo
 
 

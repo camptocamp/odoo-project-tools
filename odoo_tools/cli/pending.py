@@ -394,13 +394,16 @@ def add_pending(
     is_flag=True,
     default=True,
 )
-def remove_pending(entity_url, aggregate=True):
-    """Add a pending merge using given entity link"""
-    # pattern, given an https://github.com/<user>/<repo>/pull/<pr-index>
-    # # PR headline
-    # # PR link as is
-    # - refs/pull/<pr-index>/head
-    pm_utils.remove_pending(entity_url, aggregate=aggregate)
+@click.option(
+    "--push/--no-push",
+    "push",
+    is_flag=True,
+    default=True,
+    help="push the result of the aggregation to a remote branch",
+)
+def remove_pending(entity_url, aggregate=True, push=True):
+    """Remove a pending merge using given entity link"""
+    pm_utils.remove_pending(entity_url, aggregate=aggregate, push=push)
 
 
 if __name__ == "__main__":
