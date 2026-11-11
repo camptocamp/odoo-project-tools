@@ -19,19 +19,17 @@ def test_root_path(runner):
     assert (Path() / nested_path).exists()
     make_fake_project_root()
     assert path_utils.root_path().as_posix() == str(curr_dir)
+    # From within the tree (e.g. a submodule), git still resolves the root.
     os.chdir(nested_path)
+    path_utils.root_path.cache_clear()
     assert path_utils.root_path().as_posix() == str(curr_dir)
+    # Outside any git repository, root discovery fails loudly.
     os.chdir("/tmp")
+    path_utils.root_path.cache_clear()
     with pytest.raises(exceptions.ProjectRootFolderNotFound):
         path_utils.root_path()
 
 
 def test_build_path(project):
     curr_dir = Path().resolve()
-    (curr_dir / "sub").mkdir()
-    (curr_dir / "sub/foo.baz").write_text("test")
     assert path_utils.build_path("nested/yo.txt") == curr_dir / "nested/yo.txt"
-    assert (
-        path_utils.build_path("another.file", from_file="sub/foo.baz")
-        == curr_dir / "sub/another.file"
-    )

@@ -31,9 +31,7 @@ def test_make_towncrier_cmd():
     assert cmd == "towncrier build --yes --version=16.0.1.0.0"
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump(project):
     ver_file = config.version_file_rel_path
     assert ver_file.read_text() == "14.0.0.1.0"
@@ -74,9 +72,7 @@ def test_bump(project):
         bump(standalone_mode=False)
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.1.2.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.1.2.0", mock_marabunta_file=True)
 def test_bump_wrong_parameters(project):
     ver_file = config.version_file_rel_path
     assert ver_file.read_text() == "14.0.1.2.0"
@@ -92,9 +88,7 @@ def test_bump_wrong_parameters(project):
     assert ver_file.read_text() == "14.0.1.2.0"
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump_changelog(project):
     # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
@@ -135,9 +129,7 @@ def test_bump_changelog(project):
     assert result.exit_code == 0
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump_update_marabunta_file(project):
     # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
@@ -158,7 +150,6 @@ def test_bump_update_marabunta_file(project):
     proj_version="14.0.0.1.0",
     proj_cfg=dict(marabunta_mig_file_rel_path=None),
     mock_marabunta_file=False,
-    git_init=True,
 )
 def test_bump_update_without_marabunta_file(project):
     # run init to get all files ready (eg: towncrier)
@@ -178,7 +169,9 @@ def test_bump_update_without_marabunta_file(project):
     proj_version="18.0.0.0.0",
     proj_cfg={"version_file_rel_path": None},
     mock_marabunta_file=True,
-    git_init=True,
+    # Legacy layout: no pyproject.toml, so there is genuinely nothing to bump
+    # (a pyproject.toml would always be a bump target).
+    legacy=True,
 )
 def test_bump_without_version_file_and_no_bundle_addon(project):
     # run init to get all files ready
@@ -196,7 +189,6 @@ def test_bump_without_version_file_and_no_bundle_addon(project):
     proj_version="18.0.1.2.0",
     mock_marabunta_file=True,
     mock_bundle_addon=True,
-    git_init=True,
 )
 def test_bump_bundle_addon_manifest_version(project):
     # make sure the bundle addon is created
@@ -225,7 +217,6 @@ def test_bump_bundle_addon_manifest_version(project):
     proj_cfg={"version_file_rel_path": None},
     mock_marabunta_file=True,
     mock_bundle_addon=True,
-    git_init=True,
 )
 def test_bump_bundle_addon_manifest_version_without_version_file(project):
     # make sure the bundle addon is created
@@ -248,9 +239,7 @@ def test_bump_bundle_addon_manifest_version_without_version_file(project):
     assert "18.0.1.3.0" in (bundle_addon_path / "__manifest__.py").read_text()
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump_push_no_repo(project):
     # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
@@ -267,9 +256,7 @@ def test_bump_push_no_repo(project):
 
 
 # TODO: test more cases
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump_push_repo_with_pending_merge(project):
     ran = []
     real_run = release.run
@@ -359,9 +346,7 @@ def test_tag_signing_enabled(tmp_path):
     assert tag_signing_enabled(repo) is False
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump_commit_and_tag(project):
     project.invoke(init, catch_exceptions=False)
     cwd = Path()
@@ -400,9 +385,7 @@ def test_bump_commit_and_tag(project):
     assert not repo.is_dirty(untracked_files=True, submodules=False)
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump_commit_no_tag(project):
     project.invoke(init, catch_exceptions=False)
     # the commit flow requires a clean tree to start from
@@ -423,9 +406,7 @@ def test_bump_commit_no_tag(project):
     assert "git tag -a 14.0.0.2.0" in result.output
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump_tag_recreate(project):
     project.invoke(init, catch_exceptions=False)
     git_commit_all()
@@ -449,9 +430,7 @@ def test_bump_tag_recreate(project):
     assert tag.commit == repo.head.commit
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump_tag_recreate_declined(project):
     project.invoke(init, catch_exceptions=False)
     git_commit_all()
@@ -473,9 +452,7 @@ def test_bump_tag_recreate_declined(project):
     assert "✔ Created tag" not in result.output
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump_prompts_commit_and_tag(project):
     project.invoke(init, catch_exceptions=False)
     # the commit flow requires a clean tree to start from
@@ -492,9 +469,7 @@ def test_bump_prompts_commit_and_tag(project):
     assert "14.0.0.2.0" in [tag.name for tag in repo.tags]
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump_prompts_decline_commit(project):
     project.invoke(init, catch_exceptions=False)
     # check(a) runs while the commit decision is undecided, so start clean
@@ -512,9 +487,7 @@ def test_bump_prompts_decline_commit(project):
     assert len(repo.tags) == 0
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump_no_commit(project):
     project.invoke(init, catch_exceptions=False)
     head_before = git.Repo(".").head.commit.hexsha
@@ -533,9 +506,7 @@ def test_bump_no_commit(project):
     assert "git tag -a 14.0.0.2.0" in result.output
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump_tag_requires_commit(project):
     project.invoke(init, catch_exceptions=False)
     ver_file = config.version_file_rel_path
@@ -546,9 +517,7 @@ def test_bump_tag_requires_commit(project):
     assert ver_file.read_text() == "14.0.0.1.0"
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump_fails_on_unstaged_changes(project):
     project.invoke(init, catch_exceptions=False)
     git_commit_all()
@@ -562,9 +531,7 @@ def test_bump_fails_on_unstaged_changes(project):
     assert ver_file.read_text() == "14.0.0.1.0"
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump_ignores_untracked_files(project):
     project.invoke(init, catch_exceptions=False)
     git_commit_all()
@@ -586,9 +553,7 @@ def test_bump_ignores_untracked_files(project):
     assert set(repo.untracked_files) == {"AGENTS.md", "tmp/scratch.txt"}
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump_reports_a_branch_it_could_not_push(project):
     """A push that failed used to be reported as pushed: nothing asked git
     whether it had worked, so every repo came back green."""
@@ -618,9 +583,7 @@ def test_bump_reports_a_branch_it_could_not_push(project):
     assert result.exit_code == 1
 
 
-@pytest.mark.project_setup(
-    proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
-)
+@pytest.mark.project_setup(proj_version="14.0.0.1.0", mock_marabunta_file=True)
 def test_bump_does_not_commit_a_release_it_could_not_push(project):
     """The push runs before the commit on purpose: aggregated branches that
     never reached the remote leave nothing to rebuild the release from, so it

@@ -3,47 +3,21 @@
 
 import os
 from contextlib import contextmanager
+from functools import cache
 from pathlib import Path
 
-from ..exceptions import ProjectRootFolderNotFound
+
+@cache
+def root_path():
+    # The project root is the top of the git working tree. Cached because
+    # build_path() calls this frequently and we must not spawn git every time.
+    from .git import git_toplevel
+
+    return git_toplevel()
 
 
-def get_root_marker():
-    return ".cookiecutter.context.yml"
-
-
-# TODO: consider using `git rev-parse --show-superproject-working-tree / --show-toplevel`
-# to find out the root of the project w/o relying on marker files.
-
-
-def root_path(marker_file=None, raise_if_missing=True):
-    if marker_file is None:
-        marker_file = get_root_marker()
-    # directory from where search for .cookiecutter.context.yml starts
-    current_dir = Path.cwd()
-    max_depth = 5
-    while max_depth > 0:
-        marker = current_dir / marker_file
-        if marker.exists():
-            return current_dir
-        if current_dir.parent == current_dir:
-            break
-        current_dir = current_dir.parent
-        max_depth -= 1
-    if raise_if_missing:
-        raise ProjectRootFolderNotFound(
-            f"Missing {marker_file}. It's not a project directory. Exiting"
-        )
-
-
-def build_path(path, from_root=True, from_file=None):
-    if not from_file and from_root:
-        base_path = root_path()
-    else:
-        if from_file is None:
-            from_file = __file__
-        base_path = Path(from_file).parent.resolve()
-    return base_path / path
+def build_path(path):
+    return root_path() / path
 
 
 @contextmanager

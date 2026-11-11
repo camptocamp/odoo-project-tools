@@ -9,10 +9,9 @@ from unittest import mock
 import git
 import pytest
 
-from odoo_tools.exceptions import ProjectConfigException
 from odoo_tools.utils import git as git_utils
-from odoo_tools.utils import proj as proj_utils
 from odoo_tools.utils import ui
+from odoo_tools.utils.config import config
 from odoo_tools.utils.path import build_path, root_path
 
 from .common import (
@@ -36,25 +35,23 @@ def _make_autoshare_repo(repo_dir):
     return ar
 
 
-# ── get_project_id (proj utils) ───────────────────────────────────────────────
+# ── project_id (from config) ──────────────────────────────────────────────────
 
 
 @pytest.mark.project_setup(
     manifest=dict(odoo_version="18.0", project_id="1289"),
     proj_version="18.0.1.0.0",
 )
-def test_get_project_id_from_manifest(project):
-    assert proj_utils.get_project_id() == "1289"
+def test_project_id_from_config(project):
+    assert config.project_id == "1289"
 
 
 @pytest.mark.project_setup(
     manifest=dict(odoo_version="18.0", project_id=None),
     proj_version="18.0.1.0.0",
 )
-def test_get_project_id_not_set(project):
-    assert proj_utils.get_project_id(raise_if_missing=False) is None
-    with pytest.raises(ProjectConfigException):
-        proj_utils.get_project_id()
+def test_project_id_not_set(project):
+    assert config.project_id is None
 
 
 # ── _repo_name_from_url ───────────────────────────────────────────────────────
@@ -400,7 +397,6 @@ def test_get_pinned_sha_returns_none_on_error():
         assert sha is None
 
 
-@pytest.mark.project_setup(git_init=True)
 def test_get_pinned_sha_reads_a_staged_bump(project):
     """What `git submodule update` checks out, rather than what HEAD has."""
     repo = git.Repo(root_path())
@@ -588,7 +584,6 @@ def test_submodule_update_fetches_a_commit_not_here(project):
     mock_setup.assert_called_once()
 
 
-@pytest.mark.project_setup(git_init=True)
 def test_switching_back_needs_no_fetch(project, tmp_path, monkeypatch):
     """A commit no branch reaches any more, recorded by an older project
     commit: going back to it must not fetch."""
@@ -646,7 +641,7 @@ def test_switching_back_needs_no_fetch(project, tmp_path, monkeypatch):
 # ── get_current_branch ────────────────────────────────────────────────────────
 
 
-@pytest.mark.project_setup(git_init=True)
+@pytest.mark.project_setup()
 @pytest.mark.usefixtures("project")
 class TestGetCurrentBranch:
     def test_returns_branch_name(self):

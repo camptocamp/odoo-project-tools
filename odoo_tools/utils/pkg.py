@@ -2,7 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 from . import pypi, req
-from .proj import get_odoo_serie
+from .config import config
 
 
 class Package:
@@ -13,7 +13,7 @@ class Package:
         self.req_filepath = req_filepath
         if self.odoo:
             self.pypi_name = pypi.odoo_name_to_pkg_name(
-                name, odoo_serie=get_odoo_serie()
+                name, odoo_serie=config.odoo_serie
             )
         self.latest_version = pypi.get_last_pypi_version(self.pypi_name, odoo=odoo)
         self._req = None

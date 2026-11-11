@@ -6,22 +6,24 @@ import uuid
 
 import click
 import jinja2
+import tomlkit
 from git import Repo as GitRepo
+from rich.prompt import Confirm
 
 from ..exceptions import ProjectConfigException
+from ..utils import config as config_utils
 from ..utils import git, ui
 from ..utils.click import global_command_decorators
-from ..utils.config import PROJ_CFG_FILE, config
+from ..utils.config import DEPRECATED_PROJ_CFG_PATH, config, read_pyproject_section
 from ..utils.misc import (
     SmartDict,
     copy_file,
     get_docker_image_commit_hashes,
     get_template_path,
 )
-from ..utils.path import build_path
+from ..utils.path import build_path, root_path
 from ..utils.proj import (
     generate_odoo_config_file,
-    get_odoo_version,
     setup_venv,
 )
 
@@ -119,12 +121,22 @@ def convert_history_to_towncrier(history_path):
     history_path.write_text("\n".join(new_content) + "\n")
 
 
+def _needs_proj_cfg(source_path, dest_path):
+    """Whether to bootstrap the legacy ``.proj.cfg``.
+
+    Only for a project that has none yet, and no ``[tool.odoo-project]``
+    section either: the section replaces it, and a ``.proj.cfg`` next to it
+    would make every command warn about the deprecated file.
+    """
+    return not dest_path.exists() and read_pyproject_section() is None
+
+
 def get_init_template_files(template_version):
     template_files = [
         {
             "source": f".proj.v{template_version}.cfg",
-            "destination": build_path(f"./{PROJ_CFG_FILE}"),
-            "check": lambda source_path, dest_path: not dest_path.exists(),
+            "destination": build_path(DEPRECATED_PROJ_CFG_PATH),
+            "check": _needs_proj_cfg,
         },
         {
             "source": "towncrier.tmpl.toml",
@@ -225,9 +237,67 @@ def init(version, backup, **kw):
         try:
             template_version = config.template_version
         except ProjectConfigException:
-            # `init` also runs on projects with a malformed `.proj.cfg`
+            # `init` also runs on projects with a missing or malformed configuration
             pass
     bootstrap_files(str(template_version or "1"), backup=backup, **kw)
+
+
+@cli.command("migrate-config")
+@click.option(
+    "--commit/--no-commit",
+    "do_commit",
+    default=None,
+    help="Commit the migration. Asked when neither is given.",
+)
+def migrate_config(do_commit):
+    """Move the legacy configuration to pyproject.toml.
+
+    The settings of .proj.cfg and .cookiecutter.context.yml are written to the
+    [tool.odoo-project] section of pyproject.toml, leaving out the ones that
+    are the default anyway, and .proj.cfg is removed.
+    .cookiecutter.context.yml is left in place: it belongs to the project
+    template.
+    """
+    repo = GitRepo(root_path())
+    paths = ["pyproject.toml", DEPRECATED_PROJ_CFG_PATH]
+    # Committing takes these files as they are in the working tree: they must
+    # hold nothing but the migration.
+    if do_commit is not False and any(
+        repo.is_dirty(untracked_files=True, path=path) for path in paths
+    ):
+        raise click.ClickException(
+            "pyproject.toml or .proj.cfg has uncommitted changes. Commit or "
+            "stash them before migrating, or pass --no-commit."
+        )
+    proj_cfg_tracked = bool(repo.git.ls_files(DEPRECATED_PROJ_CFG_PATH))
+    migration = config_utils.migrate_config()
+    if not migration.changed:
+        ui.echo("Nothing to migrate.")
+        return
+    if migration.added:
+        ui.echo("Added to the [tool.odoo-project] section of pyproject.toml:")
+        for name, value in migration.added.items():
+            ui.echo(f"  {name} = {tomlkit.item(value).as_string()}")
+    if migration.dropped:
+        ui.echo("Left out, as no setting reads them: " + ", ".join(migration.dropped))
+    if migration.removed_proj_cfg:
+        ui.echo(f"Removed {DEPRECATED_PROJ_CFG_PATH}")
+    if do_commit is None:
+        do_commit = Confirm.ask("Commit the migration?", default=False)
+    if not do_commit:
+        return
+    to_commit = []
+    if migration.added:
+        repo.git.add("pyproject.toml")
+        to_commit.append("pyproject.toml")
+    if migration.removed_proj_cfg and proj_cfg_tracked:
+        to_commit.append(DEPRECATED_PROJ_CFG_PATH)
+    if not to_commit:
+        ui.echo("Nothing to commit: .proj.cfg was not tracked.")
+        return
+    message = "Migrate the project configuration to pyproject.toml"
+    repo.git.commit("--message", message, "--", *to_commit)
+    ui.echo(f'{ui.ok_mark()} Committed "{message}"')
 
 
 @cli.command()
@@ -286,7 +356,7 @@ def checkout_local_odoo(
         enterprise_hash = enterprise_hash or image_enterprise_hash
 
     # Fall back to the head of the project's odoo version branch
-    odoo_version = get_odoo_version()
+    odoo_version = config.odoo_version
     fallback_warning = (
         "Unable to find the commit hash of %s; falling back to the head "
         f"of the {odoo_version} branch, which might not match the image."

@@ -3,44 +3,15 @@
 import shutil
 import subprocess
 import venv
-from functools import cache
 
-from ..exceptions import ProjectConfigException
 from . import addon, ui
 from .config import config
 from .misc import get_template_path
-from .path import build_path, get_root_marker, root_path
-from .yaml import yaml_load
-
-
-@cache
-def get_project_manifest(key=None):
-    path = root_path() / get_root_marker()
-    return yaml_load(path.read_text())
-
-
-def get_project_manifest_key(key):
-    return get_project_manifest()[key]
+from .path import build_path, root_path
 
 
 def get_project_bundle_addon_name():
-    return "{}_bundle".format(get_project_manifest_key("customer_shortname"))
-
-
-def get_odoo_version():
-    return get_project_manifest_key("odoo_version")
-
-
-def get_odoo_serie():
-    return get_odoo_version().split(".")[0]
-
-
-def get_project_id(raise_if_missing=True) -> str | None:
-    """Return the internal company project ID from the project manifest."""
-    project_id = get_project_manifest().get("project_id")
-    if not project_id and raise_if_missing:
-        raise ProjectConfigException("project_id not found in the project manifest")
-    return str(project_id) if project_id else None
+    return f"{config.customer_shortname}_bundle"
 
 
 def get_current_version():
@@ -63,8 +34,7 @@ def get_current_version():
     if bundle_addon_path.is_dir():
         return addon.get_version(bundle_addon_path)
     # Generate a blank version on-the-fly: this is likely the case of new projects
-    odoo_version = get_project_manifest_key("odoo_version")
-    return f"{odoo_version}.0.0.0"
+    return f"{config.odoo_version}.0.0.0"
 
 
 def setup_venv(venv_dir, odoo_src_path=None):

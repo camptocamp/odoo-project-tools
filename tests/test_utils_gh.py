@@ -8,6 +8,7 @@ from unittest.mock import patch
 import git
 import pytest
 
+from odoo_tools.exceptions import ProjectConfigException
 from odoo_tools.utils import gh as gh_utils
 
 
@@ -90,7 +91,7 @@ class TestParseGithubUrl:
             gh_utils.parse_github_url("https://github.com/OCA")
 
 
-@pytest.mark.project_setup(git_init=True)
+@pytest.mark.project_setup()
 @pytest.mark.usefixtures("project")
 class TestGetCurrentRebaseBranch:
     def test_returns_none_when_no_rebase(self):
@@ -127,7 +128,7 @@ class TestGetCurrentRebaseBranch:
         assert gh_utils.get_current_rebase_branch() == "rebase-branch"
 
 
-@pytest.mark.project_setup(git_init=True)
+@pytest.mark.project_setup()
 @pytest.mark.usefixtures("project")
 class TestGetTargetBranch:
     def test_generates_branch_name(self):
@@ -147,6 +148,13 @@ class TestGetTargetBranch:
         with patch.object(gh_utils.ui, "ask_or_abort") as mock_ask:
             gh_utils.get_target_branch()
             mock_ask.assert_called_once()
+
+    @pytest.mark.project_setup(manifest=dict(project_id=None))
+    def test_fails_without_project_id(self):
+        repo = git.Repo(".")
+        repo.create_head("feature-x").checkout()
+        with pytest.raises(ProjectConfigException, match="project_id"):
+            gh_utils.get_target_branch()
 
     def test_asks_confirmation_on_version_branch(self):
         repo = git.Repo(".")
@@ -184,7 +192,7 @@ class TestParseRemoteUrl:
             gh_utils.parse_remote_url(url)
 
 
-@pytest.mark.project_setup(git_init=True)
+@pytest.mark.project_setup()
 @pytest.mark.usefixtures("project")
 class TestCheckGitDiff:
     def test_clean_repo_returns_false(self):
