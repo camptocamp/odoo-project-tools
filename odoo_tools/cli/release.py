@@ -1,7 +1,6 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-import subprocess
 from functools import partial
 
 import click
@@ -174,35 +173,9 @@ def _do_bump(rel_type=None, new_version=None):
     return new_version, modified
 
 
-def _push_repo_branch(repo, branch_name, company_git_remote):
-    """Push a single repo's pending-merge branch to the company remote."""
-    merges_config = repo.merges_config()
-    try:
-        # quiet: a remote that isn't configured yet is an answer, not something
-        # to report.
-        run(
-            f"git config remote.{company_git_remote}.url",
-            cwd=repo.abs_path,
-            check=True,
-            quiet=True,
-        )
-    except subprocess.CalledProcessError:
-        remote_url = merges_config["remotes"][company_git_remote]
-        run(
-            f"git remote add {company_git_remote} {remote_url}",
-            cwd=repo.abs_path,
-            check=True,
-        )
-    run(
-        f"git push --progress -f -v {company_git_remote} HEAD:refs/heads/{branch_name}",
-        cwd=repo.abs_path,
-        check=True,
-    )
-
-
-def _push_task(repo, branch_name, company_git_remote, progress):
+def _push_task(repo, branch_name, progress):
     progress.set_status("pushing")
-    _push_repo_branch(repo, branch_name, company_git_remote)
+    repo.push_to_remote(target_branch=branch_name)
     progress.set_outcome("pushed")
 
 
@@ -221,16 +194,13 @@ def _push_aggregated_branches(
         ui.ask_or_abort(
             "Your repository has local changes, are you sure you want to continue?"
         )
-    company_git_remote = config.company_git_remote
     repos = Repo.repositories_from_pending_folder()
     if not repos:
         ui.echo("No repo to push")
         return
     ui.run_tasks(
         {
-            repo.path.as_posix(): partial(
-                _push_task, repo, branch_name, company_git_remote
-            )
+            repo.path.as_posix(): partial(_push_task, repo, branch_name)
             for repo in repos
         },
         max_workers=max_workers,
