@@ -15,6 +15,7 @@ from odoo_tools.cli import release
 from odoo_tools.cli.project import init
 from odoo_tools.utils.config import config
 from odoo_tools.utils.git import tag_signing_enabled
+from odoo_tools.utils.pending_merge import Repo
 
 from .common import compare_line_by_line, mock_pending_merge_repo_paths
 
@@ -271,21 +272,10 @@ def test_bump_push_no_repo(project):
     proj_version="14.0.0.1.0", mock_marabunta_file=True, git_init=True
 )
 def test_bump_push_repo_with_pending_merge(project):
-    ran = []
-    real_run = release.run
-
-    def mocked_run(cmd, **kwargs):
-        # Only the per-repo branch push runs with an explicit cwd; record those
-        # and let the real bump/towncrier commands execute.
-        if "cwd" in kwargs:
-            ran.append((cmd, kwargs))
-            return ""
-        return real_run(cmd, **kwargs)
-
     mock_pending_merge_repo_paths("edi-framework")
     # run init to get all files ready (eg: towncrier)
     project.invoke(init, catch_exceptions=False)
-    with mock.patch("odoo_tools.cli.release.run", mocked_run):
+    with mock.patch.object(Repo, "push_to_remote") as push_to_remote:
         result = project.invoke(
             release.bump,
             ["minor", "--no-commit", "--no-tag"],
@@ -295,17 +285,7 @@ def test_bump_push_repo_with_pending_merge(project):
             env={"COLUMNS": "60"},
         )
     assert result.exit_code == 0
-    assert [cmd for cmd, __ in ran] == [
-        "git config remote.camptocamp.url",
-        "git push --progress -f -v camptocamp HEAD:refs/heads/merge-branch-1234-14.0.0.2.0",
-    ]
-    probe, push = (kwargs for __, kwargs in ran)
-    # the probe is a question -- it has to be able to answer no, quietly, so
-    # that a remote which isn't configured yet gets added
-    assert probe["check"] is True
-    assert probe["quiet"] is True
-    # and the push has to be able to fail, or every repo comes back green
-    assert push["check"] is True
+    push_to_remote.assert_called_once_with(target_branch="merge-branch-1234-14.0.0.2.0")
     # the step says what it is, and the repo says what came of it -- on one
     # line, unmangled, at a width narrow enough to have squeezed the old grid
     assert "Pushing the aggregated branches" in result.output
@@ -592,18 +572,13 @@ def test_bump_ignores_untracked_files(project):
 def test_bump_reports_a_branch_it_could_not_push(project):
     """A push that failed used to be reported as pushed: nothing asked git
     whether it had worked, so every repo came back green."""
-    real_run = release.run
-
-    def mocked_run(cmd, **kwargs):
-        if "cwd" not in kwargs:
-            return real_run(cmd, **kwargs)
-        if cmd.startswith("git push"):
-            raise subprocess.CalledProcessError(1, cmd)
-        return ""
-
     mock_pending_merge_repo_paths("edi-framework")
     project.invoke(init, catch_exceptions=False)
-    with mock.patch("odoo_tools.cli.release.run", mocked_run):
+    with mock.patch.object(
+        Repo,
+        "push_to_remote",
+        side_effect=subprocess.CalledProcessError(1, "git push"),
+    ):
         result = project.invoke(
             release.bump,
             ["minor", "--no-commit", "--no-tag"],
@@ -625,21 +600,16 @@ def test_bump_does_not_commit_a_release_it_could_not_push(project):
     """The push runs before the commit on purpose: aggregated branches that
     never reached the remote leave nothing to rebuild the release from, so it
     is not one to commit or tag."""
-    real_run = release.run
-
-    def mocked_run(cmd, **kwargs):
-        if "cwd" not in kwargs:
-            return real_run(cmd, **kwargs)
-        if cmd.startswith("git push"):
-            raise subprocess.CalledProcessError(1, cmd)
-        return ""
-
     mock_pending_merge_repo_paths("edi-framework")
     project.invoke(init, catch_exceptions=False)
     git_commit_all("before the release")
     head_before = git.Repo(".").head.commit.hexsha
 
-    with mock.patch("odoo_tools.cli.release.run", mocked_run):
+    with mock.patch.object(
+        Repo,
+        "push_to_remote",
+        side_effect=subprocess.CalledProcessError(1, "git push"),
+    ):
         result = project.invoke(
             release.bump,
             ["minor", "--commit", "--tag", "--push-aggregated-branches"],
