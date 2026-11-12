@@ -10,6 +10,8 @@ import pytest
 
 from odoo_tools.utils import gh as gh_utils
 
+from .common import MockSubprocessRun, mock_subprocess
+
 
 class TestParseGithubUrl:
     def test_full_pull_url(self):
@@ -199,3 +201,62 @@ class TestCheckGitDiff:
         Path("requirements.txt").write_text("modified")
         repo.index.add(["requirements.txt"])
         assert gh_utils.check_git_diff() is True
+
+
+class TestGetToken:
+    @pytest.fixture(autouse=True)
+    def no_env_token(self, monkeypatch):
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+
+    def test_env_token_wins(self, monkeypatch):
+        monkeypatch.setenv("GITHUB_TOKEN", "env-token")
+        monkeypatch.setattr(gh_utils, "_get_gh_cli_token", lambda: "cli-token")
+        assert gh_utils.get_token() == "env-token"
+
+    def test_github_token_wins_over_gh_token(self, monkeypatch):
+        monkeypatch.setenv("GITHUB_TOKEN", "github-token")
+        monkeypatch.setenv("GH_TOKEN", "gh-token")
+        assert gh_utils.get_token() == "github-token"
+
+    def test_gh_token_wins_over_gh_cli(self, monkeypatch):
+        monkeypatch.setenv("GH_TOKEN", "gh-token")
+        monkeypatch.setattr(gh_utils, "_get_gh_cli_token", lambda: "cli-token")
+        assert gh_utils.get_token() == "gh-token"
+
+    def test_falls_back_to_gh_cli(self, monkeypatch):
+        monkeypatch.setattr(gh_utils, "_get_gh_cli_token", lambda: "cli-token")
+        assert gh_utils.get_token() == "cli-token"
+
+    def test_none_when_nothing_available(self):
+        assert gh_utils.get_token() is None
+
+
+class TestGetGhCliToken:
+    @pytest.fixture(autouse=True)
+    def gh_installed(self, monkeypatch):
+        monkeypatch.setattr(gh_utils, "has_exec", lambda name: name == "gh")
+
+    def test_gh_not_installed(self, monkeypatch):
+        monkeypatch.setattr(gh_utils, "has_exec", lambda name: False)
+        assert gh_utils._get_gh_cli_token() is None
+
+    @pytest.mark.parametrize(
+        ("returncode", "stdout", "expected"),
+        [
+            (0, "gho_abc\n", "gho_abc"),
+            (1, "", None),  # not logged in
+        ],
+    )
+    def test_reads_gh_auth_token(self, returncode, stdout, expected):
+        mock_fn = MockSubprocessRun(
+            [
+                {
+                    "args": ["gh", "auth", "token", "--hostname", "github.com"],
+                    "stdout": stdout,
+                    "returncode": returncode,
+                }
+            ]
+        )
+        with mock_subprocess(mock_fn):
+            assert gh_utils._get_gh_cli_token() == expected
+        mock_fn.assert_completed_calls()

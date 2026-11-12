@@ -4,6 +4,7 @@
 import pytest
 from click.testing import CliRunner
 
+from odoo_tools.utils import gh
 from odoo_tools.utils.config import config
 from odoo_tools.utils.proj import get_project_manifest
 
@@ -82,3 +83,14 @@ def skip_update_check(monkeypatch):
     environment variable in their own fixture.
     """
     monkeypatch.setenv("OTOOLS_SKIP_UPDATE_CHECK", "1")
+
+
+@pytest.fixture(autouse=True)
+def no_gh_cli(monkeypatch):
+    """Keep the developer's own GitHub CLI login out of the tests.
+
+    The tests that exercise the ``gh`` fallback patch it back in themselves.
+    """
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+    monkeypatch.setattr(gh, "has_exec", lambda name: False)
+    gh.get_token.cache_clear()

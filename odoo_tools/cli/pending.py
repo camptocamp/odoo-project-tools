@@ -88,7 +88,7 @@ def show_pending(repo_paths=(), check=True, as_json=False, jobs=DEFAULT_MAX_WORK
     repos = _resolve_repos(repo_paths)
     all_prs = [pr for repo in repos for pr in repo._iter_pending_pull_requests()]
     if check:
-        ui.warn_missing_github_token()
+        gh.warn_missing_token()
     # ids of PRs whose enrichment failed -> error message
     errors: dict[int, str] = {}
     # Shared by every row: a new one per rebuild would restart the animation
@@ -266,7 +266,7 @@ def purge_repos(repos, jobs=DEFAULT_MAX_WORKERS):
     all_prs = [pr for repo in repos for pr in repo._iter_pending_pull_requests()]
     if not all_prs:
         return []
-    ui.warn_missing_github_token()
+    gh.warn_missing_token()
     # One row per entry rather than per pull request: the same one can be
     # listed twice, as a merge and as a patch, and two submodules can share an
     # upstream. Keyed by shortcut alone, the second entry would have no task at
