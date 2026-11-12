@@ -2,7 +2,6 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import logging
-import os
 import re
 import threading
 from collections.abc import Iterator
@@ -225,7 +224,7 @@ class Repo:
         are expected to catch and decide how to surface it.
         """
         headers = {}
-        if token := os.environ.get("GITHUB_TOKEN"):
+        if token := gh.get_token():
             headers["Authorization"] = f"token {token}"
         response = requests.get(
             self.api_url(upstream=upstream, repo=repo) + path,

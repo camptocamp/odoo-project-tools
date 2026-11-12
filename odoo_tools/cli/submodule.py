@@ -296,7 +296,7 @@ def upgrade(
     Several submodules are handled at a time; pass `--jobs 1` to get them one
     after the other.
     """
-    ui.warn_missing_github_token()
+    gh.warn_missing_token()
     submodules = list(git.iter_gitmodules(filter_path=submodule_path))
     repos = {
         submodule.path: pm_utils.Repo(submodule.path, path_check=False)

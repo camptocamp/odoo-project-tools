@@ -1,18 +1,60 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+import os
 import re
 import subprocess
+from functools import cache
 from pathlib import Path
 
 from . import git, ui
-from .os_exec import run
+from .os_exec import Command, has_exec, run
 from .proj import get_project_id
 
 RE_GH_REMOTE_URL = re.compile(
     r"^(?:https?://github\.com/|git@github\.com:)"
     r"(?P<owner>[^/]+)/(?P<repo>[^/]+?)(?:\.git)?$"
 )
+
+
+@cache
+def get_token() -> str | None:
+    """Return a GitHub token to authenticate API requests, if one is available.
+
+    ``GITHUB_TOKEN`` wins when set, then ``GH_TOKEN`` (the GitHub CLI's own
+    variable). Otherwise, the token of the GitHub CLI
+    (``gh auth token``) is used, if ``gh`` is installed and logged in.
+    """
+    return (
+        os.environ.get("GITHUB_TOKEN")
+        or os.environ.get("GH_TOKEN")
+        or _get_gh_cli_token()
+    )
+
+
+def _get_gh_cli_token() -> str | None:
+    if not has_exec("gh"):
+        return None
+    # A non-zero exit means gh isn't logged in: an answer, not a failure.
+    result = Command(["gh", "auth", "token", "--hostname", "github.com"]).run(
+        quiet=True
+    )
+    if result.returncode:
+        return None
+    return result.stdout.strip() or None
+
+
+def warn_missing_token():
+    """Warn (on stderr) when no GitHub token is available.
+
+    Unauthenticated GitHub API requests share a low rate limit and quickly
+    start failing; commands that hit the API should call this up front.
+    """
+    if not get_token():
+        ui.warn(
+            "No GitHub token found (set GITHUB_TOKEN or log in with `gh auth login`); "
+            "GitHub API requests are unauthenticated and may hit rate limits."
+        )
 
 
 def parse_remote_url(url: str) -> tuple[str, str]:

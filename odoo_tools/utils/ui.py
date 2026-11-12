@@ -1,7 +1,6 @@
 # Copyright 2023 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-import os
 import re
 import shutil
 import tempfile
@@ -39,19 +38,6 @@ def exit_msg(msg):
 def warn(msg):
     """Print a warning on stderr, so it doesn't pollute a command's output."""
     err_console.print(f"Warning: {msg}", style="yellow")
-
-
-def warn_missing_github_token():
-    """Warn (on stderr) when no GITHUB_TOKEN is set.
-
-    Unauthenticated GitHub API requests share a low rate limit and quickly
-    start failing; commands that hit the API should call this up front.
-    """
-    if not os.environ.get("GITHUB_TOKEN"):
-        warn(
-            "GITHUB_TOKEN is not set; GitHub API requests "
-            "are unauthenticated and may hit rate limits."
-        )
 
 
 def ask_confirmation(message):
