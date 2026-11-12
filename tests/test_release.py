@@ -297,7 +297,7 @@ def test_bump_push_repo_with_pending_merge(project):
     assert result.exit_code == 0
     assert [cmd for cmd, __ in ran] == [
         "git config remote.camptocamp.url",
-        "git push -f -v camptocamp HEAD:refs/heads/merge-branch-1234-14.0.0.2.0",
+        "git push --progress -f -v camptocamp HEAD:refs/heads/merge-branch-1234-14.0.0.2.0",
     ]
     probe, push = (kwargs for __, kwargs in ran)
     # the probe is a question -- it has to be able to answer no, quietly, so
