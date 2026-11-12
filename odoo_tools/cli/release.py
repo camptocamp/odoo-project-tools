@@ -194,7 +194,7 @@ def _push_repo_branch(repo, branch_name, company_git_remote):
             check=True,
         )
     run(
-        f"git push -f -v {company_git_remote} HEAD:refs/heads/{branch_name}",
+        f"git push --progress -f -v {company_git_remote} HEAD:refs/heads/{branch_name}",
         cwd=repo.abs_path,
         check=True,
     )

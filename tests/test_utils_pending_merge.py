@@ -1091,7 +1091,7 @@ def test_repo_push_to_remote(project):
         repo.abs_path, "camptocamp", "git@github.com:camptocamp/edi.git"
     )
     run.assert_called_once_with(
-        "git push -f camptocamp HEAD:refs/heads/merge-branch-1234-master-abc12345",
+        "git push --progress -f camptocamp HEAD:refs/heads/merge-branch-1234-master-abc12345",
         cwd=repo.abs_path,
         check=True,
         verbose=True,

@@ -680,7 +680,7 @@ class Repo:
             self.ssh_url(self.company_git_remote),
         )
         run(
-            f"git push -f {self.company_git_remote} HEAD:refs/heads/{target_branch}",
+            f"git push --progress -f {self.company_git_remote} HEAD:refs/heads/{target_branch}",
             cwd=self.abs_path,
             check=True,
             verbose=True,
