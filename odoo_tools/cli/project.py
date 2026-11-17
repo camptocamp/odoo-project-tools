@@ -96,7 +96,8 @@ def convert_history_to_towncrier(history_path):
             line.strip(),
         ):
             fragment_type = section_map.get(section or "", "misc")
-            fragment_name = match.group("name") or str(uuid.uuid4()).split("-")[0]
+            # "+" makes it an orphan fragment: towncrier doesn't print its name
+            fragment_name = match.group("name") or f"+{str(uuid.uuid4()).split('-')[0]}"
             fragment_description = match.group("description") or ""
             fragment_path = build_path(f"./changes.d/{fragment_name}.{fragment_type}")
             fragment_path.parent.mkdir(parents=True, exist_ok=True)
