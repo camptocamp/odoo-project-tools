@@ -123,6 +123,7 @@ def test_init_history_file_unreleased_section_until_eof(project):
     )
     build_fragments = list(build_path("changes.d").glob("*.build"))
     assert len(build_fragments) == 1
+    assert build_fragments[0].name.startswith("+")
     assert build_fragments[0].read_text() == "Project initialization\n"
     assert (
         build_path("HISTORY.rst").read_text()
